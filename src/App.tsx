@@ -70,8 +70,8 @@ export function App() {
 
   // Handlers for Orders
   const handleAddOrder = (newOrder: ProductionOrder) => {
-    setOrders([newOrder, ...orders]);
-    
+    setOrders(prev => [newOrder, ...prev]);
+
     // Auto add transaction if paid
     if (newOrder.paidAmount > 0) {
       const now = new Date();
@@ -89,7 +89,7 @@ export function App() {
         operator: settings.activeShiftOperator,
         status: 'Berhasil',
       };
-      setTransactions([newTrx, ...transactions]);
+      setTransactions(prev => [newTrx, ...prev]);
     }
 
     setShowNewOrderModal(false);
@@ -99,8 +99,8 @@ export function App() {
 
   const handleUpdateOrderStatus = (orderId: string, newStatus: OrderStatus, note?: string) => {
     const now = new Date();
-    setOrders(
-      orders.map((o) => {
+    setOrders(prev =>
+      prev.map((o) => {
         if (o.id === orderId) {
           return {
             ...o,
@@ -123,8 +123,8 @@ export function App() {
 
   const handleRecordPayment = (orderId: string, amount: number) => {
     const now = new Date();
-    setOrders(
-      orders.map((o) => {
+    setOrders(prev =>
+      prev.map((o) => {
         if (o.id === orderId) {
           const newPaid = o.paidAmount + amount;
           const newBalance = Math.max(0, o.totalAmount - newPaid);
@@ -141,44 +141,47 @@ export function App() {
     );
 
     // Record Finance Transaction
-    const orderObj = orders.find((o) => o.id === orderId);
-    if (orderObj) {
-      const transNo = 'TRX-' + now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0') + '-' + Math.floor(10 + Math.random() * 90);
-      const newTrx: FinanceTransaction = {
-        id: 'TRX-' + Date.now(),
-        transNo,
-        date: now.toISOString().split('T')[0] + ' ' + now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
-        type: 'Pemasukan',
-        category: 'Penjualan Cetak',
-        description: `Pelunasan/DP Tambahan Order ${orderObj.orderNo} (${orderObj.customerName})`,
-        amount,
-        refOrderNo: orderObj.orderNo,
-        paymentMethod: 'Cash',
-        operator: settings.activeShiftOperator,
-        status: 'Berhasil',
-      };
-      setTransactions([newTrx, ...transactions]);
-    }
+    setTransactions(prev => {
+      const orderObj = prev.find((o) => o.id === orderId);
+      if (orderObj) {
+        const transNo = 'TRX-' + now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0') + '-' + Math.floor(10 + Math.random() * 90);
+        const newTrx: FinanceTransaction = {
+          id: 'TRX-' + Date.now(),
+          transNo,
+          date: now.toISOString().split('T')[0] + ' ' + now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+          type: 'Pemasukan',
+          category: 'Penjualan Cetak',
+          description: `Pelunasan/DP Tambahan Order ${orderObj.orderNo} (${orderObj.customerName})`,
+          amount,
+          refOrderNo: orderObj.orderNo,
+          paymentMethod: 'Cash',
+          operator: settings.activeShiftOperator,
+          status: 'Berhasil',
+        };
+        return [newTrx, ...prev];
+      }
+      return prev;
+    });
   };
 
   // Product Handlers
   const handleAddProduct = (p: Product) => {
-    setProducts([p, ...products]);
+    setProducts(prev => [p, ...prev]);
   };
 
   const handleUpdateProduct = (updatedP: Product) => {
-    setProducts(products.map((p) => (p.id === updatedP.id ? updatedP : p)));
+    setProducts(prev => prev.map((p) => (p.id === updatedP.id ? updatedP : p)));
   };
 
   // Finance Handlers
   const handleAddTransaction = (trx: FinanceTransaction) => {
-    setTransactions([trx, ...transactions]);
+    setTransactions(prev => [trx, ...prev]);
   };
 
   // File Inbox Handlers
   const handleUpdateInboxFileStatus = (id: string, newStatus: InboxFileStatus) => {
-    setInboxFiles(
-      inboxFiles.map((f) => (f.id === id ? { ...f, status: newStatus } : f))
+    setInboxFiles(prev =>
+      prev.map((f) => (f.id === id ? { ...f, status: newStatus } : f))
     );
   };
 
@@ -189,12 +192,12 @@ export function App() {
   };
 
   const handleAddInboxFile = (newFile: InboxFile) => {
-    setInboxFiles([newFile, ...inboxFiles]);
+    setInboxFiles(prev => [newFile, ...prev]);
   };
 
   // Procurement Handlers
   const handleAddProcurement = (prc: AnnualProcurement) => {
-    setProcurements([prc, ...procurements]);
+    setProcurements(prev => [prc, ...prev]);
   };
 
   // Helper to trigger delete confirmation modal
@@ -204,7 +207,7 @@ export function App() {
     setDeleteModalOpen(true);
   };
 
-  // Archive (Soft Delete) Handlers per Category
+  // Delete Handlers per Category (menggunakan functional updates agar selalu dapat state terkini)
   const handleDeleteOrder = (order: ProductionOrder) => {
     triggerDeleteModal(
       {
@@ -217,7 +220,7 @@ export function App() {
         warningNote: order.status === 'Selesai' ? 'Order yang sudah selesai akan dihapus permanen.' : undefined,
       },
       () => {
-        setOrders(orders.filter((o) => o.id !== order.id));
+        setOrders(prev => prev.filter((o) => o.id !== order.id));
       }
     );
   };
@@ -233,7 +236,7 @@ export function App() {
         amount: 'Rp ' + trx.amount.toLocaleString('id-ID'),
       },
       () => {
-        setTransactions(transactions.filter((t) => t.id !== trx.id));
+        setTransactions(prev => prev.filter((t) => t.id !== trx.id));
       }
     );
   };
@@ -248,7 +251,7 @@ export function App() {
         date: file.uploadDate,
       },
       () => {
-        setInboxFiles(inboxFiles.filter((f) => f.id !== file.id));
+        setInboxFiles(prev => prev.filter((f) => f.id !== file.id));
       }
     );
   };
@@ -263,7 +266,7 @@ export function App() {
         date: new Date().toLocaleDateString('id-ID'),
       },
       () => {
-        setCustomerFiles(customerFiles.filter((c) => c.id !== folder.id));
+        setCustomerFiles(prev => prev.filter((c) => c.id !== folder.id));
       }
     );
   };
@@ -278,7 +281,7 @@ export function App() {
         amount: 'Rp ' + product.basePrice.toLocaleString('id-ID'),
       },
       () => {
-        setProducts(products.filter((p) => p.id !== product.id));
+        setProducts(prev => prev.filter((p) => p.id !== product.id));
       }
     );
   };
@@ -292,7 +295,7 @@ export function App() {
         customerName: `Lokasi: ${tool.location} • PIC: ${tool.picName}`,
       },
       () => {
-        setTools(tools.filter((t) => t.id !== tool.id));
+        setTools(prev => prev.filter((t) => t.id !== tool.id));
       }
     );
   };
@@ -307,7 +310,7 @@ export function App() {
         amount: 'Rp ' + material.unitPrice.toLocaleString('id-ID'),
       },
       () => {
-        setMaterials(materials.filter((m) => m.id !== material.id));
+        setMaterials(prev => prev.filter((m) => m.id !== material.id));
       }
     );
   };
@@ -361,7 +364,7 @@ export function App() {
 
           {currentPage === 'kasir' && (
             <KasirView
-              products={products.filter((p) => !p.isArchived)}
+              products={products}
               onCheckoutOrder={handleAddOrder}
               operatorName={settings.activeShiftOperator}
               prefilledFile={prefilledFile}
@@ -464,7 +467,7 @@ export function App() {
 
       {showNewOrderModal && (
         <NewOrderModal
-          products={products.filter((p) => !p.isArchived)}
+          products={products}
           onAddOrder={handleAddOrder}
           onClose={() => setShowNewOrderModal(false)}
           operatorName={settings.activeShiftOperator}
