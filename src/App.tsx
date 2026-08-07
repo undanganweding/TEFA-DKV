@@ -484,7 +484,7 @@ export function App() {
           isOpen={deleteModalOpen}
           itemDetails={deleteModalDetails}
           currentUserRole={settings.currentUserRole}
-          onClose={() => {
+          onCancel={() => {
             setDeleteModalOpen(false);
             setDeleteModalDetails(null);
             setDeleteConfirmAction(null);
