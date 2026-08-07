@@ -204,6 +204,30 @@ export function App() {
     setProcurements(prev => [prc, ...prev]);
   };
 
+  const handleDeleteProcurement = (proc: AnnualProcurement) => {
+    triggerDeleteModal(
+      {
+        id: proc.id,
+        category: 'Pengadaan Tahunan',
+        title: proc.title,
+        customerName: `TA ${proc.year}`,
+        date: proc.year,
+        amount: 'Rp ' + proc.totalBudget.toLocaleString('id-ID'),
+      },
+      () => {
+        setProcurements(prev => prev.filter((p) => p.id !== proc.id));
+      }
+    );
+  };
+
+  const handleUpdateProcurementStatus = (id: string, newStatus: string) => {
+    setProcurements(prev =>
+      prev.map((p) =>
+        p.id === id ? { ...p, status: newStatus as any } : p
+      )
+    );
+  };
+
   // Custom Order Handlers
   const handleAddCustomOrder = (order: CustomOrder) => {
     setCustomOrders(prev => [order, ...prev]);
@@ -523,6 +547,7 @@ export function App() {
             <PengadaanView
               procurements={procurements}
               onAddProcurement={handleAddProcurement}
+              onUpdateProcurementStatus={handleUpdateProcurementStatus}
             />
           )}
 
