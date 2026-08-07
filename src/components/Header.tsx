@@ -24,6 +24,8 @@ export const Header: React.FC<HeaderProps> = ({
         return 'Dashboard';
       case 'kasir':
         return 'Kasir TEFA';
+      case 'custom_order':
+        return 'Custom Order';
       case 'file_inbox':
         return 'File Inbox Customer';
       case 'pesanan':

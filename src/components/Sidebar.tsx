@@ -6,7 +6,7 @@ interface SidebarProps {
   onPageChange: (page: PageId) => void;
   activeOrdersCount: number;
   lowStockCount: number;
-  activeOperator: string;
+  customOrdersCount?: number;
 }
 
 interface NavItem {
@@ -22,10 +22,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onPageChange,
   activeOrdersCount,
   lowStockCount,
+  customOrdersCount = 0,
 }) => {
   const navItems: NavItem[] = [
     { id: 'dashboard', label: 'Dashboard', icon: 'grid_view' },
     { id: 'kasir', label: 'Kasir TEFA', icon: 'point_of_sale' },
+    {
+      id: 'custom_order',
+      label: 'Custom Order',
+      icon: 'add_shopping_cart',
+      badge: customOrdersCount > 0 ? customOrdersCount : undefined,
+      badgeColor: 'bg-purple-500 text-white',
+    },
     {
       id: 'file_inbox',
       label: 'File Inbox',

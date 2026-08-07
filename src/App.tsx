@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { PageId, ProductionOrder, Product, CustomerFile, ToolInventory, MaterialStock, FinanceTransaction, AnnualProcurement, SystemSettings, OrderStatus, InboxFile, InboxFileStatus } from './types';
+import { PageId, ProductionOrder, Product, CustomerFile, ToolInventory, MaterialStock, FinanceTransaction, AnnualProcurement, SystemSettings, OrderStatus, InboxFile, InboxFileStatus, CustomOrder, CustomOrderStatus } from './types';
 import {
   initialSettings,
   initialProducts,
@@ -10,6 +10,7 @@ import {
   initialTransactions,
   initialProcurements,
   initialInboxFiles,
+  initialCustomOrders,
 } from './data/mockData';
 
 import { Sidebar } from './components/Sidebar';
@@ -17,6 +18,7 @@ import { Header } from './components/Header';
 
 import { DashboardView } from './components/views/DashboardView';
 import { KasirView } from './components/views/KasirView';
+import { CustomOrderView } from './components/views/CustomOrderView';
 import { FileInboxView } from './components/views/FileInboxView';
 import { PublicUploadView } from './components/views/PublicUploadView';
 import { PesananView } from './components/views/PesananView';
@@ -47,6 +49,7 @@ export function App() {
   const [materials, setMaterials] = useState<MaterialStock[]>(initialMaterials);
   const [transactions, setTransactions] = useState<FinanceTransaction[]>(initialTransactions);
   const [procurements, setProcurements] = useState<AnnualProcurement[]>(initialProcurements);
+  const [customOrders, setCustomOrders] = useState<CustomOrder[]>(initialCustomOrders);
 
   // Global Delete Modal State
   const [deleteModalOpen, setDeleteModalOpen] = useState<boolean>(false);
@@ -67,6 +70,7 @@ export function App() {
   ).length;
 
   const lowStockCount = materials.filter((m) => m.status !== 'Aman').length;
+  const pendingCustomOrdersCount = customOrders.filter(o => o.status !== 'Selesai' && o.status !== 'Sudah Diambil').length;
 
   // Handlers for Orders
   const handleAddOrder = (newOrder: ProductionOrder) => {
@@ -198,6 +202,71 @@ export function App() {
   // Procurement Handlers
   const handleAddProcurement = (prc: AnnualProcurement) => {
     setProcurements(prev => [prc, ...prev]);
+  };
+
+  // Custom Order Handlers
+  const handleAddCustomOrder = (order: CustomOrder) => {
+    setCustomOrders(prev => [order, ...prev]);
+
+    // Auto add transaction if paid (assuming payment is made upfront)
+    if (order.sellingPrice > 0) {
+      const now = new Date();
+      const transNo = 'TRX-' + now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0') + '-' + Math.floor(10 + Math.random() * 90);
+      const newTrx: FinanceTransaction = {
+        id: 'TRX-' + Date.now(),
+        transNo,
+        date: now.toISOString().split('T')[0] + ' ' + now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+        type: 'Pemasukan',
+        category: 'Penjualan Cetak',
+        description: `Custom Order: ${order.orderName} - ${order.customerName}`,
+        amount: order.sellingPrice,
+        refOrderNo: order.orderNo,
+        paymentMethod: 'Cash',
+        operator: settings.activeShiftOperator,
+        status: 'Berhasil',
+      };
+      setTransactions(prev => [newTrx, ...prev]);
+    }
+  };
+
+  const handleUpdateCustomOrderStatus = (orderId: string, newStatus: CustomOrderStatus, note?: string) => {
+    const now = new Date();
+    setCustomOrders(prev =>
+      prev.map((o) => {
+        if (o.id === orderId) {
+          return {
+            ...o,
+            status: newStatus,
+            statusHistory: [
+              ...o.statusHistory,
+              {
+                status: newStatus,
+                timestamp: now.toLocaleString('id-ID'),
+                updatedBy: settings.activeShiftOperator,
+                note,
+              },
+            ],
+          };
+        }
+        return o;
+      })
+    );
+  };
+
+  const handleDeleteCustomOrder = (order: CustomOrder) => {
+    triggerDeleteModal(
+      {
+        id: order.id,
+        category: 'Custom Order',
+        title: order.orderName,
+        customerName: order.customerName,
+        date: order.orderDate,
+        amount: 'Rp ' + order.sellingPrice.toLocaleString('id-ID'),
+      },
+      () => {
+        setCustomOrders(prev => prev.filter((o) => o.id !== order.id));
+      }
+    );
   };
 
   // Helper to trigger delete confirmation modal
@@ -334,7 +403,7 @@ export function App() {
         onPageChange={setCurrentPage}
         activeOrdersCount={activeOrdersCount}
         lowStockCount={lowStockCount}
-        activeOperator={settings.activeShiftOperator}
+        customOrdersCount={pendingCustomOrdersCount}
       />
 
       {/* Main Workspace Area */}
@@ -369,6 +438,16 @@ export function App() {
               operatorName={settings.activeShiftOperator}
               prefilledFile={prefilledFile}
               onClearPrefilledFile={() => setPrefilledFile(null)}
+            />
+          )}
+
+          {currentPage === 'custom_order' && (
+            <CustomOrderView
+              customOrders={customOrders}
+              onAddCustomOrder={handleAddCustomOrder}
+              onUpdateCustomOrderStatus={handleUpdateCustomOrderStatus}
+              onDeleteCustomOrder={handleDeleteCustomOrder}
+              operatorName={settings.activeShiftOperator}
             />
           )}
 

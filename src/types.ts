@@ -1,6 +1,7 @@
 export type PageId =
   | 'dashboard'
   | 'kasir'
+  | 'custom_order'
   | 'file_inbox'
   | 'pesanan'
   | 'produk'
@@ -12,6 +13,59 @@ export type PageId =
   | 'pengadaan'
   | 'pengaturan'
   | 'public_upload';
+
+// Custom Order Status (Workflow)
+export type CustomOrderStatus =
+  | 'Menunggu'
+  | 'Disetujui'
+  | 'Proses Produksi'
+  | 'Quality Check'
+  | 'Selesai'
+  | 'Sudah Diambil';
+
+export interface CustomOrder {
+  id: string;
+  orderNo: string;
+  // Customer Data
+  customerName: string;
+  customerPhone: string;
+  customerClass?: string;
+  customerMajor?: string;
+  institution?: string;
+  // Order Details
+  orderName: string;
+  category: 'Printing' | 'Design Service' | 'Merchandise' | 'Advertising' | 'Lainnya';
+  description: string;
+  qty: number;
+  unit: 'pcs' | 'lembar' | 'meter' | 'paket' | 'set' | 'roll' | 'box';
+  // Financial
+  costPrice: number;
+  sellingPrice: number;
+  profit: number;
+  // Workflow
+  status: CustomOrderStatus;
+  deadline: string;
+  productionNotes?: string;
+  // File Reference
+  referenceFile?: {
+    name: string;
+    size: string;
+    type: string;
+    url?: string;
+  };
+  // Meta
+  orderDate: string;
+  operatorName: string;
+  statusHistory: Array<{
+    status: CustomOrderStatus;
+    timestamp: string;
+    updatedBy: string;
+    note?: string;
+  }>;
+  isArchived?: boolean;
+  archivedAt?: string;
+  archivedBy?: string;
+}
 
 export type InboxFileStatus =
   | 'Menunggu Pemeriksaan'
