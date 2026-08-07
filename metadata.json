@@ -1,0 +1,6 @@
+{
+  "name": "TEFA DKV Management System",
+  "description": "Sistem Manajemen Unit Produksi TEFA DKV SMK NU: Dashboard, Kasir TEFA, Pesanan Produksi, Produk & Jasa, File Customer, Inventaris Alat, Stok Bahan, Keuangan, Laporan, Pengadaan Tahunan, Pengaturan, dan Cetak Nota Transaksi.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
