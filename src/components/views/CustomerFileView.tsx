@@ -4,12 +4,12 @@ import { CustomerFile } from '../../types';
 interface CustomerFileViewProps {
   customerFiles: CustomerFile[];
   onAddCustomerFile?: (custFile: CustomerFile) => void;
-  onArchiveCustomerFolder?: (folder: CustomerFile) => void;
+  onDeleteCustomerFolder?: (folder: CustomerFile) => void;
 }
 
 export const CustomerFileView: React.FC<CustomerFileViewProps> = ({
   customerFiles,
-  onArchiveCustomerFolder,
+  onDeleteCustomerFolder,
 }) => {
   const [selectedFolder, setSelectedFolder] = useState<CustomerFile | null>(customerFiles[0] || null);
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -94,14 +94,14 @@ export const CustomerFileView: React.FC<CustomerFileViewProps> = ({
                   <p className="text-xs font-mono text-slate-400">{selectedFolder.folderPath}</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  {onArchiveCustomerFolder && (
+                  {onDeleteCustomerFolder && (
                     <button
-                      onClick={() => onArchiveCustomerFolder(selectedFolder)}
-                      className="px-3 py-2 bg-slate-100 hover:bg-amber-100 text-slate-700 hover:text-amber-800 font-bold text-xs rounded-xl flex items-center gap-1.5 transition-colors"
-                      title="Arsipkan Folder Customer"
+                      onClick={() => onDeleteCustomerFolder(selectedFolder)}
+                      className="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-800 font-bold text-xs rounded-xl flex items-center gap-1.5 transition-colors border border-rose-200"
+                      title="Hapus Folder Permanen"
                     >
-                      <span className="material-symbols-outlined text-base">archive</span>
-                      <span>Arsipkan</span>
+                      <span className="material-symbols-outlined text-base">delete_forever</span>
+                      <span>Hapus</span>
                     </button>
                   )}
                   <button

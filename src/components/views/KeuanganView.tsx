@@ -5,14 +5,14 @@ interface KeuanganViewProps {
   transactions: FinanceTransaction[];
   onAddTransaction: (trx: FinanceTransaction) => void;
   operatorName: string;
-  onArchiveTransaction?: (trx: FinanceTransaction) => void;
+  onDeleteTransaction?: (trx: FinanceTransaction) => void;
 }
 
 export const KeuanganView: React.FC<KeuanganViewProps> = ({
   transactions,
   onAddTransaction,
   operatorName,
-  onArchiveTransaction,
+  onDeleteTransaction,
 }) => {
   const [showModal, setShowModal] = useState<boolean>(false);
   const [type, setType] = useState<'Pemasukan' | 'Pengeluaran'>('Pemasukan');
@@ -149,13 +149,13 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                     </span>
                   </td>
                   <td className="p-4 text-center">
-                    {onArchiveTransaction && (
+                    {onDeleteTransaction && (
                       <button
-                        onClick={() => onArchiveTransaction(trx)}
-                        title="Arsipkan Transaksi"
-                        className="p-1.5 rounded-lg bg-slate-100 hover:bg-amber-100 text-slate-500 hover:text-amber-800 transition-colors"
+                        onClick={() => onDeleteTransaction(trx)}
+                        title="Hapus Transaksi Permanen"
+                        className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 hover:text-rose-700 transition-colors"
                       >
-                        <span className="material-symbols-outlined text-base">archive</span>
+                        <span className="material-symbols-outlined text-base">delete_forever</span>
                       </button>
                     )}
                   </td>

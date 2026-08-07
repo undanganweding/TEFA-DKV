@@ -1,44 +1,17 @@
 import React, { useState } from 'react';
 import {
   SystemSettings,
-  FinanceTransaction,
-  InboxFile,
-  CustomerFile,
-  ProductionOrder,
-  Product,
-  ToolInventory,
-  MaterialStock,
 } from '../../types';
-import { RecycleBinTab } from '../RecycleBinTab';
 
 interface PengaturanViewProps {
   settings: SystemSettings;
   onSaveSettings: (newSettings: SystemSettings) => void;
-  transactions?: FinanceTransaction[];
-  inboxFiles?: InboxFile[];
-  customerFiles?: CustomerFile[];
-  orders?: ProductionOrder[];
-  products?: Product[];
-  tools?: ToolInventory[];
-  materials?: MaterialStock[];
-  onRestoreItem?: (category: string, id: string) => void;
-  onPermanentDeleteItem?: (category: string, id: string) => void;
 }
 
 export const PengaturanView: React.FC<PengaturanViewProps> = ({
   settings,
   onSaveSettings,
-  transactions = [],
-  inboxFiles = [],
-  customerFiles = [],
-  orders = [],
-  products = [],
-  tools = [],
-  materials = [],
-  onRestoreItem = () => {},
-  onPermanentDeleteItem = () => {},
 }) => {
-  const [activeTab, setActiveTab] = useState<'settings' | 'recycle_bin'>('settings');
   const [form, setForm] = useState<SystemSettings>({
     ...settings,
     currentUserRole: settings.currentUserRole || 'Admin Utama / Kepala TEFA',
@@ -54,53 +27,26 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
 
   return (
     <div className="space-y-6 pb-12 max-w-4xl">
-      {/* Header & Main Tabs */}
-      <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* Header */}
+      <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-2xs">
         <div>
           <h2 className="text-lg font-black text-slate-900 tracking-tight">
-            Pengaturan & Pengelolaan Data TEFA DKV
+            Pengaturan & Sistem TEFA DKV
           </h2>
           <p className="text-xs text-slate-500">
-            Atur identitas unit produksi, role hak akses, serta pulihkan data dari Recycle Bin.
+            Atur identitas unit produksi, role hak akses, dan konfigurasi sistem.
           </p>
-        </div>
-
-        {/* Tab Buttons */}
-        <div className="flex items-center gap-2 bg-slate-100 p-1.5 rounded-2xl shrink-0">
-          <button
-            onClick={() => setActiveTab('settings')}
-            className={`px-4 py-2 rounded-xl text-xs font-extrabold flex items-center gap-1.5 transition-all ${
-              activeTab === 'settings'
-                ? 'bg-white text-slate-900 shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <span className="material-symbols-outlined text-base">tune</span>
-            <span>Konfigurasi Sistem</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('recycle_bin')}
-            className={`px-4 py-2 rounded-xl text-xs font-extrabold flex items-center gap-1.5 transition-all ${
-              activeTab === 'recycle_bin'
-                ? 'bg-slate-900 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <span className="material-symbols-outlined text-base text-amber-400">delete_sweep</span>
-            <span>Recycle Bin / Arsip Data</span>
-          </button>
         </div>
       </div>
 
       {savedSuccess && (
         <div className="p-4 bg-emerald-100 text-emerald-900 border border-emerald-300 rounded-2xl text-xs font-bold animate-in fade-in flex items-center gap-2">
           <span className="material-symbols-outlined">check_circle</span>
-          <span>Pengaturan sistem & role akses berhasil diperbarui!</span>
+          <span>Pengaturan sistem berhasil diperbarui!</span>
         </div>
       )}
 
-      {activeTab === 'settings' ? (
-        <form onSubmit={handleSubmit} className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-2xs space-y-6 text-xs">
+      <form onSubmit={handleSubmit} className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-2xs space-y-6 text-xs">
           {/* Hak Akses / Role Section */}
           <div className="space-y-4">
             <h3 className="font-extrabold text-slate-900 text-sm uppercase tracking-wider border-b border-slate-100 pb-2 flex items-center justify-between">
@@ -233,21 +179,7 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
             </button>
           </div>
         </form>
-      ) : (
-        <RecycleBinTab
-          currentUserRole={settings.currentUserRole}
-          transactions={transactions}
-          inboxFiles={inboxFiles}
-          customerFiles={customerFiles}
-          orders={orders}
-          products={products}
-          tools={tools}
-          materials={materials}
-          onRestoreItem={onRestoreItem}
-          onPermanentDeleteItem={onPermanentDeleteItem}
-        />
-      )}
-    </div>
-  );
-};
+      </div>
+    );
+  };
 

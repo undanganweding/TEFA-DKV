@@ -5,14 +5,14 @@ interface ProdukViewProps {
   products: Product[];
   onAddProduct: (product: Product) => void;
   onUpdateProduct: (product: Product) => void;
-  onArchiveProduct?: (product: Product) => void;
+  onDeleteProduct?: (product: Product) => void;
 }
 
 export const ProdukView: React.FC<ProdukViewProps> = ({
   products,
   onAddProduct,
   onUpdateProduct,
-  onArchiveProduct,
+  onDeleteProduct,
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('Semua');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -186,13 +186,13 @@ export const ProdukView: React.FC<ProdukViewProps> = ({
                 >
                   <span className="material-symbols-outlined text-base">edit</span>
                 </button>
-                {onArchiveProduct && (
+                {onDeleteProduct && (
                   <button
-                    onClick={() => onArchiveProduct(p)}
-                    className="p-2 bg-slate-100 hover:bg-amber-100 text-slate-500 hover:text-amber-800 rounded-xl transition-colors"
-                    title="Nonaktifkan / Arsipkan Produk"
+                    onClick={() => onDeleteProduct(p)}
+                    className="p-2 bg-rose-50 hover:bg-rose-100 text-rose-600 hover:text-rose-700 rounded-xl transition-colors"
+                    title="Hapus Produk Permanen"
                   >
-                    <span className="material-symbols-outlined text-base">archive</span>
+                    <span className="material-symbols-outlined text-base">delete_forever</span>
                   </button>
                 )}
               </div>

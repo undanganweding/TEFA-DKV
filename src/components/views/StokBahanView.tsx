@@ -4,10 +4,10 @@ import { MaterialStock } from '../../types';
 interface StokBahanViewProps {
   materials: MaterialStock[];
   onRestockItem?: (materialId: string, addQty: number) => void;
-  onArchiveMaterial?: (material: MaterialStock) => void;
+  onDeleteMaterial?: (material: MaterialStock) => void;
 }
 
-export const StokBahanView: React.FC<StokBahanViewProps> = ({ materials, onArchiveMaterial }) => {
+export const StokBahanView: React.FC<StokBahanViewProps> = ({ materials, onDeleteMaterial }) => {
   const [selectedStatus, setSelectedStatus] = useState<string>('Semua');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
@@ -131,13 +131,13 @@ export const StokBahanView: React.FC<StokBahanViewProps> = ({ materials, onArchi
                     <p className="text-[10px] text-slate-500">{mat.location}</p>
                   </td>
                   <td className="p-4 text-center">
-                    {onArchiveMaterial && (
+                    {onDeleteMaterial && (
                       <button
-                        onClick={() => onArchiveMaterial(mat)}
-                        title="Arsipkan Stok Bahan"
-                        className="p-1.5 rounded-lg bg-slate-100 hover:bg-amber-100 text-slate-500 hover:text-amber-800 transition-colors"
+                        onClick={() => onDeleteMaterial(mat)}
+                        title="Hapus Bahan Permanen"
+                        className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 hover:text-rose-700 transition-colors"
                       >
-                        <span className="material-symbols-outlined text-base">archive</span>
+                        <span className="material-symbols-outlined text-base">delete_forever</span>
                       </button>
                     )}
                   </td>

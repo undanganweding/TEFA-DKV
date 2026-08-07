@@ -6,7 +6,7 @@ interface FileInboxViewProps {
   onUpdateFileStatus: (id: string, newStatus: InboxFileStatus) => void;
   onCreateTransactionFromFile: (file: InboxFile) => void;
   onOpenPublicUpload: () => void;
-  onArchiveFile?: (file: InboxFile) => void;
+  onDeleteFile?: (file: InboxFile) => void;
 }
 
 export const FileInboxView: React.FC<FileInboxViewProps> = ({
@@ -14,7 +14,7 @@ export const FileInboxView: React.FC<FileInboxViewProps> = ({
   onUpdateFileStatus,
   onCreateTransactionFromFile,
   onOpenPublicUpload,
-  onArchiveFile,
+  onDeleteFile,
 }) => {
   const [selectedFile, setSelectedFile] = useState<InboxFile | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -252,14 +252,14 @@ export const FileInboxView: React.FC<FileInboxViewProps> = ({
                           <span className="material-symbols-outlined text-base">add</span>
                         </button>
 
-                        {/* Archive / Trash File Button */}
-                        {onArchiveFile && (
+                        {/* Delete File Button */}
+                        {onDeleteFile && (
                           <button
-                            onClick={() => onArchiveFile(file)}
-                            className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-amber-100 text-slate-500 hover:text-amber-800 flex items-center justify-center transition-colors"
-                            title="Arsipkan File ke Trash"
+                            onClick={() => onDeleteFile(file)}
+                            className="w-8 h-8 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 hover:text-rose-700 flex items-center justify-center transition-colors"
+                            title="Hapus File Permanen"
                           >
-                            <span className="material-symbols-outlined text-base">archive</span>
+                            <span className="material-symbols-outlined text-base">delete_forever</span>
                           </button>
                         )}
                       </div>

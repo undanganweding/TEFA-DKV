@@ -205,7 +205,7 @@ export function App() {
   };
 
   // Archive (Soft Delete) Handlers per Category
-  const handleArchiveOrder = (order: ProductionOrder) => {
+  const handleDeleteOrder = (order: ProductionOrder) => {
     triggerDeleteModal(
       {
         id: order.id,
@@ -214,22 +214,15 @@ export function App() {
         customerName: order.customerName,
         date: order.orderDate,
         amount: 'Rp ' + order.totalAmount.toLocaleString('id-ID'),
-        note: order.status === 'Selesai' ? 'Order yang sudah selesai disarankan diarsipkan untuk kerapihan dashboard.' : undefined,
+        warningNote: order.status === 'Selesai' ? 'Order yang sudah selesai akan dihapus permanen.' : undefined,
       },
       () => {
-        const now = new Date().toISOString();
-        setOrders(
-          orders.map((o) =>
-            o.id === order.id
-              ? { ...o, isArchived: true, archivedAt: now, archivedBy: settings.currentUserRole }
-              : o
-          )
-        );
+        setOrders(orders.filter((o) => o.id !== order.id));
       }
     );
   };
 
-  const handleArchiveTransaction = (trx: FinanceTransaction) => {
+  const handleDeleteTransaction = (trx: FinanceTransaction) => {
     triggerDeleteModal(
       {
         id: trx.id,
@@ -240,19 +233,12 @@ export function App() {
         amount: 'Rp ' + trx.amount.toLocaleString('id-ID'),
       },
       () => {
-        const now = new Date().toISOString();
-        setTransactions(
-          transactions.map((t) =>
-            t.id === trx.id
-              ? { ...t, isArchived: true, archivedAt: now, archivedBy: settings.currentUserRole }
-              : t
-          )
-        );
+        setTransactions(transactions.filter((t) => t.id !== trx.id));
       }
     );
   };
 
-  const handleArchiveInboxFile = (file: InboxFile) => {
+  const handleDeleteInboxFile = (file: InboxFile) => {
     triggerDeleteModal(
       {
         id: file.id,
@@ -262,19 +248,12 @@ export function App() {
         date: file.uploadDate,
       },
       () => {
-        const now = new Date().toISOString();
-        setInboxFiles(
-          inboxFiles.map((f) =>
-            f.id === file.id
-              ? { ...f, isArchived: true, archivedAt: now, archivedBy: settings.currentUserRole }
-              : f
-          )
-        );
+        setInboxFiles(inboxFiles.filter((f) => f.id !== file.id));
       }
     );
   };
 
-  const handleArchiveCustomerFolder = (folder: CustomerFile) => {
+  const handleDeleteCustomerFolder = (folder: CustomerFile) => {
     triggerDeleteModal(
       {
         id: folder.id,
@@ -284,19 +263,12 @@ export function App() {
         date: new Date().toLocaleDateString('id-ID'),
       },
       () => {
-        const now = new Date().toISOString();
-        setCustomerFiles(
-          customerFiles.map((c) =>
-            c.id === folder.id
-              ? { ...c, isArchived: true, archivedAt: now, archivedBy: settings.currentUserRole }
-              : c
-          )
-        );
+        setCustomerFiles(customerFiles.filter((c) => c.id !== folder.id));
       }
     );
   };
 
-  const handleArchiveProduct = (product: Product) => {
+  const handleDeleteProduct = (product: Product) => {
     triggerDeleteModal(
       {
         id: product.id,
@@ -306,19 +278,12 @@ export function App() {
         amount: 'Rp ' + product.basePrice.toLocaleString('id-ID'),
       },
       () => {
-        const now = new Date().toISOString();
-        setProducts(
-          products.map((p) =>
-            p.id === product.id
-              ? { ...p, isArchived: true, status: 'Nonaktif', archivedAt: now, archivedBy: settings.currentUserRole }
-              : p
-          )
-        );
+        setProducts(products.filter((p) => p.id !== product.id));
       }
     );
   };
 
-  const handleArchiveTool = (tool: ToolInventory) => {
+  const handleDeleteTool = (tool: ToolInventory) => {
     triggerDeleteModal(
       {
         id: tool.id,
@@ -327,19 +292,12 @@ export function App() {
         customerName: `Lokasi: ${tool.location} • PIC: ${tool.picName}`,
       },
       () => {
-        const now = new Date().toISOString();
-        setTools(
-          tools.map((t) =>
-            t.id === tool.id
-              ? { ...t, isArchived: true, archivedAt: now, archivedBy: settings.currentUserRole }
-              : t
-          )
-        );
+        setTools(tools.filter((t) => t.id !== tool.id));
       }
     );
   };
 
-  const handleArchiveMaterial = (material: MaterialStock) => {
+  const handleDeleteMaterial = (material: MaterialStock) => {
     triggerDeleteModal(
       {
         id: material.id,
@@ -349,66 +307,11 @@ export function App() {
         amount: 'Rp ' + material.unitPrice.toLocaleString('id-ID'),
       },
       () => {
-        const now = new Date().toISOString();
-        setMaterials(
-          materials.map((m) =>
-            m.id === material.id
-              ? { ...m, isArchived: true, archivedAt: now, archivedBy: settings.currentUserRole }
-              : m
-          )
-        );
+        setMaterials(materials.filter((m) => m.id !== material.id));
       }
     );
   };
 
-  // Centralized Restore Handler
-  const handleRestoreItem = (category: string, id: string) => {
-    if (category === 'Pesanan Produksi') {
-      setOrders(orders.map((o) => (o.id === id ? { ...o, isArchived: false } : o)));
-    } else if (category === 'Transaksi / Kasir') {
-      setTransactions(transactions.map((t) => (t.id === id ? { ...t, isArchived: false } : t)));
-    } else if (category === 'File Inbox / Upload') {
-      setInboxFiles(inboxFiles.map((f) => (f.id === id ? { ...f, isArchived: false } : f)));
-    } else if (category === 'Customer & File') {
-      setCustomerFiles(customerFiles.map((c) => (c.id === id ? { ...c, isArchived: false } : c)));
-    } else if (category === 'Produk / Jasa') {
-      setProducts(products.map((p) => (p.id === id ? { ...p, isArchived: false, status: 'Aktif' } : p)));
-    } else if (category === 'Inventaris Alat / Mesin') {
-      setTools(tools.map((t) => (t.id === id ? { ...t, isArchived: false } : t)));
-    } else if (category === 'Stok Bahan') {
-      setMaterials(materials.map((m) => (m.id === id ? { ...m, isArchived: false } : m)));
-    }
-  };
-
-  // Centralized Permanent Delete Handler
-  const handlePermanentDeleteItem = (category: string, id: string) => {
-    triggerDeleteModal(
-      {
-        id,
-        category,
-        title: `Hapus Permanen ${category}`,
-        customerName: `ID: ${id}`,
-        actionType: 'permanent_delete',
-      },
-      () => {
-        if (category === 'Pesanan Produksi') {
-          setOrders(orders.filter((o) => o.id !== id));
-        } else if (category === 'Transaksi / Kasir') {
-          setTransactions(transactions.filter((t) => t.id !== id));
-        } else if (category === 'File Inbox / Upload') {
-          setInboxFiles(inboxFiles.filter((f) => f.id !== id));
-        } else if (category === 'Customer & File') {
-          setCustomerFiles(customerFiles.filter((c) => c.id !== id));
-        } else if (category === 'Produk / Jasa') {
-          setProducts(products.filter((p) => p.id !== id));
-        } else if (category === 'Inventaris Alat / Mesin') {
-          setTools(tools.filter((t) => t.id !== id));
-        } else if (category === 'Stok Bahan') {
-          setMaterials(materials.filter((m) => m.id !== id));
-        }
-      }
-    );
-  };
 
   // Check if current page is standalone public upload page
   if (currentPage === 'public_upload') {
@@ -447,9 +350,9 @@ export function App() {
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
           {currentPage === 'dashboard' && (
             <DashboardView
-              orders={orders.filter((o) => !o.isArchived)}
-              materials={materials.filter((m) => !m.isArchived)}
-              inboxFiles={inboxFiles.filter((f) => !f.isArchived)}
+              orders={orders}
+              materials={materials}
+              inboxFiles={inboxFiles}
               onPageChange={setCurrentPage}
               onOpenOrderReceipt={(ord) => setActiveReceiptOrder(ord)}
               onOpenNewOrderModal={() => setShowNewOrderModal(true)}
@@ -468,69 +371,69 @@ export function App() {
 
           {currentPage === 'file_inbox' && (
             <FileInboxView
-              inboxFiles={inboxFiles.filter((f) => !f.isArchived)}
+              inboxFiles={inboxFiles}
               onUpdateFileStatus={handleUpdateInboxFileStatus}
               onCreateTransactionFromFile={handleCreateTransactionFromFile}
               onOpenPublicUpload={() => setCurrentPage('public_upload')}
-              onArchiveFile={handleArchiveInboxFile}
+              onDeleteFile={handleDeleteInboxFile}
             />
           )}
 
           {currentPage === 'pesanan' && (
             <PesananView
-              orders={orders.filter((o) => !o.isArchived)}
+              orders={orders}
               onUpdateOrderStatus={handleUpdateOrderStatus}
               onRecordPayment={handleRecordPayment}
               onOpenOrderReceipt={(ord) => setActiveReceiptOrder(ord)}
               onOpenNewOrderModal={() => setShowNewOrderModal(true)}
               onOpenPublicUpload={() => setCurrentPage('public_upload')}
-              onArchiveOrder={handleArchiveOrder}
+              onDeleteOrder={handleDeleteOrder}
             />
           )}
 
           {currentPage === 'produk' && (
             <ProdukView
-              products={products.filter((p) => !p.isArchived)}
+              products={products}
               onAddProduct={handleAddProduct}
               onUpdateProduct={handleUpdateProduct}
-              onArchiveProduct={handleArchiveProduct}
+              onDeleteProduct={handleDeleteProduct}
             />
           )}
 
           {currentPage === 'customer_file' && (
             <CustomerFileView
-              customerFiles={customerFiles.filter((c) => !c.isArchived)}
-              onArchiveCustomerFolder={handleArchiveCustomerFolder}
+              customerFiles={customerFiles}
+              onDeleteCustomerFolder={handleDeleteCustomerFolder}
             />
           )}
 
           {currentPage === 'inventaris_alat' && (
             <InventarisAlatView
-              tools={tools.filter((t) => !t.isArchived)}
-              onArchiveTool={handleArchiveTool}
+              tools={tools}
+              onDeleteTool={handleDeleteTool}
             />
           )}
 
           {currentPage === 'stok_bahan' && (
             <StokBahanView
-              materials={materials.filter((m) => !m.isArchived)}
-              onArchiveMaterial={handleArchiveMaterial}
+              materials={materials}
+              onDeleteMaterial={handleDeleteMaterial}
             />
           )}
 
           {currentPage === 'keuangan' && (
             <KeuanganView
-              transactions={transactions.filter((t) => !t.isArchived)}
+              transactions={transactions}
               onAddTransaction={handleAddTransaction}
               operatorName={settings.activeShiftOperator}
-              onArchiveTransaction={handleArchiveTransaction}
+              onDeleteTransaction={handleDeleteTransaction}
             />
           )}
 
           {currentPage === 'laporan' && (
             <LaporanView
-              orders={orders.filter((o) => !o.isArchived)}
-              transactions={transactions.filter((t) => !t.isArchived)}
+              orders={orders}
+              transactions={transactions}
             />
           )}
 
@@ -545,15 +448,6 @@ export function App() {
             <PengaturanView
               settings={settings}
               onSaveSettings={setSettings}
-              orders={orders}
-              transactions={transactions}
-              inboxFiles={inboxFiles}
-              customerFiles={customerFiles}
-              products={products}
-              tools={tools}
-              materials={materials}
-              onRestoreItem={handleRestoreItem}
-              onPermanentDeleteItem={handlePermanentDeleteItem}
             />
           )}
         </main>

@@ -4,10 +4,10 @@ import { ToolInventory } from '../../types';
 interface InventarisAlatViewProps {
   tools: ToolInventory[];
   onUpdateToolCondition?: (toolId: string, condition: any) => void;
-  onArchiveTool?: (tool: ToolInventory) => void;
+  onDeleteTool?: (tool: ToolInventory) => void;
 }
 
-export const InventarisAlatView: React.FC<InventarisAlatViewProps> = ({ tools, onArchiveTool }) => {
+export const InventarisAlatView: React.FC<InventarisAlatViewProps> = ({ tools, onDeleteTool }) => {
   const [selectedCondition, setSelectedCondition] = useState<string>('Semua');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
@@ -122,13 +122,13 @@ export const InventarisAlatView: React.FC<InventarisAlatViewProps> = ({ tools, o
               <span>Maintenance: {tool.lastMaintenance}</span>
               <div className="flex items-center gap-2">
                 <span className="font-bold text-slate-700">S/N: {tool.serialNumber}</span>
-                {onArchiveTool && (
+                {onDeleteTool && (
                   <button
-                    onClick={() => onArchiveTool(tool)}
-                    className="p-1 rounded bg-slate-100 hover:bg-amber-100 text-slate-500 hover:text-amber-800 transition-colors"
-                    title="Arsipkan Mesin / Alat"
+                    onClick={() => onDeleteTool(tool)}
+                    className="p-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-600 hover:text-rose-700 transition-colors"
+                    title="Hapus Alat Permanen"
                   >
-                    <span className="material-symbols-outlined text-sm">archive</span>
+                    <span className="material-symbols-outlined text-sm">delete_forever</span>
                   </button>
                 )}
               </div>

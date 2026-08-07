@@ -8,7 +8,7 @@ interface PesananViewProps {
   onOpenOrderReceipt: (order: ProductionOrder) => void;
   onOpenNewOrderModal: () => void;
   onOpenPublicUpload?: () => void;
-  onArchiveOrder?: (order: ProductionOrder) => void;
+  onDeleteOrder?: (order: ProductionOrder) => void;
 }
 
 export const PesananView: React.FC<PesananViewProps> = ({
@@ -18,7 +18,7 @@ export const PesananView: React.FC<PesananViewProps> = ({
   onOpenOrderReceipt,
   onOpenNewOrderModal,
   onOpenPublicUpload,
-  onArchiveOrder,
+  onDeleteOrder,
 }) => {
   const [selectedFilter, setSelectedFilter] = useState<string>('Semua');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -540,16 +540,16 @@ export const PesananView: React.FC<PesananViewProps> = ({
                   <span>Cetak Nota</span>
                 </button>
 
-                {onArchiveOrder && (
+                {onDeleteOrder && (
                   <button
                     onClick={() => {
-                      onArchiveOrder(activeOrderDetail);
+                      onDeleteOrder(activeOrderDetail);
                       setActiveOrderDetail(null);
                     }}
-                    className="bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 font-bold text-xs px-3.5 py-2.5 rounded-xl transition-colors flex items-center gap-1.5"
+                    className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs px-3.5 py-2.5 rounded-xl transition-colors flex items-center gap-1.5"
                   >
-                    <span className="material-symbols-outlined text-base">archive</span>
-                    <span>Arsipkan Order</span>
+                    <span className="material-symbols-outlined text-base">delete_forever</span>
+                    <span>Hapus Permanen</span>
                   </button>
                 )}
               </div>
