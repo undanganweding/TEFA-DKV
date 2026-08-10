@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { FinanceTransaction } from '../../types';
 
 interface KeuanganViewProps {
@@ -17,7 +17,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
   onViewTransaction,
 }) => {
   const [showModal, setShowModal] = useState<boolean>(false);
-  const [dateFilter, setDateFilter] = useState<'hari_ini' | 'bulan_ini' | 'custom'>('bulan_ini');
+  const [dateFilter, setDateFilter] = useState<'hari_ini' | 'bulan_ini' | 'semua'>('bulan_ini');
   const [selectedTransaction, setSelectedTransaction] = useState<FinanceTransaction | null>(null);
 
   // Form state
@@ -27,42 +27,52 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
   const [amount, setAmount] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'QRIS' | 'Transfer Bank'>('Cash');
 
-  // System transaction categories that should NOT be deletable
+  // System transaction categories - read only
   const SYSTEM_CATEGORIES = ['Penjualan Cetak', 'Jasa Desain'];
+
+  // Check if transaction is system-generated (auto from orders/custom orders)
+  const isSystemTransaction = (trx: FinanceTransaction): boolean => {
+    return SYSTEM_CATEGORIES.includes(trx.category);
+  };
 
   // Filter transactions by date
   const filteredTransactions = useMemo(() => {
     const now = new Date();
     const today = now.toISOString().split('T')[0];
-    const monthStart = today.substring(0, 7) + '-01';
+    const currentMonth = today.substring(0, 7);
+    const monthStart = currentMonth + '-01';
 
     return transactions.filter(t => {
       const transDate = t.date.split(' ')[0];
+      const transMonth = transDate.substring(0, 7);
+
       switch (dateFilter) {
         case 'hari_ini':
           return transDate === today;
         case 'bulan_ini':
-          return transDate >= monthStart && transDate <= today;
+          return transMonth === currentMonth;
         default:
           return true;
       }
     });
   }, [transactions, dateFilter]);
 
-  // Calculate totals from filtered transactions
+  // Calculate totals
   const totalIn = filteredTransactions
-    .filter((t) => t.type === 'Pemasukan')
+    .filter(t => t.type === 'Pemasukan')
     .reduce((acc, curr) => acc + curr.amount, 0);
 
   const totalOut = filteredTransactions
-    .filter((t) => t.type === 'Pengeluaran')
+    .filter(t => t.type === 'Pengeluaran')
     .reduce((acc, curr) => acc + curr.amount, 0);
 
   const saldoKas = totalIn - totalOut;
+  const transactionCount = filteredTransactions.length;
 
-  // Check if transaction is a system-generated one
-  const isSystemTransaction = (trx: FinanceTransaction): boolean => {
-    return SYSTEM_CATEGORIES.includes(trx.category);
+  // Format currency Indonesia
+  const formatRupiah = (val: number): string => {
+    const formatted = val.toLocaleString('id-ID');
+    return val < 0 ? `-Rp ${formatted.replace('-', '')}` : `Rp ${formatted}`;
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -70,12 +80,15 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
     if (amount <= 0 || !description.trim()) return;
 
     const now = new Date();
-    const transNo = 'TRX-' + now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0') + '-' + Math.floor(10 + Math.random() * 90);
+    const dateStr = now.toISOString().split('T')[0];
+    const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+    const randomNum = Math.floor(100 + Math.random() * 900);
+    const transNo = `TRX-${dateStr.replace(/-/g, '')}-${randomNum}`;
 
     const newTrx: FinanceTransaction = {
-      id: 'TRX-' + Date.now(),
+      id: `TRX-${Date.now()}`,
       transNo,
-      date: now.toISOString().split('T')[0] + ' ' + now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+      date: `${dateStr} ${timeStr}`,
       type,
       category: category as any,
       description,
@@ -89,10 +102,6 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
     setShowModal(false);
     setDescription('');
     setAmount(0);
-  };
-
-  const formatRupiah = (val: number) => {
-    return 'Rp ' + val.toLocaleString('id-ID');
   };
 
   return (
@@ -117,9 +126,9 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
               onChange={(e) => setDateFilter(e.target.value as any)}
               className="pl-3 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 appearance-none cursor-pointer"
             >
-              <option value="hari_ini">Hari Ini</option>
-              <option value="bulan_ini">Bulan Ini</option>
-              <option value="semua">Semua</option>
+              <option value="hari_ini">📅 Hari Ini</option>
+              <option value="bulan_ini">📆 Bulan Ini</option>
+              <option value="semua">📊 Semua Data</option>
             </select>
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
               <span className="material-symbols-outlined text-sm">expand_more</span>
@@ -129,7 +138,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
           {/* Export Button */}
           <button className="px-4 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-xl flex items-center gap-2 transition-colors">
             <span className="material-symbols-outlined text-base">file_download</span>
-            Export Laporan
+            Export
           </button>
 
           {/* Add Button */}
@@ -137,7 +146,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
             onClick={() => setShowModal(true)}
             className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center gap-2 shadow-md transition-colors"
           >
-            <span className="material-symbols-outlined text-base">add_card</span>
+            <span className="material-symbols-outlined text-base">add</span>
             + Catat Transaksi
           </button>
         </div>
@@ -151,12 +160,14 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
             <div>
               <p className="text-[10px] font-bold text-emerald-100 uppercase tracking-wider">Total Pemasukan</p>
               <p className="text-2xl font-black mt-1">{formatRupiah(totalIn)}</p>
+              <p className="text-[10px] text-emerald-200 mt-1">
+                {filteredTransactions.filter(t => t.type === 'Pemasukan').length} transaksi masuk
+              </p>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
-              <span className="material-symbols-outlined text-lg">trending_up</span>
+            <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
+              <span className="material-symbols-outlined text-2xl text-white">trending_up</span>
             </div>
           </div>
-          <p className="text-[10px] text-emerald-100 mt-2">{filteredTransactions.filter(t => t.type === 'Pemasukan').length} transaksi</p>
         </div>
 
         {/* Total Pengeluaran */}
@@ -164,13 +175,15 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
           <div className="flex items-center justify-between">
             <div>
               <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Total Pengeluaran</p>
-              <p className="text-2xl font-black text-red-600 mt-1">{formatRupiah(totalOut)}</p>
+              <p className="text-2xl font-black mt-1 text-red-600">{formatRupiah(totalOut)}</p>
+              <p className="text-[10px] text-slate-400 mt-1">
+                {filteredTransactions.filter(t => t.type === 'Pengeluaran').length} transaksi keluar
+              </p>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center">
-              <span className="material-symbols-outlined text-lg text-red-500">trending_down</span>
+            <div className="w-12 h-12 rounded-xl bg-red-50 flex items-center justify-center">
+              <span className="material-symbols-outlined text-2xl text-red-500">trending_down</span>
             </div>
           </div>
-          <p className="text-[10px] text-slate-400 mt-2">{filteredTransactions.filter(t => t.type === 'Pengeluaran').length} transaksi</p>
         </div>
 
         {/* Saldo Bersih */}
@@ -186,12 +199,12 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
               {saldoKas < 0 && (
                 <p className="text-[10px] text-red-200 mt-1 flex items-center gap-1">
                   <span className="material-symbols-outlined text-sm">warning</span>
-                  Saldo minus!
+                  Saldo minus! Perbaiki kasir
                 </p>
               )}
             </div>
-            <div className={`w-10 h-10 rounded-xl ${saldoKas < 0 ? 'bg-white/20' : 'bg-white/10'} flex items-center justify-center`}>
-              <span className={`material-symbols-outlined text-lg ${saldoKas < 0 ? 'text-white' : 'text-white/70'}`}>account_balance</span>
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${saldoKas < 0 ? 'bg-white/20' : 'bg-white/10'}`}>
+              <span className={`material-symbols-outlined text-2xl ${saldoKas < 0 ? 'text-white' : 'text-white/70'}`}>account_balance</span>
             </div>
           </div>
         </div>
@@ -201,7 +214,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
       <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
         <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
           <h3 className="font-black text-slate-900 text-sm">Riwayat Transaksi</h3>
-          <span className="text-[11px] text-slate-500 font-medium">{filteredTransactions.length} transaksi</span>
+          <span className="text-[11px] text-slate-500 font-medium">{transactionCount} data</span>
         </div>
 
         <div className="overflow-x-auto">
@@ -209,7 +222,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
             <thead className="bg-slate-50 text-slate-600 font-extrabold uppercase tracking-wider border-b border-slate-100">
               <tr>
                 <th className="p-4">No. Transaksi</th>
-                <th className="p-4">Tanggal & Waktu</th>
+                <th className="p-4">Waktu</th>
                 <th className="p-4">Jenis & Kategori</th>
                 <th className="p-4">Keterangan</th>
                 <th className="p-4">Metode</th>
@@ -218,29 +231,29 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredTransactions.length === 0 ? (
+              {transactionCount === 0 ? (
                 <tr>
                   <td colSpan={7} className="p-8 text-center">
-                    <div className="flex flex-col items-center text-slate-400">
+                    <div className="flex flex-col items-center text-slate-400 py-4">
                       <span className="material-symbols-outlined text-4xl">receipt_long</span>
                       <p className="mt-2 font-medium">Belum ada transaksi</p>
-                      <p className="text-[11px]">Catat transaksi baru untuk memulai</p>
+                      <p className="text-[11px]">Catat transaksi manual atau buat pesanan di Kasir</p>
                     </div>
                   </td>
                 </tr>
               ) : (
                 filteredTransactions.map((trx) => {
                   const isSystem = isSystemTransaction(trx);
+                  const dateParts = trx.date.split(' ');
+
                   return (
                     <tr key={trx.id} className="hover:bg-slate-50/80 transition-colors">
                       <td className="p-4">
                         <p className="font-mono font-extrabold text-slate-900">{trx.transNo}</p>
                       </td>
                       <td className="p-4 whitespace-nowrap">
-                        <p className="font-medium text-slate-700">
-                          {trx.date.split(' ')[0]}
-                        </p>
-                        <p className="text-[10px] text-slate-400">{trx.date.split(' ')[1]}</p>
+                        <p className="font-medium text-slate-700">{dateParts[0]}</p>
+                        <p className="text-[10px] text-slate-400">{dateParts[1] || ''}</p>
                       </td>
                       <td className="p-4">
                         <span className={`inline-flex items-center gap-1 text-[10px] font-extrabold px-2.5 py-1 rounded-full ${
@@ -265,19 +278,20 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                         )}
                       </td>
                       <td className="p-4">
-                        <span className="text-slate-600 font-medium">{trx.paymentMethod}</span>
+                        <p className="text-slate-600 font-medium">{trx.paymentMethod}</p>
                         <p className="text-[10px] text-slate-400 mt-0.5">{trx.operator}</p>
                       </td>
                       <td className="p-4 text-right whitespace-nowrap">
                         <span className={`font-black text-sm ${
                           trx.type === 'Pemasukan' ? 'text-emerald-600' : 'text-red-600'
                         }`}>
-                          {trx.type === 'Pemasukan' ? '+' : '-'}{formatRupiah(trx.amount)}
+                          {trx.type === 'Pemasukan' ? '+' : '-'}
+                          {formatRupiah(trx.amount)}
                         </span>
                       </td>
                       <td className="p-4 text-center">
                         <div className="flex items-center justify-center gap-1">
-                          {/* View/Detail Button - for ALL transactions */}
+                          {/* View/Detail Button - ALL transactions */}
                           <button
                             onClick={() => setSelectedTransaction(trx)}
                             title="Lihat Detail"
@@ -297,9 +311,9 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                             </button>
                           )}
 
-                          {/* Lock indicator for system transactions */}
+                          {/* Lock icon for system transactions */}
                           {isSystem && (
-                            <span className="text-[10px] text-slate-400" title="Transaksi sistem tidak dapat dihapus">
+                            <span className="text-[10px] text-slate-400" title="Transaksi sistem otomatis">
                               <span className="material-symbols-outlined text-sm">lock</span>
                             </span>
                           )}
@@ -324,7 +338,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <div>
                 <h3 className="font-black text-slate-900">Catat Transaksi Baru</h3>
-                <p className="text-[11px] text-slate-500">Pencatatan manual ke buku kas</p>
+                <p className="text-[11px] text-slate-500">Input manual ke buku kas</p>
               </div>
               <button
                 type="button"
@@ -366,7 +380,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
 
               {/* Category */}
               <div>
-                <label className="block text-[11px] font-bold text-slate-600 mb-1.5">Kategori Transaksi</label>
+                <label className="block text-[11px] font-bold text-slate-600 mb-1.5">Kategori</label>
                 <select
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
@@ -383,7 +397,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                       <option value="Pembelian Bahan">Pembelian Bahan</option>
                       <option value="Perawatan Alat">Perawatan Alat</option>
                       <option value="Operasional & Listrik">Operasional & Listrik</option>
-                      <option value="Lain-lain">Lain-lain</option>
+                      <option value="Lainnya">Lainnya</option>
                     </>
                   )}
                 </select>
@@ -434,12 +448,18 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
               </div>
 
               {/* Preview */}
-              <div className={`p-4 rounded-xl ${type === 'Pemasukan' ? 'bg-emerald-50 border border-emerald-200' : 'bg-red-50 border border-red-200'}`}>
+              <div className={`p-4 rounded-xl ${
+                type === 'Pemasukan' ? 'bg-emerald-50 border border-emerald-200' : 'bg-red-50 border border-red-200'
+              }`}>
                 <div className="flex items-center justify-between">
-                  <span className={`text-xs font-bold ${type === 'Pemasukan' ? 'text-emerald-700' : 'text-red-700'}`}>
-                    {type === 'Pemasukan' ? 'Pemasukan' : 'Pengeluaran'} Baru:
+                  <span className={`text-xs font-bold ${
+                    type === 'Pemasukan' ? 'text-emerald-700' : 'text-red-700'
+                  }`}>
+                    {type === 'Pemasukan' ? 'Pemasukan Baru:' : 'Pengeluaran Baru:'}
                   </span>
-                  <span className={`text-sm font-black ${type === 'Pemasukan' ? 'text-emerald-600' : 'text-red-600'}`}>
+                  <span className={`text-sm font-black ${
+                    type === 'Pemasukan' ? 'text-emerald-600' : 'text-red-600'
+                  }`}>
                     {type === 'Pemasukan' ? '+' : '-'}Rp {amount.toLocaleString('id-ID')}
                   </span>
                 </div>
@@ -457,9 +477,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
               <button
                 type="submit"
                 className={`flex-1 py-2.5 text-white font-bold text-xs rounded-xl shadow-md transition-colors ${
-                  type === 'Pemasukan'
-                    ? 'bg-emerald-600 hover:bg-emerald-700'
-                    : 'bg-red-600 hover:bg-red-700'
+                  type === 'Pemasukan' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'
                 }`}
               >
                 Simpan Transaksi
@@ -471,9 +489,12 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
 
       {/* Transaction Detail Modal */}
       {selectedTransaction && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50" onClick={() => setSelectedTransaction(null)}>
+        <div
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50"
+          onClick={() => setSelectedTransaction(null)}
+        >
           <div
-            className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl border border-slate-100"
+            className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl border border-slate-100 max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
@@ -483,7 +504,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
               </div>
               <button
                 onClick={() => setSelectedTransaction(null)}
-                className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-colors"
+                className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center"
               >
                 <span className="material-symbols-outlined text-slate-500">close</span>
               </button>
@@ -537,10 +558,12 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
               </div>
 
               {/* Description */}
-              <div className="bg-amber-50 p-4 rounded-xl border border-amber-100">
-                <p className="text-[10px] font-bold text-amber-700 uppercase mb-1">Keterangan</p>
-                <p className="text-sm text-slate-800 font-medium">{selectedTransaction.description}</p>
-              </div>
+              {selectedTransaction.description && (
+                <div className="bg-amber-50 p-4 rounded-xl border border-amber-100">
+                  <p className="text-[10px] font-bold text-amber-700 uppercase mb-1">Keterangan</p>
+                  <p className="text-sm text-slate-800 font-medium">{selectedTransaction.description}</p>
+                </div>
+              )}
 
               {/* Actions */}
               <div className="flex gap-3 pt-2">
@@ -550,7 +573,7 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                 >
                   Tutup
                 </button>
-                {!isSystemTransaction(selectedTransaction) && onDeleteTransaction && (
+                {onDeleteTransaction && !isSystemTransaction(selectedTransaction) && (
                   <button
                     onClick={() => {
                       onDeleteTransaction(selectedTransaction);
@@ -561,6 +584,12 @@ export const KeuanganView: React.FC<KeuanganViewProps> = ({
                     <span className="material-symbols-outlined text-sm">delete_forever</span>
                     Hapus
                   </button>
+                )}
+                {isSystemTransaction(selectedTransaction) && (
+                  <span className="flex-1 py-2.5 text-center text-slate-400 text-xs font-bold">
+                    <span className="material-symbols-outlined text-sm align-text-bottom">lock</span>
+                    Transaksi sistem
+                  </span>
                 )}
               </div>
             </div>
