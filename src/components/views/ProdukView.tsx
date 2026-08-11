@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Product } from '../../types';
 import { Pagination } from '../Pagination';
+import { ImageUploader } from '../ImageUploader';
 
 interface ProdukViewProps {
   products: Product[];
@@ -30,6 +31,9 @@ export const ProdukView: React.FC<ProdukViewProps> = ({
   const [basePrice, setBasePrice] = useState<number>(10000);
   const [description, setDescription] = useState('');
   const [isCustomDimension, setIsCustomDimension] = useState(false);
+  const [images, setImages] = useState<string[]>([]);
+  const [coverIndex, setCoverIndex] = useState<number>(0);
+  const [showInCustomerPlatform, setShowInCustomerPlatform] = useState<boolean>(true);
 
   const categories = ['Semua', 'Cetak Outdoor', 'Cetak Indoor / A3+', 'Merchandise', 'Desain & Creative'];
 
@@ -62,6 +66,9 @@ export const ProdukView: React.FC<ProdukViewProps> = ({
     setBasePrice(20000);
     setDescription('');
     setIsCustomDimension(false);
+    setImages([]);
+    setCoverIndex(0);
+    setShowInCustomerPlatform(true);
     setShowModal(true);
   };
 
@@ -74,12 +81,19 @@ export const ProdukView: React.FC<ProdukViewProps> = ({
     setBasePrice(p.basePrice);
     setDescription(p.description);
     setIsCustomDimension(!!p.isCustomDimension);
+    const pImages = p.images || (p.image ? [p.image] : []);
+    setImages(pImages);
+    const covIdx = p.coverImage ? pImages.indexOf(p.coverImage) : 0;
+    setCoverIndex(covIdx > -1 ? covIdx : 0);
+    setShowInCustomerPlatform(p.showInCustomerPlatform !== false);
     setShowModal(true);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
+
+    const coverImage = images[coverIndex] || images[0] || undefined;
 
     if (editingProduct) {
       onUpdateProduct({
@@ -91,6 +105,9 @@ export const ProdukView: React.FC<ProdukViewProps> = ({
         basePrice,
         description,
         isCustomDimension,
+        images,
+        coverImage,
+        showInCustomerPlatform,
       });
     } else {
       const newP: Product = {
@@ -104,6 +121,9 @@ export const ProdukView: React.FC<ProdukViewProps> = ({
         description,
         isCustomDimension,
         status: 'Aktif',
+        images,
+        coverImage,
+        showInCustomerPlatform,
       };
       onAddProduct(newP);
     }
@@ -220,7 +240,7 @@ export const ProdukView: React.FC<ProdukViewProps> = ({
                   <div className="flex items-start gap-3 mb-2">
                     <div className="w-14 h-14 rounded-xl bg-slate-100 shrink-0 overflow-hidden border border-slate-100">
                       <img
-                        src={getCategoryImage(p.category)}
+                        src={p.coverImage || p.images?.[0] || getCategoryImage(p.category)}
                         alt={p.name}
                         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                       />
@@ -296,9 +316,7 @@ export const ProdukView: React.FC<ProdukViewProps> = ({
               >
                 ✕
               </button>
-            </div>
-
-            <div className="space-y-3">
+            </div>            <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
               <div>
                 <label className="block font-bold text-slate-700 mb-1">Nama Produk / Jasa</label>
                 <input
@@ -364,6 +382,33 @@ export const ProdukView: React.FC<ProdukViewProps> = ({
                   placeholder="Deskripsi bahan / spesifikasi cetak..."
                   className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800 resize-none"
                 />
+              </div>
+
+              {/* Dynamic Image Uploader */}
+              <div className="pt-2 border-t border-slate-100">
+                <ImageUploader
+                  images={images}
+                  onImagesChange={(imgs, covIdx) => {
+                    setImages(imgs);
+                    if (covIdx !== undefined) setCoverIndex(covIdx);
+                  }}
+                  coverIndex={coverIndex}
+                  maxImages={5}
+                />
+              </div>
+
+              {/* Product Visibility Option */}
+              <div className="pt-2 flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="show-in-customer"
+                  checked={showInCustomerPlatform}
+                  onChange={(e) => setShowInCustomerPlatform(e.target.checked)}
+                  className="w-4 h-4 text-[#5B4BFF] focus:ring-purple-500 border-slate-300 rounded cursor-pointer accent-[#5B4BFF]"
+                />
+                <label htmlFor="show-in-customer" className="font-bold text-slate-750 cursor-pointer select-none">
+                  Tampilkan di Customer Platform
+                </label>
               </div>
             </div>
 

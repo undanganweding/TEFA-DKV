@@ -665,6 +665,14 @@ export function App() {
     setDeleteModalOpen(true);
   };
 
+  const handleAddTool = (newTool: ToolInventory) => {
+    setTools((prev) => [newTool, ...prev]);
+  };
+
+  const handleUpdateTool = (updatedTool: ToolInventory) => {
+    setTools((prev) => prev.map((t) => (t.id === updatedTool.id ? updatedTool : t)));
+  };
+
   const handleArchiveTool = (id: string) => {
     const item = tools.find((t) => t.id === id);
     if (!item) return;
@@ -804,6 +812,7 @@ export function App() {
     if (currentUser?.role === 'Guest') {
       return (
         <GuestPlatformView
+          products={products.filter((p) => !p.isArchived)}
           orders={orders}
           onAddOrder={(newOrder) => setOrders((prev) => [newOrder, ...prev])}
           onSwitchToAdmin={handleLogout}
@@ -971,6 +980,8 @@ export function App() {
             <InventarisAlatView
               tools={tools.filter((t) => !t.isArchived)}
               onArchiveTool={handleArchiveTool}
+              onAddTool={handleAddTool}
+              onUpdateTool={handleUpdateTool}
             />
           )}
 

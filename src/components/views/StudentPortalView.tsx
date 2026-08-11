@@ -111,7 +111,7 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
   const [tempAvatarPreview, setTempAvatarPreview] = useState<string | null>(null);
 
   // Filter Active Products from Admin Database
-  const activeProducts = products.filter((p) => p.status === 'Aktif' && !p.isArchived);
+  const activeProducts = products.filter((p) => p.status === 'Aktif' && !p.isArchived && p.showInCustomerPlatform !== false);
 
   // Categories Mapping
   const categoriesList = ['All', 'Printing', 'Foto', 'Sublim', 'Merchandise', 'Desain'];
@@ -713,6 +713,8 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
                         <div className="relative h-44 rounded-2xl overflow-hidden bg-slate-900 border border-slate-800">
                           <img
                             src={
+                              prod.coverImage ||
+                              prod.images?.[0] ||
                               prod.image ||
                               'https://images.unsplash.com/photo-1563986768609-322da13575f3?w=600&q=80'
                             }

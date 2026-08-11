@@ -134,6 +134,9 @@ export interface Product {
   stock?: number; // Optional for physical goods like Mug / Blank Pin
   status: 'Aktif' | 'Nonaktif';
   image?: string;
+  images?: string[];
+  coverImage?: string;
+  showInCustomerPlatform?: boolean;
   isArchived?: boolean;
   archivedAt?: string;
   archivedBy?: string;
@@ -240,6 +243,11 @@ export interface ToolInventory {
   lastMaintenance: string;
   picName: string;
   specification?: string;
+  brand?: string;
+  model?: string;
+  acquisitionCost?: number;
+  images?: string[];
+  coverImage?: string;
   isArchived?: boolean;
   archivedAt?: string;
   archivedBy?: string;
@@ -260,6 +268,7 @@ export interface MaterialStock {
   location: string;
   status: 'Aman' | 'Menipis' | 'Kritis';
   lastRestocked: string;
+  image?: string;
   isArchived?: boolean;
   archivedAt?: string;
   archivedBy?: string;

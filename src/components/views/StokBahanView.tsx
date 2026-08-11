@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MaterialStock, StockMovement, FinanceTransaction } from '../../types';
 import { Pagination } from '../Pagination';
+import { ImageUploader } from '../ImageUploader';
 
 interface StokBahanViewProps {
   materials: MaterialStock[];
@@ -80,6 +81,7 @@ export const StokBahanView: React.FC<StokBahanViewProps> = ({
     supplier: string;
     location: string;
     recordExpenseIfAdd: boolean;
+    image?: string;
   }>({
     name: '',
     code: '',
@@ -92,6 +94,7 @@ export const StokBahanView: React.FC<StokBahanViewProps> = ({
     supplier: 'CV. Paper Nusantara',
     location: 'Gudang Utama',
     recordExpenseIfAdd: true,
+    image: '',
   });
 
   // 2. Stock Adjustment Modal (Increase / Decrease with Reason)
@@ -203,6 +206,7 @@ export const StokBahanView: React.FC<StokBahanViewProps> = ({
       supplier: 'CV. Paper Nusantara',
       location: 'Gudang Utama A-1',
       recordExpenseIfAdd: true,
+      image: '',
     });
     setIsEditModalOpen(true);
   };
@@ -223,6 +227,7 @@ export const StokBahanView: React.FC<StokBahanViewProps> = ({
       supplier: mat.supplier,
       location: mat.location,
       recordExpenseIfAdd: false,
+      image: mat.image || '',
     });
     setIsEditModalOpen(true);
   };
@@ -267,6 +272,7 @@ export const StokBahanView: React.FC<StokBahanViewProps> = ({
         supplier: editForm.supplier.trim(),
         location: editForm.location.trim(),
         status,
+        image: editForm.image || undefined,
       };
 
       if (onUpdateMaterial) {
@@ -314,6 +320,7 @@ export const StokBahanView: React.FC<StokBahanViewProps> = ({
         location: editForm.location.trim() || 'Gudang Utama',
         status,
         lastRestocked: nowStr,
+        image: editForm.image || undefined,
       };
 
       if (onAddMaterial) {
@@ -843,17 +850,26 @@ export const StokBahanView: React.FC<StokBahanViewProps> = ({
                     {/* Item Top: Header & Badges */}
                     <div className="space-y-2">
                       <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <span className="text-[10px] font-mono font-bold text-slate-400 tracking-wider">
-                            {mat.code}
-                          </span>
-                          <h3
-                            onClick={() => setDetailMaterial(mat)}
-                            className="font-black text-slate-900 text-sm hover:text-[#5B4BFF] transition-colors cursor-pointer line-clamp-1"
-                            title={mat.name}
-                          >
-                            {mat.name}
-                          </h3>
+                        <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                          <div className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden shrink-0 flex items-center justify-center">
+                            {mat.image ? (
+                              <img src={mat.image} alt={mat.name} className="w-full h-full object-cover" />
+                            ) : (
+                              <span className="material-symbols-outlined text-lg text-slate-400 font-bold">inventory</span>
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <span className="text-[10px] font-mono font-bold text-slate-400 tracking-wider">
+                              {mat.code}
+                            </span>
+                            <h3
+                              onClick={() => setDetailMaterial(mat)}
+                              className="font-black text-slate-900 text-xs sm:text-sm hover:text-[#5B4BFF] transition-colors cursor-pointer line-clamp-1"
+                              title={mat.name}
+                            >
+                              {mat.name}
+                            </h3>
+                          </div>
                         </div>
                         <span
                           className={`text-[9px] font-black px-2.5 py-0.5 rounded-full border shrink-0 ${
@@ -992,8 +1008,12 @@ export const StokBahanView: React.FC<StokBahanViewProps> = ({
                     >
                       {/* Name & Badges */}
                       <div className="flex items-start gap-3 md:w-1/3">
-                        <div className="w-10 h-10 rounded-2xl bg-purple-50 border border-purple-100 text-[#5B4BFF] flex items-center justify-center font-bold shrink-0">
-                          <span className="material-symbols-outlined text-lg">inventory</span>
+                        <div className="w-10 h-10 rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden shrink-0 flex items-center justify-center">
+                          {mat.image ? (
+                            <img src={mat.image} alt={mat.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <span className="material-symbols-outlined text-lg text-slate-400">inventory</span>
+                          )}
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
@@ -1522,6 +1542,17 @@ export const StokBahanView: React.FC<StokBahanViewProps> = ({
                     />
                   </div>
                 )}
+
+                {/* Foto Bahan / Barang Uploader */}
+                <div className="pt-3 border-t border-slate-100">
+                  <ImageUploader
+                    images={editForm.image ? [editForm.image] : []}
+                    onImagesChange={(imgs) => {
+                      setEditForm({ ...editForm, image: imgs[0] || '' });
+                    }}
+                    maxImages={1}
+                  />
+                </div>
               </div>
 
               <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
@@ -1891,6 +1922,13 @@ export const StokBahanView: React.FC<StokBahanViewProps> = ({
                   <p className="text-[10px] text-slate-400">per {detailMaterial.unit}</p>
                 </div>
               </div>
+
+              {/* Material image cover */}
+              {detailMaterial.image && (
+                <div className="w-full h-44 rounded-2xl overflow-hidden border border-slate-200 shadow-2xs">
+                  <img src={detailMaterial.image} alt={detailMaterial.name} className="w-full h-full object-cover" />
+                </div>
+              )}
 
               {/* Detail Specifications */}
               <div className="bg-slate-50/80 p-4 rounded-2xl border border-slate-200/80 space-y-2 text-xs">

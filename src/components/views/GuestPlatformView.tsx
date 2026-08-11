@@ -1,8 +1,9 @@
 import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ProductionOrder } from '../../types';
+import { ProductionOrder, Product } from '../../types';
 
 interface GuestPlatformViewProps {
+  products?: Product[];
   orders: ProductionOrder[];
   onAddOrder: (order: ProductionOrder) => void;
   onSwitchToAdmin?: () => void;
@@ -72,6 +73,7 @@ const galleryItems = [
 ];
 
 export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
+  products: adminProducts = [],
   orders,
   onAddOrder,
   onSwitchToAdmin,
@@ -79,6 +81,23 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
 }) => {
   const [currentPage, setCurrentPage] = useState<GuestPage>('landing');
   const [selectedProduct, setSelectedProduct] = useState<ProductItem | null>(null);
+
+  // Map admin products to Guest ProductItem format if available
+  const displayProducts: ProductItem[] = adminProducts.length > 0
+    ? adminProducts.map(p => ({
+        id: p.id,
+        name: p.name,
+        price: `Rp ${p.basePrice.toLocaleString('id-ID')} / ${p.unit}`,
+        img: p.coverImage || p.images?.[0] || p.image || 'https://images.unsplash.com/photo-1562654501-a0ccc0fc3fb1?w=400&q=80',
+        desc: p.description,
+        specs: [
+          `Kategori: ${p.category}`,
+          `Satuan: ${p.unit}`,
+          `Status: ${p.status}`,
+          p.isCustomDimension ? 'Mendukung Ukuran Kustom' : 'Ukuran Standar'
+        ]
+      }))
+    : products;
 
   // File Upload State
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -407,7 +426,7 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                  {products.map((product, idx) => (
+                  {displayProducts.map((product, idx) => (
                     <div
                       key={idx}
                       onClick={() => setSelectedProduct(product)}

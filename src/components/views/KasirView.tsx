@@ -703,7 +703,7 @@ export const KasirView: React.FC<KasirViewProps> = ({
                   <div>
                     <div className="aspect-video w-full rounded-[14px] bg-slate-100 overflow-hidden relative mb-2.5 border border-slate-100">
                       <img
-                        src={product.image || getCategoryImage(product.category)}
+                        src={product.coverImage || product.images?.[0] || product.image || getCategoryImage(product.category)}
                         alt={product.name}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       />
