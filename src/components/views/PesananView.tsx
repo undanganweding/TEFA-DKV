@@ -71,7 +71,7 @@ export const PesananView: React.FC<PesananViewProps> = ({
     if (selectedFilter === 'Baru') matchStatus = simpleStatus === 'Baru';
     else if (selectedFilter === 'Diproses') matchStatus = simpleStatus === 'Diproses';
     else if (selectedFilter === 'Selesai') matchStatus = simpleStatus === 'Selesai';
-    else if (selectedFilter === 'Diambil') matchStatus = simpleStatus === 'Diambil' || order.status === 'Selesai';
+    else if (selectedFilter === 'Diterima') matchStatus = simpleStatus === 'Diterima';
 
     const mainProduct = order.items[0]?.productName || '';
     const mainFile = order.items.find((i) => i.fileName)?.fileName || '';
@@ -209,32 +209,32 @@ export const PesananView: React.FC<PesananViewProps> = ({
           }`}
         >
           <div className="flex items-center justify-between">
-            <p className="text-xs font-black text-emerald-900 uppercase tracking-wider">Siap Ambil</p>
+            <p className="text-xs font-black text-emerald-900 uppercase tracking-wider">Selesai</p>
             <span className="material-symbols-outlined text-emerald-600 text-xl">verified</span>
           </div>
           <h3 className="text-3xl font-black text-slate-900">{countSelesai}</h3>
         </div>
 
         <div
-          onClick={() => setSelectedFilter('Diambil')}
+          onClick={() => setSelectedFilter('Diterima')}
           className={`p-5 rounded-[24px] border shadow-xs space-y-1.5 cursor-pointer transition-all ${
-            selectedFilter === 'Diambil'
+            selectedFilter === 'Diterima'
               ? 'bg-[#F3F0FF] text-slate-900 border-purple-300 ring-2 ring-purple-300'
               : 'bg-[#F3F0FF]/70 text-slate-900 border-purple-200/80 hover:bg-[#F3F0FF]'
           }`}
         >
           <div className="flex items-center justify-between">
-            <p className="text-xs font-black text-purple-900 uppercase tracking-wider">Sudah Diambil</p>
+            <p className="text-xs font-black text-purple-900 uppercase tracking-wider">Diterima</p>
             <span className="material-symbols-outlined text-[#5B4BFF] text-xl">task_alt</span>
           </div>
-          <h3 className="text-3xl font-black text-slate-900">{countBelumDiambil}</h3>
+          <h3 className="text-3xl font-black text-slate-900">{countDiterima}</h3>
         </div>
       </div>
 
       {/* 3. Filter Bar & Search */}
       <div className="bg-white rounded-[24px] border border-slate-200/80 p-4 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
-          {['Semua', 'Baru', 'Diproses', 'Selesai', 'Diambil'].map((tab) => (
+          {['Semua', 'Baru', 'Diproses', 'Selesai', 'Diterima'].map((tab) => (
             <button
               key={tab}
               onClick={() => setSelectedFilter(tab)}
