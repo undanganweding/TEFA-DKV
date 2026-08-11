@@ -803,9 +803,9 @@ export function App() {
     if (currentUser?.role === 'Guest') {
       return (
         <GuestPlatformView
-          onSwitchToAdmin={() => {
-            alert('Silakan logout dan login dengan akun Admin.');
-          }}
+          orders={orders}
+          onAddOrder={(newOrder) => setOrders((prev) => [newOrder, ...prev])}
+          onSwitchToAdmin={handleLogout}
           onLogout={handleLogout}
         />
       );

@@ -3,6 +3,8 @@ import { motion } from 'motion/react';
 import { ProductionOrder } from '../../types';
 
 interface GuestPlatformViewProps {
+  orders: ProductionOrder[];
+  onAddOrder: (order: ProductionOrder) => void;
   onSwitchToAdmin?: () => void;
   onLogout?: () => void;
 }
@@ -10,20 +12,31 @@ interface GuestPlatformViewProps {
 type GuestPage = 'landing' | 'order' | 'tracking';
 
 const services = [
-  { id: 'cetak_dokumen', name: 'Cetak Dokumen', icon: 'description', desc: 'Poster, Brosur, Banner' },
-  { id: 'cetak_foto', name: 'Cetak Foto', icon: 'photo_library', desc: 'Foto ukuran apapun' },
-  { id: 'merchandise', name: 'Merchandise', icon: 'redeem', desc: 'Pin, Mug, Sticker' },
-  { id: 'custom', name: 'Custom Order', icon: 'design_services', desc: 'Desain sesuai request' },
+  { id: 'cetak_dokumen', name: 'Cetak Dokumen', icon: 'description', desc: 'Poster, Brosur, Banner, Buku Kenangan' },
+  { id: 'cetak_foto', name: 'Cetak Foto', icon: 'photo_library', desc: 'Cetak foto Resolusi Tinggi & Bingkai' },
+  { id: 'merchandise', name: 'Merchandise', icon: 'redeem', desc: 'Gantungan Kunci, Pin Bros, Mug, Stiker Custom' },
+  { id: 'custom', name: 'Custom Design & Studio', icon: 'design_services', desc: 'Desain Logo, Feed IG, Foto Studio & Video' },
 ];
 
 const products = [
-  { name: 'Cetak Banner Flexi 280gr', price: 'Rp 18.000/m²' },
-  { name: 'Stiker Vinyl Glossy A3+', price: 'Rp 12.000/lembar' },
-  { name: 'Pin Bros Custom 44mm', price: 'Rp 4.500/pcs' },
-  { name: 'Kartu Nama Art Paper', price: 'Rp 35.000/box' },
+  { name: 'Cetak Banner Flexi 280gr', price: 'Rp 18.000 / m²', img: 'https://images.unsplash.com/photo-1562654501-a0ccc0fc3fb1?w=400&q=80' },
+  { name: 'Stiker Vinyl Glossy A3+', price: 'Rp 12.000 / lembar', img: 'https://images.unsplash.com/photo-1589939705384-5185137a7f0f?w=400&q=80' },
+  { name: 'Pin Bros Custom DKV', price: 'Rp 4.500 / pcs', img: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=400&q=80' },
+  { name: 'Kartu Nama Exclusive Box', price: 'Rp 35.000 / box', img: 'https://images.unsplash.com/photo-1542744094-3a31b272c390?w=400&q=80' },
+];
+
+const galleryItems = [
+  { title: 'Project Branding Coffee Shop', category: 'Creative Design', img: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=600&q=80' },
+  { title: 'Poster Event Kebudayaan', category: 'Cetak Poster', img: 'https://images.unsplash.com/photo-1542744094-3a31b272c390?w=600&q=80' },
+  { title: 'Merchandise Event Sekolah', category: 'Pin & Mug', img: 'https://images.unsplash.com/photo-1562654501-a0ccc0fc3fb1?w=600&q=80' },
+  { title: 'Foto Studio Kelulusan (Wisuda)', category: 'Studio Portrait', img: 'https://images.unsplash.com/photo-1589939705384-5185137a7f0f?w=600&q=80' },
+  { title: 'Stiker Branding Botol Kemasan', category: 'Vinyl Print', img: 'https://images.unsplash.com/photo-1511556532299-8f662fc26c06?w=600&q=80' },
+  { title: 'Buku Kenangan Siswa DKV', category: 'Cetak Buku', img: 'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=600&q=80' },
 ];
 
 export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
+  orders,
+  onAddOrder,
   onSwitchToAdmin,
   onLogout,
 }) => {
@@ -37,7 +50,6 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
     service: '',
     notes: '',
   });
-  const [orderFile, setOrderFile] = useState<File | null>(null);
   const [orderSuccess, setOrderSuccess] = useState<string | null>(null);
 
   // Tracking State
@@ -47,229 +59,387 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
   const handleSubmitOrder = (e: React.FormEvent) => {
     e.preventDefault();
     if (!orderForm.name || !orderForm.whatsapp || !orderForm.service) {
-      alert('Mohon lengkapi form!');
+      alert('Mohon lengkapi formulir wajib!');
       return;
     }
 
-    // Generate order ID
-    const orderId = `TEFA-GUEST-2026-${String(Math.floor(Math.random() * 999) + 1).padStart(3, '0')}`;
-    setOrderSuccess(orderId);
+    // Generate Guest Order ID: TEFA-GUEST-2026-XXX
+    const orderNo = `TEFA-GUEST-2026-${String(Math.floor(Math.random() * 900) + 100)}`;
+    const todayStr = new Date().toISOString().split('T')[0];
+    const serviceName = services.find((s) => s.id === orderForm.service)?.name || 'Layanan Cetak';
+
+    // Construct ProductionOrder object
+    const newOrder: ProductionOrder = {
+      id: 'ORD-GUEST-' + Date.now(),
+      orderNo: orderNo,
+      customerName: orderForm.name,
+      customerPhone: orderForm.whatsapp,
+      customerEmail: orderForm.email || undefined,
+      orderDate: todayStr,
+      dueDate: todayStr + ' 16:00',
+      status: 'Menunggu Admin',
+      paymentStatus: 'Belum Bayar',
+      items: [
+        {
+          id: 'ITEM-' + Date.now(),
+          productId: orderForm.service,
+          productName: serviceName,
+          category: 'Cetak',
+          price: 0,
+          quantity: 1,
+          totalPrice: 0,
+          notes: orderForm.notes || undefined,
+        },
+      ],
+      subtotal: 0,
+      discount: 0,
+      taxAmount: 0,
+      totalAmount: 0,
+      paidAmount: 0,
+      balanceDue: 0,
+      operatorName: 'Guest Customer',
+      priority: 'Normal',
+      notes: orderForm.notes || undefined,
+      statusHistory: [
+        {
+          status: 'Menunggu Admin',
+          timestamp: new Date().toLocaleString('id-ID'),
+          updatedBy: 'System',
+          note: 'Pesanan dibuat oleh Guest Customer',
+        },
+      ],
+    };
+
+    onAddOrder(newOrder);
+    setOrderSuccess(orderNo);
     setOrderForm({ name: '', whatsapp: '', email: '', service: '', notes: '' });
-    setOrderFile(null);
   };
 
   const handleTrack = () => {
-    // Simulate tracking
-    if (trackInput.trim()) {
+    if (!trackInput.trim()) {
+      alert('Masukkan Order ID atau Nomor WhatsApp Anda!');
+      return;
+    }
+
+    const query = trackInput.trim();
+    // Search orders by orderNo or customerPhone
+    const matchedOrders = orders.filter(
+      (o) => o.orderNo.toLowerCase() === query.toLowerCase() || o.customerPhone === query
+    );
+
+    if (matchedOrders.length > 0) {
+      // Pick the latest order
+      const found = matchedOrders[0];
       setTrackResult({
-        orderId: trackInput,
-        product: 'Cetak Banner Flexi',
-        date: '11 Agu 2026',
-        status: 'Diproses',
+        orderId: found.orderNo,
+        product: found.items.map((i) => i.productName).join(', '),
+        date: found.orderDate,
+        status: found.status,
+        statusHistory: found.statusHistory || [],
       });
+    } else {
+      alert('Data pesanan tidak ditemukan. Cek kembali Order ID atau WhatsApp Anda.');
+      setTrackResult(null);
     }
   };
 
   return (
-    <div className="min-h-screen bg-white font-sans">
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-800 flex flex-col justify-between selection:bg-[#5B4BFF]/20 selection:text-[#5B4BFF]">
       {/* Header */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-40">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-          <button onClick={() => setCurrentPage('landing')} className="flex items-center gap-3 cursor-pointer">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#5B4BFF] to-purple-600 flex items-center justify-center">
+      <header className="bg-white/80 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-40">
+        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+          <button
+            onClick={() => {
+              setCurrentPage('landing');
+              setTrackResult(null);
+            }}
+            className="flex items-center gap-3 cursor-pointer text-left focus:outline-none"
+          >
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#5B4BFF] via-purple-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-purple-500/20">
               <span className="material-symbols-outlined text-white text-xl">palette</span>
             </div>
             <div>
-              <h1 className="font-black text-slate-800 text-lg leading-tight">TEFA DKV</h1>
-              <p className="text-[10px] text-slate-500 font-bold">SMK NU UNGARAN</p>
+              <h1 className="font-black text-slate-900 text-base leading-tight tracking-tight">TEFA DKV</h1>
+              <p className="text-[9px] text-[#5B4BFF] font-extrabold uppercase tracking-widest">SMK NU UNGARAN</p>
             </div>
           </button>
 
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setCurrentPage('order')}
-              className="px-4 py-2 bg-[#5B4BFF] hover:bg-[#4a3ce0] text-white font-bold text-sm rounded-xl transition-all"
+              onClick={() => {
+                setCurrentPage('order');
+                setOrderSuccess(null);
+              }}
+              className="px-4 py-2.5 bg-[#5B4BFF] hover:bg-[#4a3ce0] text-white font-extrabold text-xs rounded-xl shadow-md shadow-purple-500/10 hover:shadow-lg transition-all cursor-pointer"
             >
               Buat Pesanan
             </button>
             <button
               onClick={onSwitchToAdmin}
-              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm rounded-xl transition-all"
+              className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-xs rounded-xl transition-all cursor-pointer border border-slate-200/60"
             >
-              Login Admin
+              Login Admin / Siswa
             </button>
           </div>
         </div>
       </header>
 
-      {/* LANDING PAGE */}
-      {currentPage === 'landing' && (
-        <div>
-          {/* Hero Section */}
-          <section className="bg-gradient-to-br from-slate-900 via-slate-800 to-purple-900 text-white py-20 px-4">
-            <div className="max-w-4xl mx-auto text-center">
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-              >
-                <span className="inline-block px-4 py-1.5 bg-white/10 rounded-full text-xs font-bold mb-4 backdrop-blur-sm">
-                  Teaching Factory Desain Komunikasi Visual
-                </span>
-                <h1 className="text-4xl md:text-5xl font-black mb-4 leading-tight">
-                  Pesan Layanan Kreatif
-                  <br />
-                  <span className="bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">
-                    TEFA DKV
+      {/* Main Content Area */}
+      <main className="flex-1">
+        {/* LANDING PAGE */}
+        {currentPage === 'landing' && (
+          <div className="animate-fade-in">
+            {/* Hero Section (Navy/Purple Theme) */}
+            <section className="relative overflow-hidden bg-gradient-to-br from-[#0F1322] via-[#141933] to-[#251A4D] text-white py-24 px-6">
+              {/* Decorative Blur Orbs */}
+              <div className="absolute top-0 -left-20 w-80 h-80 bg-[#5B4BFF]/25 rounded-full blur-[100px] pointer-events-none" />
+              <div className="absolute bottom-0 right-0 w-96 h-96 bg-purple-600/20 rounded-full blur-[120px] pointer-events-none" />
+
+              <div className="max-w-4xl mx-auto text-center relative z-10">
+                <motion.div
+                  initial={{ opacity: 0, y: 30 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.6 }}
+                >
+                  <span className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-white/10 rounded-full text-[11px] font-extrabold mb-6 backdrop-blur-md border border-white/10 tracking-wider uppercase text-purple-200">
+                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                    Teaching Factory Desain Komunikasi Visual
                   </span>
-                </h1>
-                <p className="text-lg text-slate-300 mb-8 max-w-2xl mx-auto">
-                  Layanan cetak dan desain berkualitas dari siswa SMK NU Ungaran.
-                  Cepat, murah, dan hasil profesional.
-                </p>
-                <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                  <button
-                    onClick={() => setCurrentPage('order')}
-                    className="px-8 py-4 bg-[#5B4BFF] hover:bg-[#4a3ce0] text-white font-black text-lg rounded-2xl shadow-xl shadow-purple-500/30 transition-all flex items-center justify-center gap-2"
-                  >
-                    <span className="material-symbols-outlined">add_circle</span>
-                    Buat Pesanan
-                  </button>
-                  <button
-                    onClick={() => setCurrentPage('tracking')}
-                    className="px-8 py-4 bg-white/10 hover:bg-white/20 text-white font-black text-lg rounded-2xl backdrop-blur-sm transition-all flex items-center justify-center gap-2"
-                  >
-                    <span className="material-symbols-outlined">search</span>
-                    Cek Status Pesanan
-                  </button>
-                </div>
-              </motion.div>
-            </div>
-          </section>
+                  <h1 className="text-4xl md:text-6xl font-black mb-6 leading-tight tracking-tight">
+                    Pesan Layanan Kreatif
+                    <br />
+                    <span className="bg-gradient-to-r from-[#5B4BFF] via-purple-400 to-cyan-300 bg-clip-text text-transparent">
+                      TEFA DKV SMK NU Ungaran
+                    </span>
+                  </h1>
+                  <p className="text-sm md:text-base text-slate-300 mb-10 max-w-2xl mx-auto font-medium leading-relaxed">
+                    Solusi cetak cepat dan kebutuhan studio kreatif profesional. Diproduksi langsung oleh siswa bertalenta di bawah supervisi praktisi industri.
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+                    <button
+                      onClick={() => {
+                        setCurrentPage('order');
+                        setOrderSuccess(null);
+                      }}
+                      className="w-full sm:w-auto px-8 py-4 bg-[#5B4BFF] hover:bg-[#4a3ce0] text-white font-extrabold text-sm rounded-2xl shadow-xl shadow-purple-500/20 hover:shadow-2xl hover:scale-[1.02] transition-all flex items-center justify-center gap-2.5 cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-lg">add_circle</span>
+                      Buat Pesanan Cepat
+                    </button>
+                    <button
+                      onClick={() => {
+                        setCurrentPage('tracking');
+                        setTrackResult(null);
+                      }}
+                      className="w-full sm:w-auto px-8 py-4 bg-white/10 hover:bg-white/15 text-white font-extrabold text-sm rounded-2xl backdrop-blur-md border border-white/10 hover:border-white/20 transition-all flex items-center justify-center gap-2.5 cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-lg">search</span>
+                      Cek Status Pesanan
+                    </button>
+                  </div>
+                </motion.div>
+              </div>
+            </section>
 
-          {/* Services Section */}
-          <section className="py-16 px-4 bg-slate-50">
-            <div className="max-w-5xl mx-auto">
-              <h2 className="text-2xl font-black text-slate-800 text-center mb-10">Layanan Kami</h2>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {services.map((service) => (
-                  <motion.div
-                    key={service.id}
-                    whileHover={{ scale: 1.03 }}
-                    className="bg-white p-6 rounded-2xl border border-slate-200 text-center cursor-pointer hover:border-[#5B4BFF]/30 hover:shadow-lg transition-all"
-                    onClick={() => {
-                      setOrderForm(prev => ({ ...prev, service: service.id }));
-                      setCurrentPage('order');
-                    }}
-                  >
-                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#5B4BFF] to-purple-600 flex items-center justify-center mx-auto mb-4">
-                      <span className="material-symbols-outlined text-white text-2xl">{service.icon}</span>
+            {/* Services Section (70% White / Light background) */}
+            <section className="py-20 px-6 bg-white border-b border-slate-100">
+              <div className="max-w-5xl mx-auto">
+                <div className="text-center mb-16">
+                  <h2 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">Layanan Kreatif Studio</h2>
+                  <p className="text-sm text-slate-500 font-bold mt-2">Pilih kategori layanan TEFA DKV sesuai kebutuhan Anda</p>
+                  <div className="w-12 h-1 bg-[#5B4BFF] mx-auto mt-4 rounded-full" />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                  {services.map((service, idx) => (
+                    <motion.div
+                      key={service.id}
+                      whileHover={{ y: -6, shadow: '0 20px 25px -5px rgb(0 0 0 / 0.05)' }}
+                      onClick={() => {
+                        setOrderForm((prev) => ({ ...prev, service: service.id }));
+                        setCurrentPage('order');
+                        setOrderSuccess(null);
+                      }}
+                      className="bg-slate-50/50 p-6 rounded-3xl border border-slate-200/60 text-center cursor-pointer transition-all hover:bg-white hover:border-[#5B4BFF]/30 group"
+                    >
+                      <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#5B4BFF]/10 to-purple-600/10 flex items-center justify-center mx-auto mb-5 group-hover:from-[#5B4BFF] group-hover:to-purple-600 transition-all">
+                        <span className="material-symbols-outlined text-[#5B4BFF] text-2xl group-hover:text-white transition-all">
+                          {service.icon}
+                        </span>
+                      </div>
+                      <h3 className="font-extrabold text-slate-800 text-sm mb-2 group-hover:text-[#5B4BFF] transition-all">
+                        {service.name}
+                      </h3>
+                      <p className="text-xs text-slate-500 font-bold leading-relaxed">{service.desc}</p>
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+            </section>
+
+            {/* Products Section */}
+            <section className="py-20 px-6 bg-slate-50 border-b border-slate-100">
+              <div className="max-w-5xl mx-auto">
+                <div className="text-center mb-16">
+                  <h2 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">Produk Unggulan</h2>
+                  <p className="text-sm text-slate-500 font-bold mt-2">Daftar harga standar cetak cepat terpopuler</p>
+                  <div className="w-12 h-1 bg-[#5B4BFF] mx-auto mt-4 rounded-full" />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                  {products.map((product, idx) => (
+                    <div
+                      key={idx}
+                      className="bg-white p-4 rounded-3xl border border-slate-200/80 hover:shadow-lg transition-all group flex flex-col justify-between"
+                    >
+                      <div>
+                        <div className="w-full h-36 bg-slate-100 rounded-2xl mb-4 overflow-hidden relative">
+                          <img
+                            src={product.img}
+                            alt={product.name}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-350"
+                          />
+                        </div>
+                        <h3 className="font-extrabold text-slate-800 text-xs mb-1.5 leading-tight">{product.name}</h3>
+                      </div>
+                      <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
+                        <span className="text-[#5B4BFF] font-black text-xs">{product.price}</span>
+                        <span className="text-[9px] bg-slate-100 text-slate-600 font-bold px-2 py-0.5 rounded-full">
+                          Standard
+                        </span>
+                      </div>
                     </div>
-                    <h3 className="font-bold text-slate-800 mb-1">{service.name}</h3>
-                    <p className="text-xs text-slate-500">{service.desc}</p>
-                  </motion.div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
-          </section>
+            </section>
 
-          {/* Products Section */}
-          <section className="py-16 px-4">
-            <div className="max-w-5xl mx-auto">
-              <h2 className="text-2xl font-black text-slate-800 text-center mb-10">Produk Unggulan</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {products.map((product, idx) => (
-                  <motion.div
-                    key={idx}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: idx * 0.1 }}
-                    className="bg-white p-5 rounded-2xl border border-slate-200 hover:shadow-lg transition-all"
-                  >
-                    <div className="w-full h-32 bg-gradient-to-br from-slate-100 to-slate-200 rounded-xl mb-4 flex items-center justify-center">
-                      <span className="material-symbols-outlined text-5xl text-slate-300">image</span>
+            {/* Galeri Hasil Karya (NEW SECTION) */}
+            <section className="py-20 px-6 bg-white border-b border-slate-100">
+              <div className="max-w-5xl mx-auto">
+                <div className="text-center mb-16">
+                  <h2 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">Galeri Hasil Karya DKV</h2>
+                  <p className="text-sm text-slate-500 font-bold mt-2">Portofolio produksi & karya nyata studio kami</p>
+                  <div className="w-12 h-1 bg-[#5B4BFF] mx-auto mt-4 rounded-full" />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {galleryItems.map((item, idx) => (
+                    <div
+                      key={idx}
+                      className="bg-slate-50 rounded-3xl overflow-hidden border border-slate-200/60 hover:shadow-lg transition-all group"
+                    >
+                      <div className="w-full h-48 overflow-hidden relative">
+                        <img
+                          src={item.img}
+                          alt={item.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-350"
+                        />
+                        <div className="absolute top-3 left-3">
+                          <span className="text-[10px] bg-white/95 text-slate-800 font-extrabold px-3 py-1 rounded-full shadow-xs backdrop-blur-xs">
+                            {item.category}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="p-5">
+                        <h4 className="font-extrabold text-slate-850 text-sm leading-snug">{item.title}</h4>
+                      </div>
                     </div>
-                    <h3 className="font-bold text-slate-800 text-sm mb-1">{product.name}</h3>
-                    <p className="text-[#5B4BFF] font-black">{product.price}</p>
-                  </motion.div>
-                ))}
-              </div>
-            </div>
-          </section>
-
-          {/* Contact Section */}
-          <section className="py-12 px-4 bg-slate-900 text-white">
-            <div className="max-w-3xl mx-auto text-center">
-              <h2 className="text-2xl font-black mb-4">Hubungi Kami</h2>
-              <p className="text-slate-400 mb-6">TEFA DKV SMK NU Ungaran siap membantu kebutuhan cetak Anda</p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <div className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-xl">
-                  <span className="material-symbols-outlined text-[#5B4BFF]">phone</span>
-                  <span className="font-bold">0812-3456-7890</span>
-                </div>
-                <div className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-xl">
-                  <span className="material-symbols-outlined text-[#5B4BFF]">location_on</span>
-                  <span className="font-bold">SMK NU Ungaran</span>
+                  ))}
                 </div>
               </div>
-            </div>
-          </section>
+            </section>
 
-          {/* Footer */}
-          <footer className="py-6 px-4 bg-slate-950 text-slate-500 text-center text-xs">
-            <p>© 2026 TEFA DKV SMK NU Ungaran. All rights reserved.</p>
-          </footer>
-        </div>
-      )}
+            {/* Contact Section */}
+            <section className="py-20 px-6 bg-gradient-to-br from-[#0F1322] to-[#171C35] text-white">
+              <div className="max-w-4xl mx-auto">
+                <div className="text-center mb-12">
+                  <h2 className="text-2xl font-black mb-2">Informasi & Hubungi Kami</h2>
+                  <p className="text-slate-400 text-xs font-bold">Kami siap menyambut dan memproses pesanan industri Anda</p>
+                </div>
 
-      {/* ORDER PAGE */}
-      {currentPage === 'order' && (
-        <div className="min-h-screen bg-slate-50 py-8 px-4">
-          <div className="max-w-xl mx-auto">
-            {/* Back Button */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="bg-white/5 border border-white/10 rounded-2xl p-6 text-center backdrop-blur-md">
+                    <span className="material-symbols-outlined text-[#5B4BFF] text-3xl mb-3">phone</span>
+                    <h4 className="font-extrabold text-sm mb-1">WhatsApp Customer</h4>
+                    <p className="text-xs text-slate-300 font-bold">0812-3456-7890</p>
+                  </div>
+                  <div className="bg-white/5 border border-white/10 rounded-2xl p-6 text-center backdrop-blur-md">
+                    <span className="material-symbols-outlined text-[#5B4BFF] text-3xl mb-3">location_on</span>
+                    <h4 className="font-extrabold text-sm mb-1">Lokasi Studio</h4>
+                    <p className="text-xs text-slate-300 font-bold">Lab DKV, SMK NU Ungaran</p>
+                  </div>
+                  <div className="bg-white/5 border border-white/10 rounded-2xl p-6 text-center backdrop-blur-md">
+                    <span className="material-symbols-outlined text-[#5B4BFF] text-3xl mb-3">mail</span>
+                    <h4 className="font-extrabold text-sm mb-1">E-mail Studio</h4>
+                    <p className="text-xs text-slate-300 font-bold">tefa.dkv@smknuungaran.sch.id</p>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+        )}
+
+        {/* ORDER PAGE */}
+        {currentPage === 'order' && (
+          <div className="max-w-xl mx-auto py-10 px-6 animate-fade-in">
             <button
               onClick={() => setCurrentPage('landing')}
-              className="flex items-center gap-2 text-slate-600 hover:text-slate-800 font-bold mb-6 transition-colors"
+              className="flex items-center gap-2 text-slate-650 hover:text-slate-900 font-extrabold text-xs mb-6 transition-colors cursor-pointer focus:outline-none"
             >
-              <span className="material-symbols-outlined">arrow_back</span>
-              Kembali
+              <span className="material-symbols-outlined text-sm font-black">arrow_back</span>
+              Kembali Ke Beranda
             </button>
 
-            <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-200">
+            <div className="bg-white rounded-[32px] p-8 shadow-md border border-slate-200/80">
               <div className="text-center mb-8">
-                <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-[#5B4BFF] to-purple-600 flex items-center justify-center mx-auto mb-4">
-                  <span className="material-symbols-outlined text-white text-3xl">add_circle</span>
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-[#5B4BFF] to-purple-600 flex items-center justify-center mx-auto mb-4 text-white shadow-md shadow-purple-500/10">
+                  <span className="material-symbols-outlined text-white text-2xl">add_circle</span>
                 </div>
-                <h1 className="text-2xl font-black text-slate-800">Buat Pesanan</h1>
-                <p className="text-slate-500 text-sm mt-1">Isi form di bawah untuk memesan layanan</p>
+                <h2 className="text-2xl font-black text-slate-900 tracking-tight">Form Pemesanan Cepat</h2>
+                <p className="text-slate-500 text-xs font-bold mt-1">Mengakses platform order instan tanpa pendaftaran akun</p>
               </div>
 
-              {/* Success Message */}
+              {/* Success Result */}
               {orderSuccess && (
                 <motion.div
-                  initial={{ opacity: 0, scale: 0.9 }}
+                  initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  className="bg-emerald-50 border border-emerald-200 rounded-2xl p-6 mb-6 text-center"
+                  className="bg-emerald-50 border border-emerald-200 rounded-3xl p-6 mb-4 text-center"
                 >
-                  <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-4">
-                    <span className="material-symbols-outlined text-4xl text-emerald-500">check_circle</span>
+                  <div className="w-14 h-14 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-4">
+                    <span className="material-symbols-outlined text-3xl text-emerald-600">check_circle</span>
                   </div>
-                  <h3 className="text-xl font-black text-emerald-800 mb-2">Pesanan Berhasil!</h3>
-                  <p className="text-emerald-600 text-sm mb-4">Simpan kode pesanan Anda untuk tracking:</p>
-                  <div className="bg-white border-2 border-emerald-300 rounded-xl px-6 py-3 inline-block">
-                    <span className="text-2xl font-black text-emerald-700 tracking-wider">{orderSuccess}</span>
-                  </div>
-                  <p className="text-xs text-emerald-500 mt-4">
-                    Pesanan akan diproses setelah diverifikasi admin
+                  <h3 className="text-lg font-black text-emerald-800 mb-1">Pesanan Terkirim!</h3>
+                  <p className="text-emerald-600 text-xs font-bold mb-4">
+                    Simpan kode pesanan Anda di bawah untuk melacak status pengerjaan:
                   </p>
-                  <button
-                    onClick={() => {
-                      setOrderSuccess(null);
-                      setCurrentPage('tracking');
-                    }}
-                    className="mt-4 px-6 py-2 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl transition-all"
-                  >
-                    Lacak Pesanan
-                  </button>
+                  <div className="bg-white border-2 border-dashed border-emerald-300 rounded-2xl px-6 py-3.5 inline-block shadow-sm mb-2">
+                    <span className="text-xl font-black text-emerald-700 tracking-wider">{orderSuccess}</span>
+                  </div>
+                  <p className="text-[10px] text-emerald-500 font-extrabold mt-2 leading-relaxed">
+                    * Simpan kode pesanan untuk tracking.
+                    <br />
+                    Admin kami akan segera menghubungi Anda di nomor WhatsApp untuk detail pembayaran & file.
+                  </p>
+                  <div className="flex gap-2.5 justify-center mt-6">
+                    <button
+                      onClick={() => {
+                        setTrackInput(orderSuccess);
+                        setCurrentPage('tracking');
+                        setTimeout(handleTrack, 100);
+                      }}
+                      className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-750 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all cursor-pointer"
+                    >
+                      Lacak Status
+                    </button>
+                    <button
+                      onClick={() => setOrderSuccess(null)}
+                      className="px-5 py-2.5 bg-slate-200/80 hover:bg-slate-300/80 text-slate-700 font-extrabold text-xs rounded-xl transition-all cursor-pointer"
+                    >
+                      Pesan Lagi
+                    </button>
+                  </div>
                 </motion.div>
               )}
 
@@ -277,21 +447,21 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
               {!orderSuccess && (
                 <form onSubmit={handleSubmitOrder} className="space-y-5">
                   <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">
-                      Nama Lengkap <span className="text-red-500">*</span>
+                    <label className="block text-xs font-extrabold text-slate-700 mb-1.5">
+                      Nama Customer <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
                       required
                       value={orderForm.name}
                       onChange={(e) => setOrderForm({ ...orderForm, name: e.target.value })}
-                      placeholder="Masukkan nama lengkap"
-                      className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#5B4BFF]/30 focus:border-[#5B4BFF]"
+                      placeholder="Nama lengkap Anda"
+                      className="w-full px-4 py-3 border border-slate-200 rounded-2xl text-xs sm:text-sm font-semibold focus:outline-none focus:border-[#5B4BFF] focus:ring-3 focus:ring-purple-500/5 bg-slate-50/50"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">
+                    <label className="block text-xs font-extrabold text-slate-700 mb-1.5">
                       Nomor WhatsApp <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -299,26 +469,26 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
                       required
                       value={orderForm.whatsapp}
                       onChange={(e) => setOrderForm({ ...orderForm, whatsapp: e.target.value })}
-                      placeholder="08xxxxxxxxxx"
-                      className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#5B4BFF]/30 focus:border-[#5B4BFF]"
+                      placeholder="Contoh: 08123456789"
+                      className="w-full px-4 py-3 border border-slate-200 rounded-2xl text-xs sm:text-sm font-semibold focus:outline-none focus:border-[#5B4BFF] focus:ring-3 focus:ring-purple-500/5 bg-slate-50/50"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">
-                      Email <span className="text-slate-400">(Opsional)</span>
+                    <label className="block text-xs font-extrabold text-slate-700 mb-1.5">
+                      Email <span className="text-slate-400 font-normal">(Optional)</span>
                     </label>
                     <input
                       type="email"
                       value={orderForm.email}
                       onChange={(e) => setOrderForm({ ...orderForm, email: e.target.value })}
-                      placeholder="email@example.com"
-                      className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#5B4BFF]/30 focus:border-[#5B4BFF]"
+                      placeholder="email@anda.com"
+                      className="w-full px-4 py-3 border border-slate-200 rounded-2xl text-xs sm:text-sm font-semibold focus:outline-none focus:border-[#5B4BFF] focus:ring-3 focus:ring-purple-500/5 bg-slate-50/50"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">
+                    <label className="block text-xs font-extrabold text-slate-700 mb-2">
                       Pilih Layanan <span className="text-red-500">*</span>
                     </label>
                     <div className="grid grid-cols-2 gap-3">
@@ -327,162 +497,197 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
                           key={service.id}
                           type="button"
                           onClick={() => setOrderForm({ ...orderForm, service: service.id })}
-                          className={`p-4 rounded-xl border-2 text-left transition-all ${
+                          className={`p-4 rounded-2xl border-2 text-left transition-all ${
                             orderForm.service === service.id
                               ? 'border-[#5B4BFF] bg-[#5B4BFF]/5'
-                              : 'border-slate-200 hover:border-slate-300'
+                              : 'border-slate-200 hover:border-slate-350 hover:bg-slate-50/30'
                           }`}
                         >
-                          <span className={`material-symbols-outlined text-2xl ${
-                            orderForm.service === service.id ? 'text-[#5B4BFF]' : 'text-slate-400'
-                          }`}>{service.icon}</span>
-                          <p className={`font-bold text-sm mt-2 ${
-                            orderForm.service === service.id ? 'text-[#5B4BFF]' : 'text-slate-700'
-                          }`}>{service.name}</p>
+                          <span
+                            className={`material-symbols-outlined text-xl ${
+                              orderForm.service === service.id ? 'text-[#5B4BFF]' : 'text-slate-400'
+                            }`}
+                          >
+                            {service.icon}
+                          </span>
+                          <p
+                            className={`font-black text-xs mt-2 ${
+                              orderForm.service === service.id ? 'text-[#5B4BFF]' : 'text-slate-700'
+                            }`}
+                          >
+                            {service.name}
+                          </p>
                         </button>
                       ))}
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">
-                      Upload File Desain <span className="text-slate-400">(Opsional)</span>
+                    <label className="block text-xs font-extrabold text-slate-700 mb-1.5">
+                      Upload File <span className="text-slate-400 font-normal">(Optional)</span>
                     </label>
-                    <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:border-[#5B4BFF]/50 transition-colors cursor-pointer">
-                      <span className="material-symbols-outlined text-4xl text-slate-300">upload_file</span>
-                      <p className="text-sm text-slate-500 mt-2">Klik atau drag file ke sini</p>
-                      <p className="text-xs text-slate-400">JPG, PNG, PDF, AI, CDR (Max 10MB)</p>
+                    <div className="border-2 border-dashed border-slate-300 hover:border-[#5B4BFF] rounded-2xl p-6 text-center transition-colors cursor-pointer bg-slate-50/30">
+                      <span className="material-symbols-outlined text-3xl text-slate-300 mb-2">upload_file</span>
+                      <p className="text-xs text-slate-500 font-bold">Pilih berkas desain Anda</p>
+                      <p className="text-[10px] text-slate-400 mt-1 font-semibold">Maksimal 10MB (PDF, JPG, PNG, CDR, AI)</p>
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">
-                      Catatan Pesanan <span className="text-slate-400">(Opsional)</span>
+                    <label className="block text-xs font-extrabold text-slate-700 mb-1.5">
+                      Catatan Pesanan <span className="text-slate-400 font-normal">(Optional)</span>
                     </label>
                     <textarea
                       value={orderForm.notes}
                       onChange={(e) => setOrderForm({ ...orderForm, notes: e.target.value })}
-                      placeholder="Ukuran, jumlah, keterangan tambahan..."
+                      placeholder="Ukuran, bahan, jumlah cetak, atau detail request lainnya..."
                       rows={3}
-                      className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#5B4BFF]/30 focus:border-[#5B4BFF] resize-none"
+                      className="w-full px-4 py-3 border border-slate-200 rounded-2xl text-xs sm:text-sm font-semibold focus:outline-none focus:border-[#5B4BFF] focus:ring-3 focus:ring-purple-500/5 bg-slate-50/50 resize-none"
                     />
                   </div>
 
                   <button
                     type="submit"
-                    className="w-full py-4 bg-[#5B4BFF] hover:bg-[#4a3ce0] text-white font-black text-lg rounded-2xl shadow-lg shadow-purple-500/30 transition-all flex items-center justify-center gap-2"
+                    className="w-full py-4 bg-[#5B4BFF] hover:bg-[#4a3ce0] text-white font-black text-sm rounded-2xl shadow-lg shadow-purple-500/20 hover:scale-[1.01] active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer"
                   >
-                    <span className="material-symbols-outlined">send</span>
-                    Kirim Pesanan
+                    <span className="material-symbols-outlined text-base">send</span>
+                    Kirim Pesanan Sekarang
                   </button>
                 </form>
               )}
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* TRACKING PAGE */}
-      {currentPage === 'tracking' && (
-        <div className="min-h-screen bg-slate-50 py-8 px-4">
-          <div className="max-w-xl mx-auto">
-            {/* Back Button */}
+        {/* TRACKING PAGE */}
+        {currentPage === 'tracking' && (
+          <div className="max-w-xl mx-auto py-10 px-6 animate-fade-in">
             <button
-              onClick={() => setCurrentPage('landing')}
-              className="flex items-center gap-2 text-slate-600 hover:text-slate-800 font-bold mb-6 transition-colors"
+              onClick={() => {
+                setCurrentPage('landing');
+                setTrackResult(null);
+              }}
+              className="flex items-center gap-2 text-slate-650 hover:text-slate-900 font-extrabold text-xs mb-6 transition-colors cursor-pointer focus:outline-none"
             >
-              <span className="material-symbols-outlined">arrow_back</span>
-              Kembali
+              <span className="material-symbols-outlined text-sm font-black">arrow_back</span>
+              Kembali Ke Beranda
             </button>
 
-            <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-200">
+            <div className="bg-white rounded-[32px] p-8 shadow-md border border-slate-200/80">
               <div className="text-center mb-8">
-                <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-[#5B4BFF] to-purple-600 flex items-center justify-center mx-auto mb-4">
-                  <span className="material-symbols-outlined text-white text-3xl">search</span>
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-[#5B4BFF] to-purple-600 flex items-center justify-center mx-auto mb-4 text-white shadow-md shadow-purple-500/10">
+                  <span className="material-symbols-outlined text-white text-2xl">search</span>
                 </div>
-                <h1 className="text-2xl font-black text-slate-800">Lacak Pesanan</h1>
-                <p className="text-slate-500 text-sm mt-1">Masukkan Order ID atau Nomor WhatsApp</p>
+                <h2 className="text-2xl font-black text-slate-900 tracking-tight">Lacak Status Pesanan</h2>
+                <p className="text-slate-500 text-xs font-bold mt-1">Masukkan ID Order atau Nomor WhatsApp terdaftar</p>
               </div>
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-2">Order ID</label>
+                  <label className="block text-xs font-extrabold text-slate-700 mb-1.5">Order ID atau No. WhatsApp</label>
                   <input
                     type="text"
                     value={trackInput}
                     onChange={(e) => setTrackInput(e.target.value)}
-                    placeholder="TEFA-GUEST-2026-001"
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#5B4BFF]/30 focus:border-[#5B4BFF]"
+                    placeholder="Contoh: TEFA-GUEST-2026-001 atau 0812xxxxx"
+                    className="w-full px-4 py-3 border border-slate-200 rounded-2xl text-xs sm:text-sm font-semibold focus:outline-none focus:border-[#5B4BFF] focus:ring-3 focus:ring-purple-500/5 bg-slate-50/50"
                   />
                 </div>
 
                 <button
                   onClick={handleTrack}
-                  className="w-full py-4 bg-[#5B4BFF] hover:bg-[#4a3ce0] text-white font-black text-lg rounded-2xl shadow-lg shadow-purple-500/30 transition-all flex items-center justify-center gap-2"
+                  className="w-full py-4 bg-[#5B4BFF] hover:bg-[#4a3ce0] text-white font-black text-sm rounded-2xl shadow-lg shadow-purple-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  <span className="material-symbols-outlined">search</span>
-                  Lacak
+                  <span className="material-symbols-outlined text-base">search</span>
+                  Mulai Lacak
                 </button>
               </div>
 
-              {/* Track Result */}
+              {/* Track Result Display */}
               {trackResult && (
                 <motion.div
-                  initial={{ opacity: 0, y: 20 }}
+                  initial={{ opacity: 0, y: 15 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="mt-8 bg-slate-50 rounded-2xl p-6"
+                  className="mt-8 bg-slate-50/80 rounded-2xl p-6 border border-slate-200/50"
                 >
-                  <h3 className="font-bold text-slate-800 mb-4">Hasil Tracking</h3>
-                  <div className="space-y-3">
-                    <div className="flex justify-between py-2 border-b border-slate-200">
-                      <span className="text-slate-500">Order ID</span>
-                      <span className="font-bold text-slate-800">{trackResult.orderId}</span>
+                  <h3 className="font-extrabold text-slate-800 text-sm mb-4 pb-2 border-b border-slate-200">
+                    Detail Pesanan
+                  </h3>
+                  <div className="space-y-3 text-xs">
+                    <div className="flex justify-between items-center py-1">
+                      <span className="text-slate-500 font-bold">Order ID</span>
+                      <span className="font-black text-slate-800">{trackResult.orderId}</span>
                     </div>
-                    <div className="flex justify-between py-2 border-b border-slate-200">
-                      <span className="text-slate-500">Produk</span>
-                      <span className="font-bold text-slate-800">{trackResult.product}</span>
+                    <div className="flex justify-between items-center py-1">
+                      <span className="text-slate-500 font-bold">Layanan</span>
+                      <span className="font-extrabold text-slate-800 text-right">{trackResult.product}</span>
                     </div>
-                    <div className="flex justify-between py-2 border-b border-slate-200">
-                      <span className="text-slate-500">Tanggal</span>
-                      <span className="font-bold text-slate-800">{trackResult.date}</span>
+                    <div className="flex justify-between items-center py-1">
+                      <span className="text-slate-500 font-bold">Tanggal Order</span>
+                      <span className="font-extrabold text-slate-800">{trackResult.date}</span>
                     </div>
-                    <div className="flex justify-between py-2">
-                      <span className="text-slate-500">Status</span>
-                      <span className="px-3 py-1 bg-amber-100 text-amber-700 font-bold text-sm rounded-full">
+                    <div className="flex justify-between items-center py-1">
+                      <span className="text-slate-500 font-bold">Status Utama</span>
+                      <span className="px-3 py-1 bg-[#5B4BFF]/10 text-[#5B4BFF] font-black rounded-full text-[10px]">
                         {trackResult.status}
                       </span>
                     </div>
                   </div>
 
                   {/* Status Timeline */}
-                  <div className="mt-6 space-y-4">
-                    {['Menunggu Admin', 'Diproses', 'Selesai', 'Diterima'].map((step, idx) => {
-                      const isActive = trackResult.status === step ||
-                        (trackResult.status === 'Diproses' && idx <= 2) ||
-                        (trackResult.status === 'Selesai' && idx <= 3) ||
-                        (trackResult.status === 'Diterima');
-                      return (
-                        <div key={step} className="flex items-center gap-3">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                            isActive ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-400'
-                          }`}>
-                            <span className="material-symbols-outlined text-sm">
-                              {isActive ? 'check' : 'radio_button_unchecked'}
+                  <div className="mt-8 pt-6 border-t border-slate-200">
+                    <h4 className="font-extrabold text-slate-800 text-xs mb-5">Timeline Progress Produksi</h4>
+                    <div className="relative pl-6 space-y-6 before:absolute before:left-3 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
+                      {['Menunggu Admin', 'Diproses', 'Selesai', 'Diterima'].map((step) => {
+                        // Check if step is completed based on current status
+                        const getStepWeight = (statusName: string) => {
+                          if (statusName === 'Menunggu Admin') return 1;
+                          if (statusName === 'Diproses') return 2;
+                          if (statusName === 'Selesai') return 3;
+                          if (statusName === 'Diterima') return 4;
+                          return 0;
+                        };
+                        const currentWeight = getStepWeight(trackResult.status);
+                        const stepWeight = getStepWeight(step);
+                        const isDone = currentWeight >= stepWeight;
+                        const isCurrent = currentWeight === stepWeight;
+
+                        return (
+                          <div key={step} className="relative flex items-center gap-3">
+                            <div
+                              className={`absolute -left-6 w-3 h-3 rounded-full border-2 transition-all ${
+                                isDone
+                                  ? 'bg-[#5B4BFF] border-[#5B4BFF] ring-4 ring-[#5B4BFF]/20'
+                                  : 'bg-white border-slate-300'
+                              }`}
+                            />
+                            <span
+                              className={`text-xs ${
+                                isCurrent
+                                  ? 'text-[#5B4BFF] font-black'
+                                  : isDone
+                                  ? 'text-slate-800 font-bold'
+                                  : 'text-slate-400 font-semibold'
+                              }`}
+                            >
+                              {step}
                             </span>
                           </div>
-                          <span className={`text-sm font-bold ${
-                            isActive ? 'text-slate-800' : 'text-slate-400'
-                          }`}>{step}</span>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                   </div>
                 </motion.div>
               )}
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </main>
+
+      {/* Footer */}
+      <footer className="py-6 border-t border-slate-200/60 bg-white text-slate-450 text-center text-[10px] font-bold">
+        <p>© 2026 TEFA DKV SMK NU Ungaran. All rights reserved.</p>
+      </footer>
     </div>
   );
 };
