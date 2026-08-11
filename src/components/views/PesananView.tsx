@@ -6,6 +6,7 @@ interface PesananViewProps {
   orders: ProductionOrder[];
   onUpdateOrderStatus: (orderId: string, newStatus: OrderStatus, note?: string) => void;
   onRecordPayment: (orderId: string, amount: number) => void;
+  onRefundOrder?: (orderId: string, amount: number, reason: string) => void;
   onOpenOrderReceipt: (order: ProductionOrder) => void;
   onOpenNewOrderModal: () => void;
   onOpenPublicUpload?: () => void;
@@ -16,6 +17,7 @@ export const PesananView: React.FC<PesananViewProps> = ({
   orders,
   onUpdateOrderStatus,
   onRecordPayment,
+  onRefundOrder,
   onOpenOrderReceipt,
   onOpenNewOrderModal,
   onOpenPublicUpload,
@@ -28,6 +30,12 @@ export const PesananView: React.FC<PesananViewProps> = ({
   // Payment modal state
   const [showPaymentModal, setShowPaymentModal] = useState<boolean>(false);
   const [payAmountInput, setPayAmountInput] = useState<number>(0);
+
+  // Refund modal state
+  const [showRefundModal, setShowRefundModal] = useState<boolean>(false);
+  const [refundAmountInput, setRefundAmountInput] = useState<number>(0);
+  const [refundReasonInput, setRefundReasonInput] = useState<string>('Order dibatalkan');
+  const [isRefundProcessing, setIsRefundProcessing] = useState<boolean>(false);
 
   // Simple Status helper & progress calculation
   const getProgressPercentage = (status: OrderStatus): number => {
@@ -395,7 +403,11 @@ export const PesananView: React.FC<PesananViewProps> = ({
 
               <div className="bg-slate-50 p-3.5 rounded-2xl space-y-1">
                 <span className="text-slate-400 font-extrabold uppercase tracking-wider block text-[10px]">Status Pembayaran</span>
-                <p className="text-slate-900 font-extrabold text-sm">{formatRupiah(activeOrderDetail.totalAmount)}</p>
+                <p className="text-slate-900 font-extrabold text-sm">Total: {formatRupiah(activeOrderDetail.totalAmount)}</p>
+                <p className="text-slate-700 font-bold">Bayar: {formatRupiah(activeOrderDetail.paidAmount)}</p>
+                {activeOrderDetail.refundedAmount && activeOrderDetail.refundedAmount > 0 ? (
+                  <p className="text-rose-650 font-bold">Refunded: {formatRupiah(activeOrderDetail.refundedAmount)}</p>
+                ) : null}
                 <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800">
                   {activeOrderDetail.paymentStatus}
                 </span>
@@ -425,14 +437,30 @@ export const PesananView: React.FC<PesananViewProps> = ({
               </div>
             </div>
 
-            <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
-              <button
-                onClick={() => onOpenOrderReceipt(activeOrderDetail)}
-                className="bg-purple-50 text-[#5B4BFF] hover:bg-purple-100 font-extrabold text-xs px-4 py-2.5 rounded-full flex items-center gap-1.5"
-              >
-                <span className="material-symbols-outlined text-base">receipt_long</span>
-                <span>Cetak Nota Thermal</span>
-              </button>
+            <div className="pt-4 border-t border-slate-100 flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex gap-2">
+                <button
+                  onClick={() => onOpenOrderReceipt(activeOrderDetail)}
+                  className="bg-purple-50 text-[#5B4BFF] hover:bg-purple-100 font-extrabold text-xs px-4 py-2.5 rounded-full flex items-center gap-1.5 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-base">receipt_long</span>
+                  <span>Nota</span>
+                </button>
+
+                {onRefundOrder && activeOrderDetail.paidAmount > 0 && activeOrderDetail.paymentStatus !== 'REFUNDED' && (
+                  <button
+                    onClick={() => {
+                      const available = activeOrderDetail.paidAmount - (activeOrderDetail.refundedAmount || 0);
+                      setRefundAmountInput(available);
+                      setShowRefundModal(true);
+                    }}
+                    className="bg-red-50 hover:bg-red-100 text-red-650 font-extrabold text-xs px-4 py-2.5 rounded-full flex items-center gap-1.5 cursor-pointer border border-red-200"
+                  >
+                    <span className="material-symbols-outlined text-base">payments</span>
+                    <span>Refund</span>
+                  </button>
+                )}
+              </div>
 
               <button
                 onClick={() => setActiveOrderDetail(null)}
@@ -442,6 +470,134 @@ export const PesananView: React.FC<PesananViewProps> = ({
               </button>
             </div>
           </motion.div>
+        </div>
+      )}
+
+      {/* Refund Confirmation Modal */}
+      {showRefundModal && activeOrderDetail && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-55 flex items-center justify-center p-4">
+          <div className="bg-white rounded-[24px] p-6 max-w-md w-full space-y-4 border border-slate-200 shadow-2xl text-xs font-sans text-left">
+            <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+              <div className="flex items-center gap-2 text-red-600">
+                <span className="material-symbols-outlined text-lg">payments</span>
+                <h3 className="font-black text-slate-900 text-sm">Konfirmasi Refund / Kembalikan Dana</h3>
+              </div>
+              <button
+                type="button"
+                disabled={isRefundProcessing}
+                onClick={() => setShowRefundModal(false)}
+                className="w-7 h-7 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-xs space-y-2 font-mono">
+              <div className="flex justify-between">
+                <span className="text-slate-500 font-bold">Order ID:</span>
+                <span className="text-slate-900 font-black">{activeOrderDetail.orderNo}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500 font-bold">Customer:</span>
+                <span className="text-slate-900 font-extrabold max-w-[180px] truncate">{activeOrderDetail.customerName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500 font-bold">Total Order:</span>
+                <span className="text-slate-900 font-extrabold">{formatRupiah(activeOrderDetail.totalAmount)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500 font-bold">Total Paid:</span>
+                <span className="text-slate-900 font-extrabold">{formatRupiah(activeOrderDetail.paidAmount)}</span>
+              </div>
+              <div className="flex justify-between text-rose-650">
+                <span className="font-bold">Total Refunded:</span>
+                <span className="font-black">{formatRupiah(activeOrderDetail.refundedAmount || 0)}</span>
+              </div>
+              <div className="flex justify-between pt-2 border-t border-slate-200/60 font-black text-slate-900">
+                <span>Refund Available:</span>
+                <span className="text-[#5B4BFF]">{formatRupiah(activeOrderDetail.paidAmount - (activeOrderDetail.refundedAmount || 0))}</span>
+              </div>
+            </div>
+
+            <div className="space-y-3 font-semibold text-slate-700">
+              <div>
+                <label className="block text-slate-600 mb-1">Jumlah Refund (Rp) *</label>
+                <input
+                  type="number"
+                  required
+                  disabled={isRefundProcessing}
+                  value={refundAmountInput || ''}
+                  onChange={(e) => setRefundAmountInput(Number(e.target.value) || 0)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-black text-slate-900"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-600 mb-1">Alasan Refund *</label>
+                <select
+                  disabled={isRefundProcessing}
+                  value={refundReasonInput}
+                  onChange={(e) => setRefundReasonInput(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900"
+                >
+                  <option value="Order dibatalkan">Order dibatalkan</option>
+                  <option value="Kesalahan produksi">Kesalahan produksi</option>
+                  <option value="Pembayaran berlebih">Pembayaran berlebih</option>
+                  <option value="Permintaan customer">Permintaan customer</option>
+                  <option value="Lainnya">Lainnya</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                disabled={isRefundProcessing}
+                onClick={() => setShowRefundModal(false)}
+                className="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-full cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                disabled={isRefundProcessing}
+                onClick={() => {
+                  const available = activeOrderDetail.paidAmount - (activeOrderDetail.refundedAmount || 0);
+                  if (refundAmountInput > available) {
+                    alert(`Jumlah refund melebihi batas yang tersedia (${formatRupiah(available)})`);
+                    return;
+                  }
+                  if (refundAmountInput <= 0) {
+                    alert('Jumlah refund harus lebih besar dari 0');
+                    return;
+                  }
+                  setIsRefundProcessing(true);
+                  // Simulate brief timeout to block double clicks
+                  setTimeout(() => {
+                    if (onRefundOrder) {
+                      onRefundOrder(activeOrderDetail.id, refundAmountInput, refundReasonInput);
+                    }
+                    setIsRefundProcessing(false);
+                    setShowRefundModal(false);
+                    // Refresh details inside main orders mapping
+                    const updated = orders.find((o) => o.id === activeOrderDetail.id);
+                    if (updated) {
+                      setActiveOrderDetail({
+                        ...updated,
+                        refundedAmount: (updated.refundedAmount || 0) + refundAmountInput,
+                        paymentStatus: ((updated.refundedAmount || 0) + refundAmountInput) >= updated.paidAmount ? 'REFUNDED' : 'PARTIALLY_REFUNDED'
+                      });
+                    } else {
+                      setActiveOrderDetail(null);
+                    }
+                  }, 300);
+                }}
+                className="px-5 py-2 bg-red-600 hover:bg-red-750 text-white font-extrabold rounded-full shadow-md cursor-pointer flex items-center gap-1"
+              >
+                {isRefundProcessing ? 'Memproses...' : 'Konfirmasi Refund'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -49,6 +49,31 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     .filter((t) => t.type === 'Pemasukan')
     .reduce((sum, t) => sum + t.amount, 0);
 
+  const nowTime = new Date();
+  const todayStr = nowTime.getFullYear() + '-' + String(nowTime.getMonth() + 1).padStart(2, '0') + '-' + String(nowTime.getDate()).padStart(2, '0');
+  const currentMonthPrefix = nowTime.getFullYear() + '-' + String(nowTime.getMonth() + 1).padStart(2, '0');
+
+  // Transactions today
+  const todayTransactions = safeTransactions.filter((t) => t.date.startsWith(todayStr));
+  const todayOmzet = todayTransactions
+    .filter((t) => t.type === 'Pemasukan')
+    .reduce((sum, t) => sum + t.amount, 0);
+  const todayHpp = todayTransactions
+    .filter((t) => t.type === 'Pemasukan')
+    .reduce((sum, t) => sum + (t.cogsAmount || 0), 0);
+  const todayLaba = todayOmzet - todayHpp;
+  const todayTrxCount = todayTransactions.length;
+
+  // Transactions this month
+  const monthTransactions = safeTransactions.filter((t) => t.date.includes(currentMonthPrefix));
+  const monthOmzet = monthTransactions
+    .filter((t) => t.type === 'Pemasukan')
+    .reduce((sum, t) => sum + t.amount, 0);
+  const monthHpp = monthTransactions
+    .filter((t) => t.type === 'Pemasukan')
+    .reduce((sum, t) => sum + (t.cogsAmount || 0), 0);
+  const monthLaba = monthOmzet - monthHpp;
+
   // Formatting currency shorthand
   const formatShorthand = (val: number) => {
     if (val >= 1000000) {
@@ -279,6 +304,61 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </p>
             </div>
           </motion.div>
+        </div>
+      </div>
+
+      {/* LAPORAN KEUANGAN TEFA (REALTIME FROM TRANSACTIONS) */}
+      <div className="space-y-2.5">
+        <div className="flex items-center justify-between px-1">
+          <h3 className="font-black text-slate-900 text-xs uppercase tracking-wider flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-[#10B981]"></span>
+            <span>Kinerja Keuangan Hari Ini &amp; Bulan Ini</span>
+          </h3>
+          <span className="text-[10px] font-bold text-emerald-650 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-100">
+            Realtime Transaction Data
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Card 1: Omzet Hari Ini */}
+          <div className="bg-white border border-slate-200/90 rounded-[22px] p-4 shadow-2xs space-y-2 text-left">
+            <p className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">Omzet Hari Ini</p>
+            <h3 className="text-xl font-black text-slate-900">Rp {todayOmzet.toLocaleString('id-ID')}</h3>
+            <p className="text-[10px] font-semibold text-slate-400">{todayTrxCount} transaksi sukses</p>
+          </div>
+
+          {/* Card 2: HPP Hari Ini */}
+          <div className="bg-white border border-slate-200/90 rounded-[22px] p-4 shadow-2xs space-y-2 text-left">
+            <p className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">HPP Hari Ini</p>
+            <h3 className="text-xl font-black text-rose-650">Rp {todayHpp.toLocaleString('id-ID')}</h3>
+            <p className="text-[10px] font-semibold text-slate-400">Modal bahan terpakai</p>
+          </div>
+
+          {/* Card 3: Laba Hari Ini */}
+          <div className="bg-white border border-slate-200/90 rounded-[22px] p-4 shadow-2xs space-y-2 text-left">
+            <p className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">Laba Hari Ini</p>
+            <h3 className="text-xl font-black text-emerald-700">Rp {todayLaba.toLocaleString('id-ID')}</h3>
+            <p className="text-[10px] font-semibold text-slate-400">Keuntungan bersih studio</p>
+          </div>
+
+          {/* Card 4: Kinerja Bulan Ini */}
+          <div className="bg-[#151A2D] border border-slate-800 text-white rounded-[22px] p-4 shadow-md space-y-2 text-left">
+            <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Bulan Ini ({nowTime.toLocaleString('id-ID', { month: 'long' })})</p>
+            <div className="space-y-1 text-[11px] font-bold text-slate-300">
+              <div className="flex justify-between">
+                <span>Omzet:</span>
+                <span className="text-white font-black">Rp {monthOmzet.toLocaleString('id-ID')}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>HPP:</span>
+                <span className="text-rose-450 font-black">Rp {monthHpp.toLocaleString('id-ID')}</span>
+              </div>
+              <div className="flex justify-between border-t border-slate-700/60 pt-1 mt-1">
+                <span>Laba:</span>
+                <span className="text-emerald-400 font-black">Rp {monthLaba.toLocaleString('id-ID')}</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 

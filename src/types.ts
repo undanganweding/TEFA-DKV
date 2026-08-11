@@ -116,7 +116,7 @@ export type OrderStatus =
   | 'Ditolak'
   | 'Dibatalkan';
 
-export type PaymentStatus = 'Belum Bayar' | 'DP' | 'Lunas';
+export type PaymentStatus = 'Belum Bayar' | 'DP' | 'Lunas' | 'PARTIALLY_REFUNDED' | 'REFUNDED';
 
 export type PaymentMethod = 'Cash' | 'QRIS' | 'Transfer Bank' | 'DP / Piutang';
 
@@ -128,6 +128,11 @@ export interface Product {
   subcategory?: string;
   unit: 'm2' | 'lembar' | 'pcs' | 'paket' | 'meter' | 'set' | 'box';
   basePrice: number; // Harga per unit
+  costPrice?: number; // HPP Modal per unit
+  recipe?: Array<{
+    materialId: string;
+    qtyRequired: number;
+  }>;
   minQty: number;
   description: string;
   isCustomDimension?: boolean; // e.g. Flexi banner (Panjang x Lebar)
@@ -149,6 +154,7 @@ export interface CartItem {
   category: string;
   unit: string;
   unitPrice: number;
+  costPrice?: number; // Historical cost/HPP per unit
   qty: number;
   // Custom dimensions if banner
   lengthMeters?: number;
@@ -177,13 +183,23 @@ export interface ProductionOrder {
   paymentMethod?: PaymentMethod;
   items: CartItem[];
   subtotal: number;
+  totalHpp?: number; // Total cost price of the order
   discount: number;
   taxAmount: number;
   totalAmount: number;
   paidAmount: number;
   balanceDue: number;
+  refundedAmount?: number; // Total amount refunded so far
+  refunds?: Array<{
+    id: string;
+    date: string;
+    amount: number;
+    reason: string;
+    operator: string;
+  }>;
   operatorName: string;
   priority: 'Normal' | 'Mendesak' | 'Prioritas Tinggi';
+  stockDeducted?: boolean; // Flag to track material stock deduction status
   notes?: string;
   designNotes?: string;
   finishingNotes?: string;
@@ -281,6 +297,9 @@ export interface StockMovement {
   date: string;
   type: 'Masuk' | 'Keluar' | 'Penyesuaian'; // Incoming, Production Usage, Stock Adjustment
   quantity: number;
+  beforeStock?: number; // Stock level before this movement
+  afterStock?: number; // Stock level after this movement
+  referenceId?: string; // Reference order ID or transaction ID
   unit: string;
   unitCost: number;
   totalValue: number;
@@ -298,6 +317,8 @@ export interface FinanceTransaction {
   category: 'Penjualan Cetak' | 'Jasa Desain' | 'Pelunasan / Angsuran' | 'Pembelian Bahan' | 'Perawatan Alat' | 'Operasional & Listrik' | 'Lain-lain';
   description: string;
   amount: number;
+  cogsAmount?: number; // HPP Modal
+  profitAmount?: number; // Laba Kotor (amount - cogsAmount)
   refOrderNo?: string;
   paymentMethod: PaymentMethod;
   operator: string;
@@ -316,6 +337,8 @@ export interface AnnualProcurement {
   qty: number;
   estimatedUnitPrice: number;
   totalBudget: number;
+  actualCost?: number; // Realized cost amount
+  remainingBudget?: number; // Remaining budget (totalBudget - actualCost)
   priority: 'Sangat Penting' | 'Penting' | 'Sekunder';
   status: 'Diusulkan' | 'Dalam Review' | 'Disetujui' | 'Direalisasikan';
   requestedBy: string;

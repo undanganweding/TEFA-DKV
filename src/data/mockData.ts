@@ -32,6 +32,10 @@ export const initialProducts: Product[] = [
     category: 'Cetak Outdoor',
     unit: 'm2',
     basePrice: 18000,
+    costPrice: 5000,
+    recipe: [
+      { materialId: 'MAT-001', qtyRequired: 0.02 } // 1 m2 consumes 0.02 roll of Flexi roll (which is 50m * 3.2m = 160 m2 total)
+    ],
     minQty: 1,
     description: 'Bahan banner standar spanduk/baliho luar ruang, tinta anti air & tahan panas.',
     isCustomDimension: true,
@@ -45,6 +49,10 @@ export const initialProducts: Product[] = [
     category: 'Cetak Outdoor',
     unit: 'm2',
     basePrice: 25000,
+    costPrice: 8000,
+    recipe: [
+      { materialId: 'MAT-001', qtyRequired: 0.02 }
+    ],
     minQty: 1,
     description: 'Bahan tebal serat halus, cetak warna lebih tajam untuk backdrop & panggung.',
     isCustomDimension: true,
@@ -58,6 +66,10 @@ export const initialProducts: Product[] = [
     category: 'Cetak Indoor / A3+',
     unit: 'lembar',
     basePrice: 12000,
+    costPrice: 3800,
+    recipe: [
+      { materialId: 'MAT-002', qtyRequired: 0.01 } // 1 lembar = 0.01 pack
+    ],
     minQty: 1,
     description: 'Bahan sintetis tahan air, tidak mudah robek, termasuk kiss cut potong pola.',
     isCustomDimension: false,
@@ -71,6 +83,10 @@ export const initialProducts: Product[] = [
     category: 'Cetak Indoor / A3+',
     unit: 'lembar',
     basePrice: 8500,
+    costPrice: 2000,
+    recipe: [
+      { materialId: 'MAT-002', qtyRequired: 0.01 }
+    ],
     minQty: 1,
     description: 'Stiker kertas ekonomis cocok untuk label toples, snack, & kemasan UMKM.',
     isCustomDimension: false,
@@ -84,6 +100,10 @@ export const initialProducts: Product[] = [
     category: 'Cetak Indoor / A3+',
     unit: 'box',
     basePrice: 35000,
+    costPrice: 10000,
+    recipe: [
+      { materialId: 'MAT-005', qtyRequired: 0.1 } // 1 box = 10 lembar A3+ (0.1 pack)
+    ],
     minQty: 1,
     description: 'Cetak 2 sisi high resolution + box transparan akrilik. Laminasi pilihan Doff/Glossy.',
     isCustomDimension: false,
@@ -97,6 +117,10 @@ export const initialProducts: Product[] = [
     category: 'Cetak Indoor / A3+',
     unit: 'lembar',
     basePrice: 2500,
+    costPrice: 600,
+    recipe: [
+      { materialId: 'MAT-005', qtyRequired: 0.005 } // 200 lembar A4 = 1 pack A3+
+    ],
     minQty: 10,
     description: 'Kertas mengkilap halus, tajam untuk katalog promosi, pendaftaran sekolah & event.',
     isCustomDimension: false,
@@ -110,6 +134,10 @@ export const initialProducts: Product[] = [
     category: 'Merchandise',
     unit: 'pcs',
     basePrice: 28000,
+    costPrice: 12500,
+    recipe: [
+      { materialId: 'MAT-004', qtyRequired: 0.0278 } // 1 mug = 1/36 box
+    ],
     minQty: 1,
     description: 'Mug keramik SNI warna putih jernih + cetak full color anti luntur + dus souvenir.',
     isCustomDimension: false,
@@ -124,6 +152,10 @@ export const initialProducts: Product[] = [
     category: 'Merchandise',
     unit: 'pcs',
     basePrice: 4500,
+    costPrice: 1500,
+    recipe: [
+      { materialId: 'MAT-006', qtyRequired: 0.01 } // 1 pin = 0.01 pack
+    ],
     minQty: 10,
     description: 'Pin gantungan/bros dengan mika pelindung anti gores.',
     isCustomDimension: false,
@@ -138,6 +170,10 @@ export const initialProducts: Product[] = [
     category: 'Merchandise',
     unit: 'pcs',
     basePrice: 8000,
+    costPrice: 2500,
+    recipe: [
+      { materialId: 'MAT-006', qtyRequired: 0.01 }
+    ],
     minQty: 1,
     description: 'Bahan PVC keras tahan lama + cetak 2 sisi tajam + Tali Lanyard polos.',
     isCustomDimension: false,
@@ -152,6 +188,7 @@ export const initialProducts: Product[] = [
     category: 'Desain & Creative',
     unit: 'paket',
     basePrice: 150000,
+    costPrice: 0,
     minQty: 1,
     description: 'Konsep logo modern 3 opsi, file master (AI, CDR, PDF, PNG Transparan) & Brand Guidelines.',
     isCustomDimension: false,
@@ -165,6 +202,7 @@ export const initialProducts: Product[] = [
     category: 'Desain & Creative',
     unit: 'paket',
     basePrice: 15000,
+    costPrice: 0,
     minQty: 1,
     description: 'Bantuan merapikan ukuran, tracing vektor, dan penyelarasan warna CMYK.',
     isCustomDimension: false,
@@ -828,6 +866,8 @@ export const initialProcurements: AnnualProcurement[] = [
     qty: 1,
     estimatedUnitPrice: 38000000,
     totalBudget: 38000000,
+    actualCost: 35500000,
+    remainingBudget: 2500000,
     priority: 'Sangat Penting',
     status: 'Disetujui',
     requestedBy: 'Ahmad Fajar (Kaprogli DKV)',

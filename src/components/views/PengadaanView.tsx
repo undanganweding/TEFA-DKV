@@ -198,12 +198,26 @@ export const PengadaanView: React.FC<PengadaanViewProps> = ({
                   <p className="text-[10px] text-slate-400">Diusulkan oleh: {proc.requestedBy}</p>
                 </div>
 
-                <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200/80 text-left md:text-right shrink-0">
-                  <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Est. Total Anggaran</p>
-                  <p className="text-base font-black text-slate-900">{formatRupiah(proc.totalBudget)}</p>
-                  <p className="text-[10px] text-slate-500 font-medium">
-                    {proc.qty} x {formatRupiah(proc.estimatedUnitPrice)}
-                  </p>
+                <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200/80 text-left md:text-right shrink-0 space-y-1">
+                  <div>
+                    <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Est. Total Anggaran</p>
+                    <p className="text-sm font-black text-slate-900">{formatRupiah(proc.totalBudget)}</p>
+                    <p className="text-[9px] text-slate-500 font-semibold">
+                      {proc.qty} x {formatRupiah(proc.estimatedUnitPrice)}
+                    </p>
+                  </div>
+                  {proc.actualCost !== undefined && (
+                    <div className="pt-1.5 border-t border-slate-200 text-[10px] space-y-0.5">
+                      <div className="flex justify-between md:justify-end gap-3 text-slate-600">
+                        <span>Realisasi:</span>
+                        <span className="font-extrabold text-slate-800">{formatRupiah(proc.actualCost)}</span>
+                      </div>
+                      <div className="flex justify-between md:justify-end gap-3 text-emerald-700 font-bold">
+                        <span>Sisa:</span>
+                        <span>{formatRupiah(proc.totalBudget - proc.actualCost)}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </motion.div>
             ))

@@ -393,11 +393,14 @@ export function App() {
 
     const subtotal = cartItems.reduce((acc, curr) => acc + curr.totalPrice, 0);
     const totalAmount = Math.max(0, subtotal - cartDiscount);
+    const totalHpp = cartItems.reduce((acc, curr) => acc + ((curr.costPrice || 0) * curr.qty), 0);
+
+    const actualPaid = cartPaidAmount > totalAmount ? totalAmount : cartPaidAmount;
 
     let paymentStatus: 'Belum Bayar' | 'DP' | 'Lunas' = 'Belum Bayar';
-    if (cartPaidAmount >= totalAmount && totalAmount > 0) {
+    if (actualPaid >= totalAmount && totalAmount > 0) {
       paymentStatus = 'Lunas';
-    } else if (cartPaidAmount > 0) {
+    } else if (actualPaid > 0) {
       paymentStatus = 'DP';
     }
 
@@ -413,11 +416,12 @@ export function App() {
       paymentMethod: cartPaymentMethod,
       items: cartItems,
       subtotal,
+      totalHpp,
       discount: cartDiscount,
       taxAmount: 0,
       totalAmount,
-      paidAmount: cartPaidAmount,
-      balanceDue: Math.max(0, totalAmount - cartPaidAmount),
+      paidAmount: actualPaid,
+      balanceDue: Math.max(0, totalAmount - actualPaid),
       operatorName: settings.activeShiftOperator || 'Kepala TEFA',
       priority: cartOrderPriority,
       notes: cartNotes,
@@ -435,6 +439,116 @@ export function App() {
     handleClearCartGlobal();
   };
 
+  // Helper to handle material stock deduction and movement logging
+  const processStockDeduction = (order: ProductionOrder) => {
+    order.items.forEach((item) => {
+      const product = products.find((p) => p.id === item.productId);
+      if (product && product.recipe) {
+        product.recipe.forEach((recipeItem) => {
+          setMaterials((prev) =>
+            prev.map((m) => {
+              if (m.id === recipeItem.materialId) {
+                const qtyToDeduct = recipeItem.qtyRequired * item.qty;
+                const newStock = Math.max(0, Number((m.currentStock - qtyToDeduct).toFixed(4)));
+                let newStatus: MaterialStock['status'] = 'Aman';
+                if (newStock <= m.minStock * 0.5) {
+                  newStatus = 'Kritis';
+                } else if (newStock <= m.minStock) {
+                  newStatus = 'Menipis';
+                }
+
+                // Add Stock Movement log
+                const now = new Date();
+                const newMovement: StockMovement = {
+                  id: 'MOV-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+                  materialId: m.id,
+                  materialName: m.name,
+                  date:
+                    now.toISOString().split('T')[0] +
+                    ' ' +
+                    now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+                  type: 'Keluar',
+                  quantity: -qtyToDeduct,
+                  beforeStock: m.currentStock,
+                  afterStock: newStock,
+                  referenceId: order.orderNo,
+                  unit: m.unit,
+                  unitCost: m.unitPrice,
+                  totalValue: Math.round(qtyToDeduct * m.unitPrice),
+                  notes: `Pemakaian produksi Order No ${order.orderNo}`,
+                  operator: currentUser?.name || 'Operator TEFA',
+                };
+                setStockMovements((prevMovements) => [newMovement, ...prevMovements]);
+
+                return {
+                  ...m,
+                  currentStock: newStock,
+                  status: newStatus,
+                };
+              }
+              return m;
+            })
+          );
+        });
+      }
+    });
+  };
+
+  // Helper to reverse material stock deduction on cancellation
+  const processStockReversal = (order: ProductionOrder) => {
+    order.items.forEach((item) => {
+      const product = products.find((p) => p.id === item.productId);
+      if (product && product.recipe) {
+        product.recipe.forEach((recipeItem) => {
+          setMaterials((prev) =>
+            prev.map((m) => {
+              if (m.id === recipeItem.materialId) {
+                const qtyToRestore = recipeItem.qtyRequired * item.qty;
+                const newStock = Number((m.currentStock + qtyToRestore).toFixed(4));
+                let newStatus: MaterialStock['status'] = 'Aman';
+                if (newStock <= m.minStock * 0.5) {
+                  newStatus = 'Kritis';
+                } else if (newStock <= m.minStock) {
+                  newStatus = 'Menipis';
+                }
+
+                // Add Reversal Stock Movement log
+                const now = new Date();
+                const newMovement: StockMovement = {
+                  id: 'MOV-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+                  materialId: m.id,
+                  materialName: m.name,
+                  date:
+                    now.toISOString().split('T')[0] +
+                    ' ' +
+                    now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+                  type: 'Penyesuaian',
+                  quantity: qtyToRestore,
+                  beforeStock: m.currentStock,
+                  afterStock: newStock,
+                  referenceId: order.orderNo,
+                  unit: m.unit,
+                  unitCost: m.unitPrice,
+                  totalValue: Math.round(qtyToRestore * m.unitPrice),
+                  notes: `REVERSAL pembatalan Order No ${order.orderNo}`,
+                  operator: currentUser?.name || 'Operator TEFA',
+                };
+                setStockMovements((prevMovements) => [newMovement, ...prevMovements]);
+
+                return {
+                  ...m,
+                  currentStock: newStock,
+                  status: newStatus,
+                };
+              }
+              return m;
+            })
+          );
+        });
+      }
+    });
+  };
+
   // Handlers for Orders
   const handleAddOrder = (newOrder: ProductionOrder) => {
     setOrders((prev) => [newOrder, ...prev]);
@@ -449,6 +563,11 @@ export function App() {
         String(now.getDate()).padStart(2, '0') +
         '-' +
         Math.floor(10 + Math.random() * 90);
+
+      const paymentRatio = newOrder.paidAmount / (newOrder.totalAmount || 1);
+      const transactionCogs = Math.round((newOrder.totalHpp || 0) * paymentRatio);
+      const transactionProfit = newOrder.paidAmount - transactionCogs;
+
       const newTrx: FinanceTransaction = {
         id: 'TRX-' + Date.now(),
         transNo,
@@ -460,6 +579,8 @@ export function App() {
         category: 'Penjualan Cetak',
         description: `Pembayaran ${newOrder.paymentStatus} Order No ${newOrder.orderNo} (${newOrder.customerName})`,
         amount: newOrder.paidAmount,
+        cogsAmount: transactionCogs,
+        profitAmount: transactionProfit,
         refOrderNo: newOrder.orderNo,
         paymentMethod: newOrder.paymentMethod || 'Cash',
         operator: settings.activeShiftOperator,
@@ -487,6 +608,29 @@ export function App() {
               note: `Status diperbarui menjadi ${newStatus}`,
             },
           ];
+
+          // Trigger stock deduction if moving to Diproses and not yet deducted
+          if (newStatus === 'Diproses' && !ord.stockDeducted) {
+            setTimeout(() => processStockDeduction(ord), 50);
+            return {
+              ...ord,
+              status: newStatus,
+              statusHistory: updatedHistory,
+              stockDeducted: true,
+            };
+          }
+
+          // Trigger stock reversal if cancelled/rejected and was already deducted
+          if ((newStatus === 'Dibatalkan' || newStatus === 'Ditolak') && ord.stockDeducted) {
+            setTimeout(() => processStockReversal(ord), 50);
+            return {
+              ...ord,
+              status: newStatus,
+              statusHistory: updatedHistory,
+              stockDeducted: false,
+            };
+          }
+
           return {
             ...ord,
             status: newStatus,
@@ -502,7 +646,10 @@ export function App() {
     setOrders((prev) =>
       prev.map((ord) => {
         if (ord.id === orderId) {
-          const newPaid = ord.paidAmount + additionalAmount;
+          const actualAdditional = additionalAmount > ord.balanceDue ? ord.balanceDue : additionalAmount;
+          if (actualAdditional <= 0) return ord; // Nothing left to pay
+
+          const newPaid = ord.paidAmount + actualAdditional;
           const newBalance = Math.max(0, ord.totalAmount - newPaid);
           let newPayStatus: 'Belum Bayar' | 'DP' | 'Lunas' = ord.paymentStatus;
           if (newPaid >= ord.totalAmount) {
@@ -520,6 +667,11 @@ export function App() {
             String(now.getDate()).padStart(2, '0') +
             '-' +
             Math.floor(10 + Math.random() * 90);
+
+          const paymentRatio = actualAdditional / (ord.totalAmount || 1);
+          const transactionCogs = Math.round((ord.totalHpp || 0) * paymentRatio);
+          const transactionProfit = actualAdditional - transactionCogs;
+
           const newTrx: FinanceTransaction = {
             id: 'TRX-' + Date.now(),
             transNo,
@@ -530,7 +682,9 @@ export function App() {
             type: 'Pemasukan',
             category: 'Pelunasan / Angsuran',
             description: `Pelunasan Order No ${ord.orderNo} (${ord.customerName})`,
-            amount: additionalAmount,
+            amount: actualAdditional,
+            cogsAmount: transactionCogs,
+            profitAmount: transactionProfit,
             refOrderNo: ord.orderNo,
             paymentMethod: ord.paymentMethod || 'Cash',
             operator: settings.activeShiftOperator,
@@ -543,6 +697,84 @@ export function App() {
             paidAmount: newPaid,
             balanceDue: newBalance,
             paymentStatus: newPayStatus,
+          };
+        }
+        return ord;
+      })
+    );
+  };
+
+  const handleRefundOrder = (orderId: string, refundAmount: number, reason: string) => {
+    setOrders((prev) =>
+      prev.map((ord) => {
+        if (ord.id === orderId) {
+          const currentRefunded = ord.refundedAmount || 0;
+          const refundAvailable = ord.paidAmount - currentRefunded;
+          
+          if (refundAmount > refundAvailable) {
+            alert(`Jumlah refund melebihi batas yang tersedia (${refundAvailable.toLocaleString('id-ID')})`);
+            return ord;
+          }
+          if (refundAmount <= 0) {
+            alert('Jumlah refund harus lebih besar dari 0');
+            return ord;
+          }
+
+          const newRefunded = currentRefunded + refundAmount;
+          let newPayStatus: PaymentStatus = ord.paymentStatus;
+          if (newRefunded >= ord.paidAmount) {
+            newPayStatus = 'REFUNDED';
+          } else {
+            newPayStatus = 'PARTIALLY_REFUNDED';
+          }
+
+          // Create Refund FinanceTransaction
+          const now = new Date();
+          const transNo =
+            'RFD-' +
+            now.getFullYear() +
+            String(now.getMonth() + 1).padStart(2, '0') +
+            String(now.getDate()).padStart(2, '0') +
+            '-' +
+            Math.floor(10 + Math.random() * 90);
+
+          const paymentRatio = refundAmount / (ord.totalAmount || 1);
+          const transactionCogs = Math.round((ord.totalHpp || 0) * paymentRatio);
+          const transactionProfit = refundAmount - transactionCogs;
+
+          const newTrx: FinanceTransaction = {
+            id: 'TRX-REFUND-' + Date.now(),
+            transNo,
+            date:
+              now.toISOString().split('T')[0] +
+              ' ' +
+              now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+            type: 'Pengeluaran',
+            category: 'Lain-lain',
+            description: `Refund (${reason}) Order No ${ord.orderNo} (${ord.customerName})`,
+            amount: refundAmount,
+            cogsAmount: transactionCogs,
+            profitAmount: transactionProfit,
+            refOrderNo: ord.orderNo,
+            paymentMethod: ord.paymentMethod || 'Cash',
+            operator: settings.activeShiftOperator,
+            status: 'Berhasil',
+          };
+          setTransactions((prevTrx) => [newTrx, ...prevTrx]);
+
+          const newRefundRecord = {
+            id: 'RFD-' + Date.now(),
+            date: now.toISOString().split('T')[0],
+            amount: refundAmount,
+            reason,
+            operator: settings.activeShiftOperator,
+          };
+
+          return {
+            ...ord,
+            refundedAmount: newRefunded,
+            paymentStatus: newPayStatus,
+            refunds: [...(ord.refunds || []), newRefundRecord],
           };
         }
         return ord;
@@ -969,6 +1201,7 @@ export function App() {
               orders={orders.filter((o) => !o.isArchived)}
               onUpdateOrderStatus={handleUpdateOrderStatus}
               onRecordPayment={handleRecordPayment}
+              onRefundOrder={handleRefundOrder}
               onOpenOrderReceipt={(ord) => setActiveReceiptOrder(ord)}
               onOpenNewOrderModal={() => setShowNewOrderModal(true)}
               onOpenPublicUpload={() => setCurrentPage('public_upload')}

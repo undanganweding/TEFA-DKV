@@ -10,7 +10,7 @@ interface GuestPlatformViewProps {
   onLogout?: () => void;
 }
 
-type GuestPage = 'landing' | 'order' | 'tracking';
+type GuestPage = 'landing' | 'order' | 'tracking' | 'product_order';
 
 interface ProductItem {
   id: string;
@@ -113,6 +113,14 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
     notes: '',
   });
   const [orderSuccess, setOrderSuccess] = useState<string | null>(null);
+  const [selectedOrderProduct, setSelectedOrderProduct] = useState<ProductItem | null>(null);
+  const [productQty, setProductQty] = useState<number>(1);
+  const [orderSuccessData, setOrderSuccessData] = useState<{
+    orderNo: string;
+    productName: string;
+    qty: number;
+    totalPrice: string;
+  } | null>(null);
 
   // Tracking State
   const [trackInput, setTrackInput] = useState('');
@@ -166,19 +174,62 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  const productRequiresFile = (prod: ProductItem) => {
+    const nameLower = prod.name.toLowerCase();
+    const descLower = prod.desc.toLowerCase();
+    return (
+      nameLower.includes('cetak') ||
+      nameLower.includes('print') ||
+      nameLower.includes('foto') ||
+      nameLower.includes('stiker') ||
+      nameLower.includes('banner') ||
+      descLower.includes('cetak') ||
+      descLower.includes('print') ||
+      descLower.includes('file') ||
+      descLower.includes('desain')
+    );
+  };
+
   const handleSubmitOrder = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!orderForm.name || !orderForm.whatsapp || !orderForm.service) {
-      alert('Mohon lengkapi formulir wajib!');
+    if (!orderForm.name.trim() || !orderForm.whatsapp.trim()) {
+      alert('Nama dan Nomor WhatsApp wajib diisi!');
       return;
     }
 
-    // Generate Guest Order ID: TEFA-GUEST-2026-XXX
-    const orderNo = `TEFA-GUEST-2026-${String(Math.floor(Math.random() * 900) + 100)}`;
     const todayStr = new Date().toISOString().split('T')[0];
-    const serviceName = services.find((s) => s.id === orderForm.service)?.name || 'Layanan Cetak';
+    const now = new Date();
+    const dateStr = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
+    const randomSuffix = String(Math.floor(Math.random() * 900) + 100);
+    const orderNo = `TEFA-${dateStr}-${randomSuffix}`;
 
-    // Prepare artwork files if uploaded
+    let productName = '';
+    let unitPrice = 0;
+    let qty = 1;
+    let subtotal = 0;
+
+    if (currentPage === 'product_order' && selectedOrderProduct) {
+      if (productRequiresFile(selectedOrderProduct) && !selectedFile) {
+        setFileError('Produk ini memerlukan file desain! Silakan upload file desain Anda.');
+        return;
+      }
+      productName = selectedOrderProduct.name;
+      unitPrice = parseInt(selectedOrderProduct.price.replace(/[^\d]/g, ''), 10) || 0;
+      qty = productQty;
+      subtotal = unitPrice * qty;
+    } else {
+      // Custom Order / Quick Order Flow
+      if (!orderForm.service) {
+        alert('Mohon pilih jenis layanan!');
+        return;
+      }
+      const serviceName = services.find((s) => s.id === orderForm.service)?.name || 'Layanan Cetak Custom';
+      productName = serviceName;
+      unitPrice = 0;
+      qty = 1;
+      subtotal = 0;
+    }
+
     const artworkFiles = selectedFile
       ? [
           {
@@ -186,19 +237,18 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
             name: selectedFile.name,
             size: `${(selectedFile.size / (1024 * 1024)).toFixed(2)} MB`,
             type: selectedFile.type,
-            url: '#', // In real system, this would be the uploaded file URL
+            url: '#',
             uploadDate: todayStr,
           },
         ]
       : [];
 
-    // Construct ProductionOrder object
     const newOrder: ProductionOrder = {
       id: 'ORD-GUEST-' + Date.now(),
       orderNo: orderNo,
-      customerName: orderForm.name,
-      customerPhone: orderForm.whatsapp,
-      customerEmail: orderForm.email || undefined,
+      customerName: orderForm.name.trim(),
+      customerPhone: orderForm.whatsapp.trim(),
+      customerEmail: orderForm.email.trim() || undefined,
       orderDate: todayStr,
       dueDate: todayStr + ' 16:00',
       status: 'Menunggu Admin',
@@ -206,21 +256,21 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
       items: [
         {
           id: 'ITEM-' + Date.now(),
-          productId: orderForm.service,
-          productName: serviceName,
+          productId: selectedOrderProduct ? selectedOrderProduct.id : orderForm.service,
+          productName: productName,
           category: 'Cetak',
-          price: 0,
-          quantity: 1,
-          totalPrice: 0,
+          price: unitPrice,
+          quantity: qty,
+          totalPrice: subtotal,
           notes: orderForm.notes || undefined,
         },
       ],
-      subtotal: 0,
+      subtotal: subtotal,
       discount: 0,
       taxAmount: 0,
-      totalAmount: 0,
+      totalAmount: subtotal,
       paidAmount: 0,
-      balanceDue: 0,
+      balanceDue: subtotal,
       operatorName: 'Guest Customer',
       priority: 'Normal',
       notes: orderForm.notes || undefined,
@@ -237,6 +287,14 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
 
     onAddOrder(newOrder);
     setOrderSuccess(orderNo);
+    setOrderSuccessData({
+      orderNo: orderNo,
+      productName: productName,
+      qty: qty,
+      totalPrice: subtotal > 0 ? `Rp ${subtotal.toLocaleString('id-ID')}` : 'Akan dihitung oleh Admin',
+    });
+
+    // Reset forms
     setOrderForm({ name: '', whatsapp: '', email: '', service: '', notes: '' });
     setSelectedFile(null);
   };
@@ -270,16 +328,21 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
   };
 
   const handleProductOrderClick = (product: ProductItem) => {
+    setSelectedOrderProduct(product);
+    setProductQty(1);
     setOrderForm({
       name: '',
       whatsapp: '',
       email: '',
       service: product.id,
-      notes: `Pemesanan Produk Unggulan: ${product.name}`,
+      notes: '',
     });
     setSelectedProduct(null);
     setOrderSuccess(null);
-    setCurrentPage('order');
+    setOrderSuccessData(null);
+    setSelectedFile(null);
+    setFileError(null);
+    setCurrentPage('product_order');
   };
 
   return (
@@ -545,43 +608,69 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
               </div>
 
               {/* Success Result */}
-              {orderSuccess && (
+              {orderSuccess && orderSuccessData && (
                 <motion.div
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  className="bg-emerald-50 border border-emerald-200 rounded-3xl p-6 mb-4 text-center"
+                  className="bg-[#E6F4EA] border border-[#B7E1CD] rounded-[24px] p-6 mb-4 text-center space-y-4"
                 >
-                  <div className="w-14 h-14 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-4">
+                  <div className="w-14 h-14 rounded-full bg-emerald-100 flex items-center justify-center mx-auto">
                     <span className="material-symbols-outlined text-3xl text-emerald-600">check_circle</span>
                   </div>
-                  <h3 className="text-lg font-black text-emerald-800 mb-1">Pesanan Terkirim!</h3>
-                  <p className="text-emerald-600 text-xs font-bold mb-4">
-                    Simpan kode pesanan Anda di bawah untuk melacak status pengerjaan:
-                  </p>
-                  <div className="bg-white border-2 border-dashed border-emerald-300 rounded-2xl px-6 py-3.5 inline-block shadow-sm mb-2">
-                    <span className="text-xl font-black text-emerald-700 tracking-wider">{orderSuccess}</span>
+                  <div>
+                    <h3 className="text-lg font-black text-emerald-800 mb-1">Pesanan Berhasil Dibuat!</h3>
+                    <p className="text-emerald-600 text-xs font-bold">
+                      Berikut rincian pesanan instan Anda:
+                    </p>
                   </div>
-                  <p className="text-[10px] text-emerald-500 font-extrabold mt-2 leading-relaxed">
-                    * Simpan kode pesanan untuk tracking.
-                    <br />
-                    Admin kami akan segera menghubungi Anda di nomor WhatsApp untuk detail pembayaran & file.
-                  </p>
-                  <div className="flex gap-2.5 justify-center mt-6">
+
+                  <div className="bg-white border border-slate-200 rounded-2xl p-4 text-left text-xs space-y-2.5 font-sans">
+                    <div className="flex justify-between">
+                      <span className="text-slate-500 font-bold">Order ID:</span>
+                      <span className="text-slate-900 font-black">{orderSuccessData.orderNo}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500 font-bold">Produk:</span>
+                      <span className="text-slate-900 font-extrabold text-right max-w-[200px] truncate">{orderSuccessData.productName}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500 font-bold">Quantity:</span>
+                      <span className="text-slate-900 font-extrabold">{orderSuccessData.qty}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500 font-bold">Total:</span>
+                      <span className="text-[#5B4BFF] font-black">{orderSuccessData.totalPrice}</span>
+                    </div>
+                    <div className="flex justify-between pt-2 border-t border-slate-100 items-center">
+                      <span className="text-slate-500 font-bold">Status Awal:</span>
+                      <span className="px-2.5 py-0.5 bg-amber-100 text-amber-800 border border-amber-200 rounded-full text-[10px] font-black">
+                        Menunggu Konfirmasi
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2.5 justify-center pt-2">
                     <button
                       onClick={() => {
                         setTrackInput(orderSuccess);
                         setCurrentPage('tracking');
                         setTimeout(handleTrack, 100);
+                        setOrderSuccess(null);
+                        setOrderSuccessData(null);
                       }}
-                      className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-750 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all cursor-pointer"
+                      className="px-5 py-2.5 bg-[#5B4BFF] hover:bg-[#4a3ce0] text-white font-extrabold text-xs rounded-xl shadow-md shadow-purple-500/10 transition-all cursor-pointer"
                     >
-                      Lacak Status
+                      Lacak Pesanan
                     </button>
                     <button
-                      onClick={() => setOrderSuccess(null)}
+                      onClick={() => {
+                        setOrderSuccess(null);
+                        setOrderSuccessData(null);
+                        setCurrentPage('landing');
+                      }}
                       className="px-5 py-2.5 bg-slate-200/80 hover:bg-slate-300/80 text-slate-700 font-extrabold text-xs rounded-xl transition-all cursor-pointer"
                     >
-                      Pesan Lagi
+                      Kembali ke Beranda
                     </button>
                   </div>
                 </motion.div>
@@ -743,6 +832,274 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
                   >
                     <span className="material-symbols-outlined text-base">send</span>
                     Kirim Pesanan Sekarang
+                  </button>
+                </form>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* PRODUCT ORDER PAGE */}
+        {currentPage === 'product_order' && selectedOrderProduct && (
+          <div className="max-w-xl mx-auto py-10 px-6 animate-fade-in">
+            <button
+              onClick={() => {
+                setCurrentPage('landing');
+                setSelectedFile(null);
+                setFileError(null);
+              }}
+              className="flex items-center gap-2 text-slate-655 hover:text-slate-900 font-extrabold text-xs mb-6 transition-colors cursor-pointer focus:outline-none"
+            >
+              <span className="material-symbols-outlined text-sm font-black">arrow_back</span>
+              Kembali Ke Beranda
+            </button>
+
+            <div className="bg-white rounded-[32px] p-8 shadow-md border border-slate-200/80">
+              <div className="text-center mb-8">
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-[#5B4BFF] to-purple-600 flex items-center justify-center mx-auto mb-4 text-white shadow-md shadow-purple-500/10">
+                  <span className="material-symbols-outlined text-white text-2xl">shopping_cart</span>
+                </div>
+                <h2 className="text-2xl font-black text-slate-900 tracking-tight">Form Pemesanan Produk</h2>
+                <p className="text-slate-500 text-xs font-bold mt-1">Isi formulir berikut untuk melakukan pemesanan</p>
+              </div>
+
+              {/* Success Result */}
+              {orderSuccess && orderSuccessData && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="bg-emerald-50 border border-emerald-200 rounded-3xl p-6 mb-4 text-center space-y-4"
+                >
+                  <div className="w-14 h-14 rounded-full bg-emerald-100 flex items-center justify-center mx-auto">
+                    <span className="material-symbols-outlined text-3xl text-emerald-600">check_circle</span>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black text-emerald-800 mb-1">Pesanan Berhasil Dibuat!</h3>
+                    <p className="text-emerald-600 text-xs font-bold">
+                      Berikut rincian pesanan instan Anda:
+                    </p>
+                  </div>
+
+                  <div className="bg-white border border-slate-200 rounded-2xl p-4 text-left text-xs space-y-2.5 font-sans">
+                    <div className="flex justify-between">
+                      <span className="text-slate-500 font-bold">Order ID:</span>
+                      <span className="text-slate-900 font-black">{orderSuccessData.orderNo}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500 font-bold">Produk:</span>
+                      <span className="text-slate-900 font-extrabold text-right max-w-[200px] truncate">{orderSuccessData.productName}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500 font-bold">Quantity:</span>
+                      <span className="text-slate-900 font-extrabold">{orderSuccessData.qty}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500 font-bold">Total:</span>
+                      <span className="text-[#5B4BFF] font-black">{orderSuccessData.totalPrice}</span>
+                    </div>
+                    <div className="flex justify-between pt-2 border-t border-slate-100 items-center">
+                      <span className="text-slate-500 font-bold">Status Awal:</span>
+                      <span className="px-2.5 py-0.5 bg-amber-100 text-amber-800 border border-amber-200 rounded-full text-[10px] font-black">
+                        Menunggu Konfirmasi
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2.5 justify-center pt-2">
+                    <button
+                      onClick={() => {
+                        setTrackInput(orderSuccess);
+                        setCurrentPage('tracking');
+                        setTimeout(handleTrack, 100);
+                        setOrderSuccess(null);
+                        setOrderSuccessData(null);
+                      }}
+                      className="px-5 py-2.5 bg-[#5B4BFF] hover:bg-[#4a3ce0] text-white font-extrabold text-xs rounded-xl shadow-md shadow-purple-500/10 transition-all cursor-pointer"
+                    >
+                      Lacak Pesanan
+                    </button>
+                    <button
+                      onClick={() => {
+                        setOrderSuccess(null);
+                        setOrderSuccessData(null);
+                        setCurrentPage('landing');
+                      }}
+                      className="px-5 py-2.5 bg-slate-200/80 hover:bg-slate-300/80 text-slate-700 font-extrabold text-xs rounded-xl transition-all cursor-pointer"
+                    >
+                      Kembali ke Beranda
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* Order Form */}
+              {!orderSuccess && (
+                <form onSubmit={handleSubmitOrder} className="space-y-5">
+                  {/* Selected Product Card Details */}
+                  <div className="bg-slate-50/70 border border-slate-200 p-4 rounded-2xl flex gap-3 text-left">
+                    <div className="w-16 h-16 rounded-xl bg-slate-200 overflow-hidden shrink-0">
+                      <img src={selectedOrderProduct.img} alt={selectedOrderProduct.name} className="w-full h-full object-cover" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[10px] text-purple-650 font-extrabold uppercase tracking-wide">
+                        Produk Terpilih
+                      </p>
+                      <h4 className="font-extrabold text-slate-800 text-xs truncate mt-0.5">{selectedOrderProduct.name}</h4>
+                      <p className="text-slate-500 font-semibold text-[10px] mt-0.5">Tarif: {selectedOrderProduct.price}</p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-extrabold text-slate-700 mb-1.5">
+                      Nama Customer <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={orderForm.name}
+                      onChange={(e) => setOrderForm({ ...orderForm, name: e.target.value })}
+                      placeholder="Nama lengkap Anda"
+                      className="w-full px-4 py-3 border border-slate-200 rounded-2xl text-xs sm:text-sm font-semibold focus:outline-none focus:border-[#5B4BFF] focus:ring-3 focus:ring-purple-500/5 bg-slate-50/50"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-extrabold text-slate-700 mb-1.5">
+                      Nomor WhatsApp <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={orderForm.whatsapp}
+                      onChange={(e) => setOrderForm({ ...orderForm, whatsapp: e.target.value })}
+                      placeholder="Contoh: 08123456789"
+                      className="w-full px-4 py-3 border border-slate-200 rounded-2xl text-xs sm:text-sm font-semibold focus:outline-none focus:border-[#5B4BFF] focus:ring-3 focus:ring-purple-500/5 bg-slate-50/50"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-extrabold text-slate-700 mb-1.5">
+                      Email <span className="text-slate-400 font-normal">(Optional)</span>
+                    </label>
+                    <input
+                      type="email"
+                      value={orderForm.email}
+                      onChange={(e) => setOrderForm({ ...orderForm, email: e.target.value })}
+                      placeholder="email@anda.com"
+                      className="w-full px-4 py-3 border border-slate-200 rounded-2xl text-xs sm:text-sm font-semibold focus:outline-none focus:border-[#5B4BFF] focus:ring-3 focus:ring-purple-500/5 bg-slate-50/50"
+                    />
+                  </div>
+
+                  {/* Quantity selector with realtime calculation */}
+                  <div>
+                    <label className="block text-xs font-extrabold text-slate-700 mb-2">
+                      Jumlah Pesanan (Quantity)
+                    </label>
+                    <div className="flex items-center gap-4 bg-slate-50 border border-slate-200 rounded-2xl p-2 w-fit">
+                      <button
+                        type="button"
+                        onClick={() => setProductQty(q => Math.max(1, q - 1))}
+                        className="w-8 h-8 rounded-lg bg-white border border-slate-250 flex items-center justify-center font-bold text-slate-750 hover:bg-slate-100 cursor-pointer"
+                      >
+                        -
+                      </button>
+                      <span className="w-10 text-center text-xs font-black text-slate-900">{productQty}</span>
+                      <button
+                        type="button"
+                        onClick={() => setProductQty(q => q + 1)}
+                        className="w-8 h-8 rounded-lg bg-white border border-slate-250 flex items-center justify-center font-bold text-slate-750 hover:bg-slate-100 cursor-pointer"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Realtime Subtotal */}
+                  <div className="bg-[#5B4BFF]/5 border border-[#5B4BFF]/15 rounded-2xl p-4 flex justify-between items-center text-xs">
+                    <span className="text-slate-655 font-bold">Total Pembayaran:</span>
+                    <span className="text-[#5B4BFF] font-black text-sm">
+                      Rp {((parseInt(selectedOrderProduct.price.replace(/[^\d]/g, ''), 10) || 0) * productQty).toLocaleString('id-ID')}
+                    </span>
+                  </div>
+
+                  {/* File Upload (Required if product requires it) */}
+                  <div>
+                    <label className="block text-xs font-extrabold text-slate-700 mb-1.5 flex items-center justify-between">
+                      <span>Upload File Desain {productRequiresFile(selectedOrderProduct) && <span className="text-red-500">*</span>}</span>
+                      <span className="text-[10px] text-slate-400 font-medium">Maksimal 10MB</span>
+                    </label>
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleFileChange}
+                      accept=".pdf,.jpg,.jpeg,.png,.cdr,.ai"
+                      className="hidden"
+                      id="guest-artwork-product-upload"
+                    />
+                    
+                    <div
+                      onDragOver={handleDragOver}
+                      onDrop={handleDrop}
+                      onClick={() => fileInputRef.current?.click()}
+                      className={`border-2 border-dashed rounded-2xl p-6 text-center transition-all cursor-pointer bg-slate-50/30 ${
+                        selectedFile
+                          ? 'border-emerald-500 bg-emerald-50/15'
+                          : fileError
+                          ? 'border-red-400 bg-red-50/10'
+                          : 'border-slate-300 hover:border-[#5B4BFF]'
+                      }`}
+                    >
+                      {selectedFile ? (
+                        <div className="flex flex-col items-center">
+                          <span className="material-symbols-outlined text-3xl text-emerald-500 mb-2">check_circle</span>
+                          <p className="text-xs text-slate-800 font-black truncate max-w-xs">{selectedFile.name}</p>
+                          <p className="text-[10px] text-slate-500 font-semibold mt-1">
+                            {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB
+                          </p>
+                          <button
+                            type="button"
+                            onClick={handleRemoveFile}
+                            className="mt-3 px-3 py-1 bg-red-50 hover:bg-red-100 border border-red-200 text-red-650 font-extrabold text-[10px] rounded-lg transition-colors flex items-center gap-1 mx-auto cursor-pointer"
+                          >
+                            <span className="material-symbols-outlined text-[12px]">delete</span>
+                            Hapus File
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center">
+                          <span className="material-symbols-outlined text-3xl text-slate-300 mb-2">upload_file</span>
+                          <p className="text-xs text-slate-500 font-bold">Klik atau seret (drag & drop) berkas ke sini</p>
+                          <p className="text-[10px] text-slate-400 mt-1 font-semibold">Format: PDF, JPG, PNG, CDR, AI</p>
+                        </div>
+                      )}
+                    </div>
+                    {fileError && (
+                      <p className="text-[10px] text-red-550 font-bold mt-1.5 flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[12px] font-black">error</span>
+                        {fileError}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-extrabold text-slate-700 mb-1.5">
+                      Catatan / Instruksi Tambahan <span className="text-slate-400 font-normal">(Optional)</span>
+                    </label>
+                    <textarea
+                      value={orderForm.notes}
+                      onChange={(e) => setOrderForm({ ...orderForm, notes: e.target.value })}
+                      placeholder="Tuliskan ukuran kustom, finishing, atau instruksi pengerjaan..."
+                      rows={3}
+                      className="w-full px-4 py-3 border border-slate-200 rounded-2xl text-xs sm:text-sm font-semibold focus:outline-none focus:border-[#5B4BFF] focus:ring-3 focus:ring-purple-500/5 bg-slate-50/50 resize-none"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full py-4 bg-[#5B4BFF] hover:bg-[#4a3ce0] text-white font-black text-sm rounded-2xl shadow-lg shadow-purple-500/20 hover:scale-[1.01] active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-base">send</span>
+                    Kirim Pesanan
                   </button>
                 </form>
               )}

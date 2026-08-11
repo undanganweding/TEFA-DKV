@@ -208,6 +208,7 @@ export const KasirView: React.FC<KasirViewProps> = ({
   const [customSizeSpec, setCustomSizeSpec] = useState<string>('');
   const [customQty, setCustomQty] = useState<number>(1);
   const [customUnitPrice, setCustomUnitPrice] = useState<number>(10000);
+  const [customCostPrice, setCustomCostPrice] = useState<number>(0);
   const [customFileName, setCustomFileName] = useState<string>('');
   const [customSaveAsProduct, setCustomSaveAsProduct] = useState<boolean>(false);
 
@@ -318,6 +319,7 @@ export const KasirView: React.FC<KasirViewProps> = ({
       category: product.category,
       unit: product.unit,
       unitPrice: product.basePrice,
+      costPrice: product.costPrice || 0,
       qty: 1,
       totalPrice: product.basePrice,
     };
@@ -368,6 +370,7 @@ export const KasirView: React.FC<KasirViewProps> = ({
       category: item.category || 'Cetak Indoor / A3+',
       unit: item.unit || 'pcs',
       unitPrice: item.price,
+      costPrice: products.find(p => p.id === item.productId)?.costPrice || 0,
       qty: 1,
       totalPrice: item.price,
     };
@@ -400,6 +403,7 @@ export const KasirView: React.FC<KasirViewProps> = ({
       category: activeBannerProduct.category,
       unit: activeBannerProduct.unit,
       unitPrice: activeBannerProduct.basePrice,
+      costPrice: activeBannerProduct.costPrice || 0,
       qty: bannerQty,
       lengthMeters: bannerLength,
       widthMeters: bannerWidth,
@@ -446,6 +450,7 @@ export const KasirView: React.FC<KasirViewProps> = ({
       category: itemCategory,
       unit: 'pcs',
       unitPrice: customUnitPrice,
+      costPrice: customCostPrice,
       qty: customQty,
       totalPrice: customUnitPrice * customQty,
       notes: [
@@ -481,6 +486,7 @@ export const KasirView: React.FC<KasirViewProps> = ({
         category: itemCategory,
         unit: 'pcs',
         basePrice: customUnitPrice,
+        costPrice: customCostPrice,
         minQty: 1,
         description:
           [customSizeSpec, customDescription].filter(Boolean).join(' - ') || 'Layanan Custom TEFA',
@@ -498,6 +504,7 @@ export const KasirView: React.FC<KasirViewProps> = ({
     setCustomSizeSpec('');
     setCustomQty(1);
     setCustomUnitPrice(10000);
+    setCustomCostPrice(0);
     setCustomFileName('');
     setCustomSaveAsProduct(false);
   };
@@ -934,7 +941,7 @@ export const KasirView: React.FC<KasirViewProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-slate-500 font-bold mb-1">Harga Satuan (Rp) *</label>
+                    <label className="block text-slate-500 font-bold mb-1">Harga Satuan Jual (Rp) *</label>
                     <input
                       type="number"
                       value={customUnitPrice}
@@ -943,6 +950,17 @@ export const KasirView: React.FC<KasirViewProps> = ({
                       required
                     />
                   </div>
+                </div>
+
+                <div>
+                  <label className="block text-slate-500 font-bold mb-1">HPP / Harga Modal Satuan (Rp)</label>
+                  <input
+                    type="number"
+                    value={customCostPrice || ''}
+                    onChange={(e) => setCustomCostPrice(Number(e.target.value) || 0)}
+                    placeholder="0"
+                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900"
+                  />
                 </div>
 
                 <div>
