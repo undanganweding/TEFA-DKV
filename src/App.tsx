@@ -43,6 +43,7 @@ import { LoginView } from './components/views/LoginView';
 import { KasirView } from './components/views/KasirView';
 import { FileInboxView } from './components/views/FileInboxView';
 import { StudentPortalView } from './components/views/StudentPortalView';
+import { GuestPlatformView } from './components/views/GuestPlatformView';
 import { PesananView } from './components/views/PesananView';
 import { ProdukView } from './components/views/ProdukView';
 import { CustomerFileView } from './components/views/CustomerFileView';
@@ -794,8 +795,22 @@ export function App() {
     setStoredSession(updatedUser);
   };
 
-  // 1. If page is Student / Customer Portal (public_upload), render full-width Customer Platform without Admin Sidebar
+  // 1. If page is Student / Customer Portal (public_upload), render Customer Platform
+  // - Registered students see StudentPortalView with full dashboard
+  // - Guest users see simple landing page style GuestPlatformView
   if (currentPage === 'public_upload') {
+    // If Guest user, show simple Guest Platform
+    if (currentUser?.role === 'Guest') {
+      return (
+        <GuestPlatformView
+          onSwitchToAdmin={() => {
+            alert('Silakan logout dan login dengan akun Admin.');
+          }}
+          onLogout={handleLogout}
+        />
+      );
+    }
+    // If registered student, show full Student Portal
     return (
       <StudentPortalView
         products={products.filter((p) => !p.isArchived)}
@@ -804,12 +819,7 @@ export function App() {
         onAddInboxFile={handleAddInboxFile}
         onAddOrder={handleAddOrder}
         onSwitchToAdmin={() => {
-          if (currentUser?.role === 'Siswa' || currentUser?.role === 'Guest') {
-            // Prompt to logout & sign in with Admin Account if student tries to open Admin Platform
-            alert('Akses Admin terbatas untuk Kepala TEFA & Admin TEFA. Silakan Logout & Login dengan akun Admin.');
-          } else {
-            setCurrentPage('dashboard');
-          }
+          alert('Akses Admin terbatas untuk Kepala TEFA & Admin TEFA. Silakan Logout & Login dengan akun Admin.');
         }}
         currentUser={currentUser}
         onUpdateProfile={handleUpdateProfile}

@@ -81,8 +81,8 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   const [regPassword, setRegPassword] = useState<string>('');
   const [regConfirmPassword, setRegConfirmPassword] = useState<string>('');
   const [regNis, setRegNis] = useState<string>('');
-  const [regClass, setRegClass] = useState<string>('XI DKV 1');
-  const [regMajor, setRegMajor] = useState<string>('Desain Komunikasi Visual');
+  const [regClass, setRegClass] = useState<string>('');
+  const [regMajor, setRegMajor] = useState<string>('DKV');
   const [regWhatsapp, setRegWhatsapp] = useState<string>('');
   const [regAvatarUrl, setRegAvatarUrl] = useState<string>('');
   const [showCropModal, setShowCropModal] = useState<boolean>(false);
@@ -162,8 +162,8 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
       setErrorMessage('Email aktif wajib diisi.');
       return;
     }
-    if (!regNis.trim()) {
-      setErrorMessage('NIS Siswa wajib diisi.');
+    if (!regClass.trim()) {
+      setErrorMessage('Kelas wajib diisi.');
       return;
     }
     if (!regWhatsapp.trim()) {
@@ -598,7 +598,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                     Pendaftaran Akun Siswa
                   </h2>
                   <p className="text-xs text-slate-500 font-bold">
-                    Khusus Siswa SMK NU Ungaran Jurusan DKV
+                    Pendaftaran Siswa SMK NU Ungaran
                   </p>
                 </div>
 
@@ -680,11 +680,10 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                   <div className="grid grid-cols-3 gap-2">
                     <div>
                       <label className="block text-[11px] font-extrabold text-slate-700 mb-1">
-                        NIS Siswa
+                        NIS Siswa <span className="text-slate-400 font-normal">(Opsional)</span>
                       </label>
                       <input
                         type="text"
-                        required
                         value={regNis}
                         onChange={(e) => setRegNis(e.target.value)}
                         placeholder="202611045"
@@ -693,31 +692,32 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                     </div>
                     <div>
                       <label className="block text-[11px] font-extrabold text-slate-700 mb-1">
-                        Kelas
-                      </label>
-                      <select
-                        value={regClass}
-                        onChange={(e) => setRegClass(e.target.value)}
-                        className="w-full px-2.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#5B4BFF]"
-                      >
-                        <option value="X DKV 1">X DKV 1</option>
-                        <option value="X DKV 2">X DKV 2</option>
-                        <option value="XI DKV 1">XI DKV 1</option>
-                        <option value="XI DKV 2">XI DKV 2</option>
-                        <option value="XII DKV 1">XII DKV 1</option>
-                        <option value="XII DKV 2">XII DKV 2</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-extrabold text-slate-700 mb-1 truncate">
-                        Jurusan
+                        Kelas <span className="text-red-400">*</span>
                       </label>
                       <input
                         type="text"
-                        readOnly
-                        value={regMajor}
-                        className="w-full px-2.5 py-2 rounded-xl bg-slate-100 border border-slate-200 text-[11px] font-bold text-slate-600"
+                        required
+                        value={regClass}
+                        onChange={(e) => setRegClass(e.target.value)}
+                        placeholder="X, XI, XII DKV 1"
+                        className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#5B4BFF]"
                       />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-extrabold text-slate-700 mb-1">
+                        Jurusan <span className="text-red-400">*</span>
+                      </label>
+                      <select
+                        value={regMajor}
+                        onChange={(e) => setRegMajor(e.target.value)}
+                        className="w-full px-2.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#5B4BFF]"
+                      >
+                        <option value="DKV">1. DKV (Desain Komunikasi Visual)</option>
+                        <option value="TJKT">2. TJKT (Teknik Jaringan Komputer dan Telekomunikasi)</option>
+                        <option value="BROFI">3. BROFI (Broadcasting dan Film)</option>
+                        <option value="TBSM/TO">4. TBSM/TO (Teknik dan Bisnis Sepeda Motor)</option>
+                        <option value="TE">5. TE (Teknik Elektronika)</option>
+                      </select>
                     </div>
                   </div>
 
