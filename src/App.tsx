@@ -54,6 +54,7 @@ import { LaporanView } from './components/views/LaporanView';
 import { PengadaanView } from './components/views/PengadaanView';
 import { PengaturanView } from './components/views/PengaturanView';
 import { ProfileView } from './components/views/ProfileView';
+import { KelolaLoginView } from './components/views/KelolaLoginView';
 
 import { ReceiptModal } from './components/modals/ReceiptModal';
 import { NewOrderModal } from './components/modals/NewOrderModal';
@@ -1033,6 +1034,10 @@ export function App() {
               onUpdateProfile={handleUpdateProfile}
               onNavigate={setCurrentPage}
             />
+          )}
+
+          {currentPage === 'kelola_login' && (
+            <KelolaLoginView />
           )}
         </main>
       </div>

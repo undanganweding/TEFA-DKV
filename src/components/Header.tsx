@@ -125,6 +125,8 @@ export const Header: React.FC<HeaderProps> = ({
         return 'Pengadaan Tahunan Studio';
       case 'pengaturan':
         return 'Pengaturan & System Recycle';
+      case 'kelola_login':
+        return 'Kelola Konten Halaman Login';
       default:
         return 'TEFA DKV Creative Platform';
     }

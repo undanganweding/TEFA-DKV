@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { motion } from 'motion/react';
+import React, { useState, useRef } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { ProductionOrder } from '../../types';
 
 interface GuestPlatformViewProps {
@@ -11,6 +11,15 @@ interface GuestPlatformViewProps {
 
 type GuestPage = 'landing' | 'order' | 'tracking';
 
+interface ProductItem {
+  id: string;
+  name: string;
+  price: string;
+  img: string;
+  desc: string;
+  specs: string[];
+}
+
 const services = [
   { id: 'cetak_dokumen', name: 'Cetak Dokumen', icon: 'description', desc: 'Poster, Brosur, Banner, Buku Kenangan' },
   { id: 'cetak_foto', name: 'Cetak Foto', icon: 'photo_library', desc: 'Cetak foto Resolusi Tinggi & Bingkai' },
@@ -18,11 +27,39 @@ const services = [
   { id: 'custom', name: 'Custom Design & Studio', icon: 'design_services', desc: 'Desain Logo, Feed IG, Foto Studio & Video' },
 ];
 
-const products = [
-  { name: 'Cetak Banner Flexi 280gr', price: 'Rp 18.000 / m²', img: 'https://images.unsplash.com/photo-1562654501-a0ccc0fc3fb1?w=400&q=80' },
-  { name: 'Stiker Vinyl Glossy A3+', price: 'Rp 12.000 / lembar', img: 'https://images.unsplash.com/photo-1589939705384-5185137a7f0f?w=400&q=80' },
-  { name: 'Pin Bros Custom DKV', price: 'Rp 4.500 / pcs', img: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=400&q=80' },
-  { name: 'Kartu Nama Exclusive Box', price: 'Rp 35.000 / box', img: 'https://images.unsplash.com/photo-1542744094-3a31b272c390?w=400&q=80' },
+const products: ProductItem[] = [
+  {
+    id: 'cetak_dokumen',
+    name: 'Cetak Banner Flexi 280gr',
+    price: 'Rp 18.000 / m²',
+    img: 'https://images.unsplash.com/photo-1562654501-a0ccc0fc3fb1?w=400&q=80',
+    desc: 'Cetak banner luar ruangan berkualitas tinggi menggunakan mesin cetak solvent modern dengan bahan Flexi Tiongkok 280gr. Tahan segala cuaca, warna pekat tahan lama, ideal untuk media promosi outdoor.',
+    specs: ['Bahan: Flexi Frontlite Tiongkok 280gr', 'Lebar Maksimal: 3.2 meter (tanpa sambungan)', 'Resolusi Cetak: Standard Outdoor Resolution', 'Finishing: Mata ayam (ring besi) di sudut / Selongsong kayu / Lipat kelim lem'],
+  },
+  {
+    id: 'merchandise',
+    name: 'Stiker Vinyl Glossy A3+',
+    price: 'Rp 12.000 / lembar',
+    img: 'https://images.unsplash.com/photo-1589939705384-5185137a7f0f?w=400&q=80',
+    desc: 'Stiker lembaran berbahan dasar plastik vinyl putih susu dengan permukaan mengkilap (glossy). Tahan air (waterproof), perekat sangat kuat, tidak mudah sobek, cocok sekali untuk label kemasan produk makanan/minuman.',
+    specs: ['Bahan: Vinyl Glossy White Premium', 'Ukuran Lembar: A3+ (area cetak 31 x 47 cm)', 'Tinta: Toner Laser anti-luntur', 'Finishing: Kiss-Cut (setengah putus siap tempel) / Die-Cut (putus)'],
+  },
+  {
+    id: 'merchandise',
+    name: 'Pin Bros Custom DKV',
+    price: 'Rp 4.500 / pcs',
+    img: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=400&q=80',
+    desc: 'Pin bros berbentuk bulat peniti custom untuk aksesoris identitas, tanda panitia acara sekolah/kampus, souvenir pernikahan, merchandise wisuda, atau branding logo komunitas.',
+    specs: ['Ukuran: Diameter Standar 44mm / 58mm', 'Laminasi Atas: Glossy Mengkilap / Doff Halus', 'Bahan Peniti: Plastik Putih/Hitam kokoh anti-karat', 'Desain: Bebas custom foto / tulisan'],
+  },
+  {
+    id: 'cetak_dokumen',
+    name: 'Kartu Nama Exclusive Box',
+    price: 'Rp 35.000 / box',
+    img: 'https://images.unsplash.com/photo-1542744094-3a31b272c390?w=400&q=80',
+    desc: 'Kartu nama cetak dua sisi dengan bahan kertas tebal berkualitas tinggi. Sudah dikemas menggunakan kotak plastik mika transparan eksklusif agar tetap bersih dan rapi saat dibagikan ke klien penting.',
+    specs: ['Bahan: Art Carton 260gr / 310gr tebal', 'Isi per Box: 100 lembar kartu nama presisi', 'Ukuran Potong: Standar 90mm x 55mm', 'Pilihan Cetak: 1 Sisi (Single) / 2 Sisi (Bolak-balik)'],
+  },
 ];
 
 const galleryItems = [
@@ -41,6 +78,12 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
   onLogout,
 }) => {
   const [currentPage, setCurrentPage] = useState<GuestPage>('landing');
+  const [selectedProduct, setSelectedProduct] = useState<ProductItem | null>(null);
+
+  // File Upload State
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
 
   // Order Form State
   const [orderForm, setOrderForm] = useState({
@@ -56,6 +99,54 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
   const [trackInput, setTrackInput] = useState('');
   const [trackResult, setTrackResult] = useState<any>(null);
 
+  // File Upload Handlers
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    validateAndSetFile(file);
+  };
+
+  const validateAndSetFile = (file: File) => {
+    setFileError(null);
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    const allowedExtensions = /(\.pdf|\.jpg|\.jpeg|\.png|\.cdr|\.ai)$/i;
+
+    if (file.size > maxSize) {
+      setFileError('Ukuran berkas melebihi batas maksimal 10MB!');
+      setSelectedFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    if (!allowedExtensions.exec(file.name)) {
+      setFileError('Tipe berkas tidak didukung! Gunakan format PDF, JPG, PNG, CDR, atau AI.');
+      setSelectedFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    setSelectedFile(file);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      validateAndSetFile(file);
+    }
+  };
+
+  const handleRemoveFile = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedFile(null);
+    setFileError(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
   const handleSubmitOrder = (e: React.FormEvent) => {
     e.preventDefault();
     if (!orderForm.name || !orderForm.whatsapp || !orderForm.service) {
@@ -67,6 +158,20 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
     const orderNo = `TEFA-GUEST-2026-${String(Math.floor(Math.random() * 900) + 100)}`;
     const todayStr = new Date().toISOString().split('T')[0];
     const serviceName = services.find((s) => s.id === orderForm.service)?.name || 'Layanan Cetak';
+
+    // Prepare artwork files if uploaded
+    const artworkFiles = selectedFile
+      ? [
+          {
+            id: 'FILE-' + Date.now(),
+            name: selectedFile.name,
+            size: `${(selectedFile.size / (1024 * 1024)).toFixed(2)} MB`,
+            type: selectedFile.type,
+            url: '#', // In real system, this would be the uploaded file URL
+            uploadDate: todayStr,
+          },
+        ]
+      : [];
 
     // Construct ProductionOrder object
     const newOrder: ProductionOrder = {
@@ -100,6 +205,7 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
       operatorName: 'Guest Customer',
       priority: 'Normal',
       notes: orderForm.notes || undefined,
+      artworkFiles: artworkFiles.length > 0 ? artworkFiles : undefined,
       statusHistory: [
         {
           status: 'Menunggu Admin',
@@ -113,6 +219,7 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
     onAddOrder(newOrder);
     setOrderSuccess(orderNo);
     setOrderForm({ name: '', whatsapp: '', email: '', service: '', notes: '' });
+    setSelectedFile(null);
   };
 
   const handleTrack = () => {
@@ -143,8 +250,21 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
     }
   };
 
+  const handleProductOrderClick = (product: ProductItem) => {
+    setOrderForm({
+      name: '',
+      whatsapp: '',
+      email: '',
+      service: product.id,
+      notes: `Pemesanan Produk Unggulan: ${product.name}`,
+    });
+    setSelectedProduct(null);
+    setOrderSuccess(null);
+    setCurrentPage('order');
+  };
+
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-800 flex flex-col justify-between selection:bg-[#5B4BFF]/20 selection:text-[#5B4BFF]">
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-800 flex flex-col justify-between selection:bg-[#5B4BFF]/20 selection:text-[#5B4BFF] relative">
       {/* Header */}
       <header className="bg-white/80 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-40">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
@@ -282,7 +402,7 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
               <div className="max-w-5xl mx-auto">
                 <div className="text-center mb-16">
                   <h2 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">Produk Unggulan</h2>
-                  <p className="text-sm text-slate-500 font-bold mt-2">Daftar harga standar cetak cepat terpopuler</p>
+                  <p className="text-sm text-slate-500 font-bold mt-2">Daftar harga cetak cepat terpopuler (Klik untuk melihat detail & pesan)</p>
                   <div className="w-12 h-1 bg-[#5B4BFF] mx-auto mt-4 rounded-full" />
                 </div>
 
@@ -290,7 +410,8 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
                   {products.map((product, idx) => (
                     <div
                       key={idx}
-                      className="bg-white p-4 rounded-3xl border border-slate-200/80 hover:shadow-lg transition-all group flex flex-col justify-between"
+                      onClick={() => setSelectedProduct(product)}
+                      className="bg-white p-4 rounded-3xl border border-slate-200/80 hover:shadow-xl transition-all group flex flex-col justify-between cursor-pointer hover:border-[#5B4BFF]/35"
                     >
                       <div>
                         <div className="w-full h-36 bg-slate-100 rounded-2xl mb-4 overflow-hidden relative">
@@ -300,12 +421,12 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-350"
                           />
                         </div>
-                        <h3 className="font-extrabold text-slate-800 text-xs mb-1.5 leading-tight">{product.name}</h3>
+                        <h3 className="font-extrabold text-slate-800 text-xs mb-1.5 leading-tight group-hover:text-[#5B4BFF] transition-colors">{product.name}</h3>
                       </div>
                       <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
                         <span className="text-[#5B4BFF] font-black text-xs">{product.price}</span>
-                        <span className="text-[9px] bg-slate-100 text-slate-600 font-bold px-2 py-0.5 rounded-full">
-                          Standard
+                        <span className="text-[9px] bg-purple-50 text-[#5B4BFF] font-bold px-2 py-0.5 rounded-full">
+                          Detail Info
                         </span>
                       </div>
                     </div>
@@ -314,7 +435,7 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
               </div>
             </section>
 
-            {/* Galeri Hasil Karya (NEW SECTION) */}
+            {/* Galeri Hasil Karya */}
             <section className="py-20 px-6 bg-white border-b border-slate-100">
               <div className="max-w-5xl mx-auto">
                 <div className="text-center mb-16">
@@ -384,8 +505,12 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
         {currentPage === 'order' && (
           <div className="max-w-xl mx-auto py-10 px-6 animate-fade-in">
             <button
-              onClick={() => setCurrentPage('landing')}
-              className="flex items-center gap-2 text-slate-650 hover:text-slate-900 font-extrabold text-xs mb-6 transition-colors cursor-pointer focus:outline-none"
+              onClick={() => {
+                setCurrentPage('landing');
+                setSelectedFile(null);
+                setFileError(null);
+              }}
+              className="flex items-center gap-2 text-slate-655 hover:text-slate-900 font-extrabold text-xs mb-6 transition-colors cursor-pointer focus:outline-none"
             >
               <span className="material-symbols-outlined text-sm font-black">arrow_back</span>
               Kembali Ke Beranda
@@ -522,15 +647,62 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
                     </div>
                   </div>
 
+                  {/* Functional File Upload (Max 10MB) */}
                   <div>
                     <label className="block text-xs font-extrabold text-slate-700 mb-1.5">
-                      Upload File <span className="text-slate-400 font-normal">(Optional)</span>
+                      Upload File Desain <span className="text-slate-400 font-normal">(Optional)</span>
                     </label>
-                    <div className="border-2 border-dashed border-slate-300 hover:border-[#5B4BFF] rounded-2xl p-6 text-center transition-colors cursor-pointer bg-slate-50/30">
-                      <span className="material-symbols-outlined text-3xl text-slate-300 mb-2">upload_file</span>
-                      <p className="text-xs text-slate-500 font-bold">Pilih berkas desain Anda</p>
-                      <p className="text-[10px] text-slate-400 mt-1 font-semibold">Maksimal 10MB (PDF, JPG, PNG, CDR, AI)</p>
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleFileChange}
+                      accept=".pdf,.jpg,.jpeg,.png,.cdr,.ai"
+                      className="hidden"
+                      id="guest-artwork-upload"
+                    />
+                    
+                    <div
+                      onDragOver={handleDragOver}
+                      onDrop={handleDrop}
+                      onClick={() => fileInputRef.current?.click()}
+                      className={`border-2 border-dashed rounded-2xl p-6 text-center transition-all cursor-pointer bg-slate-50/30 ${
+                        selectedFile
+                          ? 'border-emerald-500 bg-emerald-50/15'
+                          : fileError
+                          ? 'border-red-400 bg-red-50/10'
+                          : 'border-slate-300 hover:border-[#5B4BFF]'
+                      }`}
+                    >
+                      {selectedFile ? (
+                        <div className="flex flex-col items-center">
+                          <span className="material-symbols-outlined text-3xl text-emerald-500 mb-2">check_circle</span>
+                          <p className="text-xs text-slate-800 font-black truncate max-w-xs">{selectedFile.name}</p>
+                          <p className="text-[10px] text-slate-500 font-semibold mt-1">
+                            {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB
+                          </p>
+                          <button
+                            type="button"
+                            onClick={handleRemoveFile}
+                            className="mt-3 px-3 py-1 bg-red-50 hover:bg-red-100 border border-red-200 text-red-650 font-extrabold text-[10px] rounded-lg transition-colors flex items-center gap-1 mx-auto cursor-pointer"
+                          >
+                            <span className="material-symbols-outlined text-[12px]">delete</span>
+                            Hapus File
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center">
+                          <span className="material-symbols-outlined text-3xl text-slate-300 mb-2">upload_file</span>
+                          <p className="text-xs text-slate-500 font-bold">Klik atau seret (drag & drop) berkas ke sini</p>
+                          <p className="text-[10px] text-slate-400 mt-1 font-semibold">Maksimal 10MB (PDF, JPG, PNG, CDR, AI)</p>
+                        </div>
+                      )}
                     </div>
+                    {fileError && (
+                      <p className="text-[10px] text-red-550 font-bold mt-1.5 flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[12px] font-black">error</span>
+                        {fileError}
+                      </p>
+                    )}
                   </div>
 
                   <div>
@@ -567,7 +739,7 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
                 setCurrentPage('landing');
                 setTrackResult(null);
               }}
-              className="flex items-center gap-2 text-slate-650 hover:text-slate-900 font-extrabold text-xs mb-6 transition-colors cursor-pointer focus:outline-none"
+              className="flex items-center gap-2 text-slate-655 hover:text-slate-900 font-extrabold text-xs mb-6 transition-colors cursor-pointer focus:outline-none"
             >
               <span className="material-symbols-outlined text-sm font-black">arrow_back</span>
               Kembali Ke Beranda
@@ -683,6 +855,85 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
           </div>
         )}
       </main>
+
+      {/* Product Detail Modal */}
+      <AnimatePresence>
+        {selectedProduct && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedProduct(null)}
+              className="absolute inset-0 bg-[#0F1322]/80 backdrop-blur-xs"
+            />
+            {/* Modal Card */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white rounded-[32px] overflow-hidden max-w-lg w-full relative z-10 shadow-2xl border border-slate-200 flex flex-col"
+            >
+              {/* Product Image Header */}
+              <div className="w-full h-56 relative bg-slate-100">
+                <img
+                  src={selectedProduct.img}
+                  alt={selectedProduct.name}
+                  className="w-full h-full object-cover"
+                />
+                <button
+                  onClick={() => setSelectedProduct(null)}
+                  className="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/90 hover:bg-white flex items-center justify-center shadow-md text-slate-800 transition-colors cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-lg font-black">close</span>
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="p-6 md:p-8 flex-1 overflow-y-auto max-h-[50vh]">
+                <span className="text-[10px] bg-[#5B4BFF]/10 text-[#5B4BFF] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider">
+                  Produk Unggulan
+                </span>
+                <h3 className="text-xl md:text-2xl font-black text-slate-900 mt-2.5 mb-1.5 leading-tight">
+                  {selectedProduct.name}
+                </h3>
+                <p className="text-[#5B4BFF] font-black text-lg mb-4">{selectedProduct.price}</p>
+                
+                <h4 className="text-xs font-extrabold text-slate-800 mb-1.5">Deskripsi Produk</h4>
+                <p className="text-xs text-slate-600 font-bold leading-relaxed mb-6">
+                  {selectedProduct.desc}
+                </p>
+
+                <h4 className="text-xs font-extrabold text-slate-800 mb-2.5">Spesifikasi Standar</h4>
+                <ul className="space-y-1.5 mb-2">
+                  {selectedProduct.specs.map((spec, i) => (
+                    <li key={i} className="text-xs text-slate-600 font-bold flex items-start gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#5B4BFF] mt-1.5 shrink-0" />
+                      <span>{spec}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Action Footer */}
+              <div className="p-6 border-t border-slate-150 bg-slate-50 flex items-center justify-between gap-4">
+                <div>
+                  <span className="text-[10px] text-slate-500 font-bold">Mulai dari</span>
+                  <p className="text-[#5B4BFF] font-black text-sm">{selectedProduct.price}</p>
+                </div>
+                <button
+                  onClick={() => handleProductOrderClick(selectedProduct)}
+                  className="px-6 py-3 bg-[#5B4BFF] hover:bg-[#4a3ce0] text-white font-extrabold text-xs rounded-xl shadow-md shadow-purple-500/10 transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-sm">shopping_cart</span>
+                  Pesan Sekarang
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Footer */}
       <footer className="py-6 border-t border-slate-200/60 bg-white text-slate-450 text-center text-[10px] font-bold">

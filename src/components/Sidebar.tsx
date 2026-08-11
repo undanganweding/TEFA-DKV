@@ -77,6 +77,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'laporan', label: 'Laporan', icon: 'assessment' },
     { id: 'pengadaan', label: 'Pengadaan Tahunan', icon: 'calendar_add_on' },
     { id: 'pengaturan', label: 'Pengaturan', icon: 'settings' },
+    { id: 'kelola_login', label: 'Kelola Login Page', icon: 'slideshow' },
   ];
 
   // Filter items according to role permissions
@@ -86,8 +87,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       return true; // Full Access
     }
     if (role === 'Admin TEFA' || role === 'Guru / Operator') {
-      // Management Access: Produk, Order (Pesanan), File (Inbox & Customer File), Produksi, Customer, Inventaris (Alat & Stok), Kasir, Dashboard
-      return ['dashboard', 'kasir', 'file_inbox', 'pesanan', 'produk', 'inventaris_alat', 'stok_bahan'].includes(item.id);
+      // Management Access: Produk, Order (Pesanan), File (Inbox & Customer File), Produksi, Customer, Inventaris (Alat & Stok), Kasir, Dashboard, Kelola Login
+      return ['dashboard', 'kasir', 'file_inbox', 'pesanan', 'produk', 'inventaris_alat', 'stok_bahan', 'kelola_login'].includes(item.id);
     }
     return true;
   });

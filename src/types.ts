@@ -14,7 +14,8 @@ export type PageId =
   | 'pengaturan'
   | 'public_upload'
   | 'profile'
-  | 'pendaftaran_siswa'; // Halaman pendaftaran siswa baru
+  | 'pendaftaran_siswa'
+  | 'kelola_login'; // Halaman kelola login content
 
 export type UserRole = 'Kepala TEFA' | 'Admin TEFA' | 'Guru / Operator' | 'Admin' | 'Siswa' | 'Guest';
 

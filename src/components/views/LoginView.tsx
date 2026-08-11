@@ -8,60 +8,24 @@ import {
   createGuestUser,
 } from '../../utils/authStore';
 import { AvatarCropModal } from '../AvatarCropModal';
+import { getLoginSlides, SlideItem } from '../../utils/loginContentStore';
 
 interface LoginViewProps {
   onLoginSuccess: (user: UserProfile) => void;
 }
 
-interface SlideItem {
-  id: number;
-  title: string;
-  description: string;
-  features: string[];
-  imageUrl: string;
-  badge: string;
-  visualTag: string;
-}
-
-const slides: SlideItem[] = [
-  {
-    id: 1,
-    title: 'TEFA DKV Creative Management',
-    description:
-      'Platform digital enterprise terpadu untuk mengelola produksi cetak, kasir POS, manajemen file, dan workflow industri DKV.',
-    features: ['Production Control', 'Point of Sales', 'File Inbox System'],
-    imageUrl:
-      'https://images.unsplash.com/photo-1542744094-3a31b272c390?w=1200&q=85',
-    badge: 'TEFA DKV',
-    visualTag: 'Studio & Workstation DKV',
-  },
-  {
-    id: 2,
-    title: 'Manajemen Produksi Real-Time',
-    description:
-      'Pantau alur pengerjaan order dari pemeriksaan file masuk, cetak outdoor/indoor, finishing, hingga siap diambil.',
-    features: ['Production Tracking', 'Queue Management', 'Quality Inspection'],
-    imageUrl:
-      'https://images.unsplash.com/photo-1562654501-a0ccc0fc3fb1?w=1200&q=85',
-    badge: 'SMK NU UNGARAN',
-    visualTag: 'Mesin Press & Large Format Print',
-  },
-  {
-    id: 3,
-    title: 'Workspace Digital Siswa',
-    description:
-      'Wadah nyata siswa DKV untuk berkolaborasi, submit karya cetak, menerima order industri, dan melihat histori transaksi.',
-    features: ['Student Asset Hub', 'Direct Order Form', 'Order Status Timeline'],
-    imageUrl:
-      'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=1200&q=85',
-    badge: 'Teaching Factory',
-    visualTag: 'Portfolio & Project Management',
-  },
-];
-
 type AuthTab = 'login' | 'register_student' | 'forgot_password';
 
 export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
+  const [slides, setSlides] = useState<SlideItem[]>(getLoginSlides());
+
+  useEffect(() => {
+    const handleUpdate = () => {
+      setSlides(getLoginSlides());
+    };
+    window.addEventListener('tefa_slides_updated', handleUpdate);
+    return () => window.removeEventListener('tefa_slides_updated', handleUpdate);
+  }, []);
   // Slider State
   const [currentSlide, setCurrentSlide] = useState<number>(0);
   const [isPaused, setIsPaused] = useState<boolean>(false);
@@ -249,7 +213,15 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
     }, 600);
   };
 
-  const activeSlide = slides[currentSlide];
+  const activeSlide = slides[currentSlide] || {
+    id: 0,
+    title: 'TEFA DKV SMK NU Ungaran',
+    description: 'Teaching Factory Desain Komunikasi Visual',
+    features: [],
+    imageUrl: 'https://images.unsplash.com/photo-1542744094-3a31b272c390?w=1200&q=85',
+    badge: 'TEFA DKV',
+    visualTag: 'Creative Studio',
+  };
 
   return (
     <div className="min-h-screen w-full bg-[#0F1322] text-slate-100 flex items-center justify-center p-3 sm:p-6 font-sans relative overflow-hidden select-none">
