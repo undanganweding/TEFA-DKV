@@ -1,7 +1,7 @@
 export type PageId =
   | 'dashboard'
   | 'kasir'
-  | 'custom_order'
+  | 'manajemen_user'
   | 'file_inbox'
   | 'pesanan'
   | 'produk'
@@ -12,59 +12,65 @@ export type PageId =
   | 'laporan'
   | 'pengadaan'
   | 'pengaturan'
-  | 'public_upload';
+  | 'public_upload'
+  | 'profile';
 
-// Custom Order Status (Workflow)
-export type CustomOrderStatus =
-  | 'Menunggu'
-  | 'Disetujui'
-  | 'Proses Produksi'
-  | 'Quality Check'
-  | 'Selesai'
-  | 'Sudah Diambil';
+export type UserRole = 'Kepala TEFA' | 'Admin TEFA' | 'Guru / Operator' | 'Admin' | 'Siswa' | 'Guest';
 
-export interface CustomOrder {
-  id: string;
-  orderNo: string;
-  // Customer Data
-  customerName: string;
-  customerPhone: string;
-  customerClass?: string;
-  customerMajor?: string;
-  institution?: string;
-  // Order Details
-  orderName: string;
-  category: 'Printing' | 'Design Service' | 'Merchandise' | 'Advertising' | 'Lainnya';
+export interface UserNotifications {
+  orderNotif: boolean;
+  fileInboxNotif: boolean;
+  productionNotif: boolean;
+  stockNotif: boolean;
+}
+
+export interface InstitutionProfile {
+  schoolName: string;
+  tefaName: string;
+  logoUrl: string;
+  address: string;
+  contactPhone: string;
+  schoolEmail: string;
+  website: string;
   description: string;
-  qty: number;
-  unit: 'pcs' | 'lembar' | 'meter' | 'paket' | 'set' | 'roll' | 'box';
-  // Financial
-  costPrice: number;
-  sellingPrice: number;
-  profit: number;
-  // Workflow
-  status: CustomOrderStatus;
-  deadline: string;
-  productionNotes?: string;
-  // File Reference
-  referenceFile?: {
-    name: string;
-    size: string;
-    type: string;
-    url?: string;
-  };
-  // Meta
-  orderDate: string;
-  operatorName: string;
-  statusHistory: Array<{
-    status: CustomOrderStatus;
-    timestamp: string;
-    updatedBy: string;
-    note?: string;
-  }>;
-  isArchived?: boolean;
-  archivedAt?: string;
-  archivedBy?: string;
+}
+
+export interface UserProfile {
+  id: string;
+  name: string;
+  username?: string;
+  email: string;
+  role: UserRole;
+  avatar: string;
+  defaultPage: PageId;
+  statusAkun: 'Pending' | 'Approved' | 'Active' | 'Aktif' | 'Menunggu Verifikasi' | 'Rejected' | 'Inactive' | 'Nonaktif';
+  rejectReason?: string;
+  phone: string;
+  address?: string;
+  birthDate?: string;
+  // Kepala TEFA / Staff
+  position?: string;
+  nip?: string;
+  schoolEmail?: string;
+  expertise?: string;
+  subject?: string;
+  employeeId?: string;
+  // Siswa
+  nis?: string;
+  studentClass?: string;
+  major?: string;
+  whatsapp?: string;
+  // Admin / System
+  adminId?: string;
+  unitAccess?: string;
+  // Auth & Security
+  passwordHash?: string;
+  createdAt?: string;
+  verifiedAt?: string;
+  verifiedBy?: string;
+  // Preferences
+  theme: 'light' | 'dark';
+  notifications: UserNotifications;
 }
 
 export type InboxFileStatus =
@@ -146,6 +152,9 @@ export interface CartItem {
   totalPrice: number;
   fileUrl?: string;
   fileName?: string;
+  isCustomOrder?: boolean;
+  customSizeSpec?: string;
+  customDescription?: string;
 }
 
 export interface ProductionOrder {
@@ -169,6 +178,7 @@ export interface ProductionOrder {
   balanceDue: number;
   operatorName: string;
   priority: 'Normal' | 'Mendesak' | 'Prioritas Tinggi';
+  notes?: string;
   designNotes?: string;
   finishingNotes?: string;
   artworkFiles?: Array<{
@@ -239,8 +249,10 @@ export interface MaterialStock {
   category: 'Kertas & Stiker' | 'Bahan Banner & Cloth' | 'Tinta & Solvent' | 'Bahan Sublim & Merchandise' | 'Aksesoris Finishing';
   currentStock: number;
   minStock: number;
-  unit: 'roll' | 'pack' | 'rim' | 'liter' | 'pcs' | 'box';
-  unitPrice: number;
+  unit: 'roll' | 'pack' | 'rim' | 'liter' | 'pcs' | 'box' | 'lembar' | 'm2' | string;
+  unitPrice: number; // Cost Price / Modal
+  costPrice?: number; // Modal unit price
+  sellingRefPrice?: number; // Reference selling price per unit
   supplier: string;
   location: string;
   status: 'Aman' | 'Menipis' | 'Kritis';
@@ -250,12 +262,28 @@ export interface MaterialStock {
   archivedBy?: string;
 }
 
+export interface StockMovement {
+  id: string;
+  materialId: string;
+  materialName: string;
+  date: string;
+  type: 'Masuk' | 'Keluar' | 'Penyesuaian'; // Incoming, Production Usage, Stock Adjustment
+  quantity: number;
+  unit: string;
+  unitCost: number;
+  totalValue: number;
+  supplier?: string;
+  purchaseDate?: string;
+  notes?: string;
+  operator?: string;
+}
+
 export interface FinanceTransaction {
   id: string;
   transNo: string;
   date: string;
   type: 'Pemasukan' | 'Pengeluaran';
-  category: 'Penjualan Cetak' | 'Jasa Desain' | 'Pembelian Bahan' | 'Perawatan Alat' | 'Operasional & Listrik' | 'Lain-lain';
+  category: 'Penjualan Cetak' | 'Jasa Desain' | 'Pelunasan / Angsuran' | 'Pembelian Bahan' | 'Perawatan Alat' | 'Operasional & Listrik' | 'Lain-lain';
   description: string;
   amount: number;
   refOrderNo?: string;

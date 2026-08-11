@@ -25,7 +25,14 @@ async function startServer() {
 
       const { prompt, type } = req.body;
 
-      const ai = new GoogleGenAI({ apiKey });
+      const ai = new GoogleGenAI({
+        apiKey,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build',
+          },
+        },
+      });
       
       let systemInstruction = 'Anda adalah Asisten Cerdas AI TEFA DKV SMK NU Ma\'arif 1. Tugas Anda adalah membantu operasional percetakan, estimasi biaya cetak banner/stiker/merchandise, rekomendasi file artwork (CMYK, resolution, bleed), troubleshooting masalah mesin cetak (Roland, Konica Minolta), dan draf kutipan harga customer dalam Bahasa Indonesia yang ramah, sopan, dan profesional.';
       
@@ -36,7 +43,7 @@ async function startServer() {
       }
 
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3.6-flash',
         contents: prompt,
         config: {
           systemInstruction,
