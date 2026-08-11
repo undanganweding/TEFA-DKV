@@ -193,15 +193,15 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
         return;
       }
 
-      setSuccessToast(result.message || 'Registrasi Akun Siswa Berhasil!');
+      setSuccessToast('Pendaftaran berhasil! Menunggu persetujuan admin TEFA.');
 
       // Reset form & redirect to login after short delay
       setTimeout(() => {
         setEmailOrUsername(result.user!.email);
         setPassword(regPassword);
         setActiveTab('login');
-        setSuccessToast('Akun Anda telah terdaftar. Silakan klik "Masuk Dashboard"');
-      }, 1200);
+        setSuccessToast('Akun Anda telah terdaftar dan menunggu persetujuan admin.');
+      }, 2000);
     }, 900);
   };
 

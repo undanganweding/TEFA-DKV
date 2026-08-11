@@ -21,7 +21,7 @@ export const INITIAL_ACCOUNTS: UserProfile[] = [
     role: 'Kepala TEFA',
     avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&q=80',
     defaultPage: 'dashboard',
-    statusAkun: 'Aktif',
+    statusAkun: 'Active',
     phone: '081234567890',
     position: 'Kepala Unit Teaching Factory DKV',
     nip: '198504122010011005',
@@ -39,7 +39,7 @@ export const INITIAL_ACCOUNTS: UserProfile[] = [
     role: 'Admin TEFA',
     avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&q=80',
     defaultPage: 'dashboard',
-    statusAkun: 'Aktif',
+    statusAkun: 'Active',
     phone: '081987654321',
     position: 'Administrator Platform TEFA',
     employeeId: 'ADM-2026-002',
@@ -56,7 +56,7 @@ export const INITIAL_ACCOUNTS: UserProfile[] = [
     role: 'Siswa',
     avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150&q=80',
     defaultPage: 'public_upload',
-    statusAkun: 'Aktif',
+    statusAkun: 'Active',
     phone: '085712345678',
     whatsapp: '085712345678',
     nis: '202611045',
@@ -150,18 +150,27 @@ export const authenticateUser = (identifier: string, passwordInput: string): Log
     };
   }
 
-  // Check account status
-  if (user.statusAkun === 'Menunggu Verifikasi') {
+  // Check account status - Pending
+  if (user.statusAkun === 'Pending') {
     return {
       success: false,
-      message: 'Akun Anda sedang dalam proses verifikasi oleh Admin TEFA. Silakan hubungi pengelola.',
+      message: 'Akun Anda sedang menunggu persetujuan admin TEFA. Silakan hubungi pengelola.',
     };
   }
 
-  if (user.statusAkun === 'Nonaktif') {
+  // Check account status - Rejected
+  if (user.statusAkun === 'Rejected') {
     return {
       success: false,
-      message: 'Akun Anda telah dinonaktifkan. Silakan hubungi Kepala TEFA / Admin.',
+      message: `Akun Anda ditolak. ${user.rejectReason ? 'Alasan: ' + user.rejectReason : 'Silakan hubungi Admin untuk informasi lebih lanjut.'}`,
+    };
+  }
+
+  // Check account status - Inactive
+  if (user.statusAkun === 'Inactive') {
+    return {
+      success: false,
+      message: 'Akun Anda tidak aktif. Silakan hubungi Kepala TEFA / Admin.',
     };
   }
 
@@ -219,7 +228,7 @@ export const registerStudentAccount = (input: RegisterStudentInput): RegisterRes
     };
   }
 
-  // Create new Student Profile
+  // Create new Student Profile with PENDING status (needs admin approval)
   const newStudent: UserProfile = {
     id: `USR-STD-${Date.now().toString().slice(-6)}`,
     name: input.name.trim(),
@@ -230,7 +239,7 @@ export const registerStudentAccount = (input: RegisterStudentInput): RegisterRes
       input.avatar ||
       'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&q=80',
     defaultPage: 'public_upload',
-    statusAkun: 'Aktif', // Can be logged in directly or set to Aktif
+    statusAkun: 'Pending', // Changed from 'Aktif' - requires admin approval
     phone: input.whatsapp.trim() || '081234567890',
     whatsapp: input.whatsapp.trim(),
     nis: input.nis.trim(),
@@ -248,7 +257,7 @@ export const registerStudentAccount = (input: RegisterStudentInput): RegisterRes
   return {
     success: true,
     user: newStudent,
-    message: 'Registrasi berhasil! Akun Siswa DKV Anda telah aktif.',
+    message: 'Pendaftaran berhasil dikirim. Silakan menunggu persetujuan admin TEFA.',
   };
 };
 
@@ -282,14 +291,131 @@ export const resetUserPassword = (emailInput: string, newPassword: string): { su
 };
 
 // 6. User Status Management (Admin Action)
-export const updateUserStatus = (userId: string, newStatus: 'Aktif' | 'Menunggu Verifikasi' | 'Nonaktif'): UserProfile[] => {
+export type AdminUserStatus = 'Pending' | 'Approved' | 'Active' | 'Rejected' | 'Inactive';
+
+export const updateUserStatus = (userId: string, newStatus: AdminUserStatus, rejectReason?: string): UserProfile[] => {
   const users = getStoredUsers();
-  const updated = users.map((u) => (u.id === userId ? { ...u, statusAkun: newStatus } : u));
+  const updated = users.map((u) => {
+    if (u.id === userId) {
+      return {
+        ...u,
+        statusAkun: newStatus,
+        rejectReason: newStatus === 'Rejected' ? rejectReason : undefined,
+        verifiedAt: newStatus === 'Active' ? new Date().toISOString() : u.verifiedAt,
+      };
+    }
+    return u;
+  });
   saveUsers(updated);
   return updated;
 };
 
-// 7. Session Persistence
+// 7. Approve Student (Admin Action)
+export const approveStudent = (userId: string): UserProfile[] => {
+  return updateUserStatus(userId, 'Active');
+};
+
+// 8. Reject Student (Admin Action)
+export const rejectStudent = (userId: string, reason: string): UserProfile[] => {
+  return updateUserStatus(userId, 'Rejected', reason);
+};
+
+// 9. Get Users by Filter
+export type UserFilter = 'all' | 'pending' | 'active' | 'admin' | 'inactive';
+
+export const getFilteredUsers = (filter: UserFilter): UserProfile[] => {
+  const users = getStoredUsers();
+
+  switch (filter) {
+    case 'pending':
+      return users.filter((u) => u.statusAkun === 'Pending');
+    case 'active':
+      return users.filter((u) => u.statusAkun === 'Active');
+    case 'admin':
+      return users.filter((u) => u.role === 'Admin TEFA' || u.role === 'Kepala TEFA');
+    case 'inactive':
+      return users.filter((u) => u.statusAkun === 'Inactive' || u.statusAkun === 'Rejected');
+    case 'all':
+    default:
+      return users;
+  }
+};
+
+// 10. Update User Profile (Admin Action)
+export interface UpdateUserInput {
+  name?: string;
+  email?: string;
+  nis?: string;
+  studentClass?: string;
+  major?: string;
+  whatsapp?: string;
+  phone?: string;
+  avatar?: string;
+  role?: UserRole;
+}
+
+export const updateUserProfile = (userId: string, updates: UpdateUserInput): UserProfile[] => {
+  const users = getStoredUsers();
+  const updated = users.map((u) => {
+    if (u.id === userId) {
+      return {
+        ...u,
+        ...updates,
+        email: updates.email?.toLowerCase() || u.email,
+      };
+    }
+    return u;
+  });
+  saveUsers(updated);
+  return updated;
+};
+
+// 11. Reset User Password (Admin Action)
+export const resetUserPasswordAdmin = (userId: string, newPassword: string): { success: boolean; message: string } => {
+  const users = getStoredUsers();
+  const userIndex = users.findIndex((u) => u.id === userId);
+
+  if (userIndex === -1) {
+    return { success: false, message: 'User tidak ditemukan.' };
+  }
+
+  if (!newPassword || newPassword.length < 8) {
+    return { success: false, message: 'Password baru minimal harus 8 karakter.' };
+  }
+
+  users[userIndex].passwordHash = hashPassword(newPassword);
+  saveUsers(users);
+
+  return { success: true, message: 'Password berhasil direset!' };
+};
+
+// 12. Delete User (Admin Action) - Keeps order history
+export const deleteUser = (userId: string): { success: boolean; message: string } => {
+  const users = getStoredUsers();
+  const user = users.find((u) => u.id === userId);
+
+  if (!user) {
+    return { success: false, message: 'User tidak ditemukan.' };
+  }
+
+  // Don't allow deleting main admins
+  if (user.id === 'USR-ADMIN-001' || user.id === 'USR-ADMIN-002') {
+    return { success: false, message: 'Tidak dapat menghapus akun admin utama sistem.' };
+  }
+
+  const updated = users.filter((u) => u.id !== userId);
+  saveUsers(updated);
+
+  return { success: true, message: 'Akun berhasil dihapus. Histori order tetap tersimpan.' };
+};
+
+// 13. Get Pending Approval Count
+export const getPendingCount = (): number => {
+  const users = getStoredUsers();
+  return users.filter((u) => u.statusAkun === 'Pending').length;
+};
+
+// 14. Session Persistence
 export const getStoredSession = (): UserProfile | null => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_SESSION);
@@ -320,7 +446,7 @@ export const createGuestUser = (): UserProfile => {
     role: 'Guest',
     avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&q=80',
     defaultPage: 'public_upload',
-    statusAkun: 'Aktif',
+    statusAkun: 'Active',
     phone: '',
     theme: 'light',
     notifications: { orderNotif: false, fileInboxNotif: false, productionNotif: false, stockNotif: false },

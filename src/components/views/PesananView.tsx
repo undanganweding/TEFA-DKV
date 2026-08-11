@@ -34,27 +34,24 @@ export const PesananView: React.FC<PesananViewProps> = ({
     switch (status) {
       case 'Draft':
         return 10;
-      case 'Antrian':
+      case 'Menunggu Admin':
         return 25;
-      case 'Proses Desain':
-        return 50;
-      case 'Cetak/Produksi':
+      case 'Diproses':
         return 75;
-      case 'Finishing':
-        return 90;
-      case 'Siap Ambil':
       case 'Selesai':
+        return 90;
+      case 'Diterima':
         return 100;
       default:
         return 30;
     }
   };
 
-  const getSimpleStatus = (status: OrderStatus): 'Baru' | 'Diproses' | 'Selesai' | 'Diambil' => {
-    if (status === 'Draft' || status === 'Antrian') return 'Baru';
-    if (status === 'Proses Desain' || status === 'Cetak/Produksi' || status === 'Finishing') return 'Diproses';
-    if (status === 'Siap Ambil') return 'Selesai';
-    if (status === 'Selesai') return 'Diambil';
+  const getSimpleStatus = (status: OrderStatus): 'Baru' | 'Diproses' | 'Selesai' | 'Diterima' => {
+    if (status === 'Draft' || status === 'Menunggu Admin') return 'Baru';
+    if (status === 'Diproses') return 'Diproses';
+    if (status === 'Selesai') return 'Selesai';
+    if (status === 'Diterima') return 'Diterima';
     return 'Baru';
   };
 
@@ -62,8 +59,8 @@ export const PesananView: React.FC<PesananViewProps> = ({
   const countBaru = orders.filter((o) => getSimpleStatus(o.status) === 'Baru').length;
   const countDiproses = orders.filter((o) => getSimpleStatus(o.status) === 'Diproses').length;
   const countSelesai = orders.filter((o) => getSimpleStatus(o.status) === 'Selesai').length;
-  const countBelumDiambil = orders.filter(
-    (o) => getSimpleStatus(o.status) === 'Selesai' || o.status === 'Siap Ambil'
+  const countDiterima = orders.filter(
+    (o) => getSimpleStatus(o.status) === 'Diterima'
   ).length;
 
   // Filter logic
@@ -110,14 +107,14 @@ export const PesananView: React.FC<PesananViewProps> = ({
         return (
           <span className="px-3 py-1 rounded-full text-xs font-black bg-emerald-100 text-emerald-800 border border-emerald-200 inline-flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-            Siap Ambil
+            Selesai
           </span>
         );
-      case 'Diambil':
+      case 'Diterima':
         return (
           <span className="px-3 py-1 rounded-full text-xs font-black bg-purple-100 text-purple-800 border border-purple-200 inline-flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-[#5B4BFF]"></span>
-            Selesai
+            Diterima
           </span>
         );
       default:
@@ -407,9 +404,9 @@ export const PesananView: React.FC<PesananViewProps> = ({
 
             {/* Change Status Controls */}
             <div className="space-y-2">
-              <label className="text-xs font-extrabold text-slate-700">Ubah Status Produksi:</label>
+              <label className="text-xs font-extrabold text-slate-700">Ubah Status Pesanan:</label>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {(['Antrian', 'Proses Desain', 'Cetak/Produksi', 'Siap Ambil', 'Selesai'] as OrderStatus[]).map((st) => (
+                {(['Menunggu Admin', 'Diproses', 'Selesai', 'Diterima'] as OrderStatus[]).map((st) => (
                   <button
                     key={st}
                     onClick={() => {

@@ -199,7 +199,7 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
         institution: `SMK NU Ungaran (${classGrade})`,
         orderDate: '2026-08-11',
         dueDate: '2026-08-13 15:00',
-        status: 'Antrian',
+        status: 'Menunggu Admin',
         paymentStatus: 'Belum Bayar',
         items: [
           {
@@ -226,7 +226,7 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
         notes: notes,
         statusHistory: [
           {
-            status: 'Antrian',
+            status: 'Menunggu Admin',
             timestamp: formattedDate,
             updatedBy: customerName,
             note: 'Order dan file diunggah oleh siswa via Student TEFA Platform.',
@@ -1227,8 +1227,8 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
                         {[
                           { label: 'Order Dibuat', icon: 'check_circle', active: true },
                           { label: 'File Diterima', icon: 'description', active: ord.status !== 'Draft' },
-                          { label: 'Produksi', icon: 'precision_manufacturing', active: ['Cetak/Produksi', 'Finishing', 'Siap Ambil', 'Selesai'].includes(ord.status) },
-                          { label: 'Quality Control', icon: 'verified', active: ['Finishing', 'Siap Ambil', 'Selesai'].includes(ord.status) },
+                          { label: 'Diproses', icon: 'precision_manufacturing', active: ['Diproses'].includes(ord.status) },
+                          { label: 'Selesai', icon: 'verified', active: ['Selesai', 'Diterima'].includes(ord.status) },
                           { label: 'Selesai', icon: 'task_alt', active: ord.status === 'Selesai' },
                         ].map((step, sIdx) => (
                           <div

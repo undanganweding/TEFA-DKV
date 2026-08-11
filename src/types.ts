@@ -13,7 +13,8 @@ export type PageId =
   | 'pengadaan'
   | 'pengaturan'
   | 'public_upload'
-  | 'profile';
+  | 'profile'
+  | 'pendaftaran_siswa'; // Halaman pendaftaran siswa baru
 
 export type UserRole = 'Kepala TEFA' | 'Admin TEFA' | 'Guru / Operator' | 'Admin' | 'Siswa' | 'Guest';
 
@@ -35,6 +36,8 @@ export interface InstitutionProfile {
   description: string;
 }
 
+export type UserStatus = 'Pending' | 'Approved' | 'Active' | 'Rejected' | 'Inactive';
+
 export interface UserProfile {
   id: string;
   name: string;
@@ -43,7 +46,7 @@ export interface UserProfile {
   role: UserRole;
   avatar: string;
   defaultPage: PageId;
-  statusAkun: 'Pending' | 'Approved' | 'Active' | 'Aktif' | 'Menunggu Verifikasi' | 'Rejected' | 'Inactive' | 'Nonaktif';
+  statusAkun: UserStatus;
   rejectReason?: string;
   phone: string;
   address?: string;
@@ -105,12 +108,11 @@ export interface InboxFile {
 
 export type OrderStatus =
   | 'Draft'
-  | 'Antrian'
-  | 'Proses Desain'
-  | 'Cetak/Produksi'
-  | 'Finishing'
-  | 'Siap Ambil'
+  | 'Menunggu Admin'
+  | 'Diproses'
   | 'Selesai'
+  | 'Diterima'
+  | 'Ditolak'
   | 'Dibatalkan';
 
 export type PaymentStatus = 'Belum Bayar' | 'DP' | 'Lunas';

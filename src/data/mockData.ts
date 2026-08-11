@@ -182,7 +182,7 @@ export const initialOrders: ProductionOrder[] = [
     institution: 'PCNU Kota Semarang',
     orderDate: '2025-08-07',
     dueDate: '2025-08-08 15:00',
-    status: 'Proses Desain',
+    status: 'Diproses',
     paymentStatus: 'DP',
     paymentMethod: 'Transfer Bank',
     items: [
@@ -236,8 +236,8 @@ export const initialOrders: ProductionOrder[] = [
     ],
     statusHistory: [
       { status: 'Draft', timestamp: '2025-08-07 09:00', updatedBy: 'Kasir TEFA' },
-      { status: 'Antrian', timestamp: '2025-08-07 09:15', updatedBy: 'Kasir TEFA', note: 'DP dikonfirmasi Rp 300.000 via BRI' },
-      { status: 'Proses Desain', timestamp: '2025-08-07 10:00', updatedBy: 'M. Rizky (Desainer)' },
+      { status: 'Menunggu Admin', timestamp: '2025-08-07 09:15', updatedBy: 'Kasir TEFA', note: 'DP dikonfirmasi Rp 300.000 via BRI' },
+      { status: 'Diproses', timestamp: '2025-08-07 10:00', updatedBy: 'M. Rizky (Desainer)' },
     ],
   },
   {
@@ -248,7 +248,7 @@ export const initialOrders: ProductionOrder[] = [
     institution: 'OSIS SMK NU Ma\'arif 1',
     orderDate: '2025-08-07',
     dueDate: '2025-08-07 16:00',
-    status: 'Cetak/Produksi',
+    status: 'Diproses',
     paymentStatus: 'Lunas',
     paymentMethod: 'QRIS',
     items: [
@@ -296,8 +296,8 @@ export const initialOrders: ProductionOrder[] = [
     ],
     statusHistory: [
       { status: 'Draft', timestamp: '2025-08-07 10:10', updatedBy: 'Kasir TEFA' },
-      { status: 'Antrian', timestamp: '2025-08-07 10:15', updatedBy: 'Kasir TEFA' },
-      { status: 'Cetak/Produksi', timestamp: '2025-08-07 11:00', updatedBy: 'Operator Cetak A3+' },
+      { status: 'Menunggu Admin', timestamp: '2025-08-07 10:15', updatedBy: 'Kasir TEFA' },
+      { status: 'Diproses', timestamp: '2025-08-07 11:00', updatedBy: 'Operator Cetak A3+' },
     ],
   },
   {
@@ -308,7 +308,7 @@ export const initialOrders: ProductionOrder[] = [
     institution: 'UMKM Kuliner Semarang',
     orderDate: '2025-08-06',
     dueDate: '2025-08-07 12:00',
-    status: 'Siap Ambil',
+    status: 'Selesai',
     paymentStatus: 'Lunas',
     paymentMethod: 'Cash',
     items: [
@@ -345,9 +345,9 @@ export const initialOrders: ProductionOrder[] = [
     priority: 'Normal',
     statusHistory: [
       { status: 'Draft', timestamp: '2025-08-06 13:00', updatedBy: 'Kasir TEFA' },
-      { status: 'Cetak/Produksi', timestamp: '2025-08-06 14:30', updatedBy: 'Tim Sublim' },
-      { status: 'Finishing', timestamp: '2025-08-06 16:30', updatedBy: 'Tim Quality Control' },
-      { status: 'Siap Ambil', timestamp: '2025-08-07 08:00', updatedBy: 'Admin TEFA', note: 'Sudah di-packing rapi di Rak A-02' },
+      { status: 'Diproses', timestamp: '2025-08-06 14:30', updatedBy: 'Tim Sublim' },
+      { status: 'Diproses', timestamp: '2025-08-06 16:30', updatedBy: 'Tim Quality Control' },
+      { status: 'Selesai', timestamp: '2025-08-07 08:00', updatedBy: 'Admin TEFA', note: 'Sudah di-packing rapi di Rak A-02' },
     ],
   },
   {
