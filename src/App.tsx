@@ -53,7 +53,6 @@ import { LaporanView } from './components/views/LaporanView';
 import { PengadaanView } from './components/views/PengadaanView';
 import { PengaturanView } from './components/views/PengaturanView';
 import { ProfileView } from './components/views/ProfileView';
-import { UserManagementView } from './components/views/UserManagementView';
 
 import { ReceiptModal } from './components/modals/ReceiptModal';
 import { NewOrderModal } from './components/modals/NewOrderModal';
@@ -1024,10 +1023,6 @@ export function App() {
               onUpdateProfile={handleUpdateProfile}
               onNavigate={setCurrentPage}
             />
-          )}
-
-          {currentPage === 'manajemen_user' && (
-            <UserManagementView currentUser={currentUser} />
           )}
         </main>
       </div>

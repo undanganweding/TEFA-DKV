@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { PageId, UserProfile } from '../types';
 import { getInitials, getRoleGradient } from './views/ProfileView';
-import { getPendingCount } from '../utils/authStore';
 
 interface SidebarProps {
   currentPage: PageId;
@@ -34,9 +33,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState<boolean>(false);
   const profileCardRef = useRef<HTMLDivElement | null>(null);
 
-  // Get pending approval count
-  const pendingCount = getPendingCount();
-
   // Close popup menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -54,13 +50,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const navItems: NavItem[] = [
     { id: 'dashboard', label: 'Dashboard', icon: 'grid_view' },
     { id: 'kasir', label: 'Kasir TEFA', icon: 'point_of_sale' },
-    {
-      id: 'manajemen_user',
-      label: 'Manajemen Akun',
-      icon: 'manage_accounts',
-      badge: pendingCount > 0 ? pendingCount : undefined,
-      badgeColor: 'bg-amber-500/20 text-amber-200 border border-amber-400/30',
-    },
     {
       id: 'file_inbox',
       label: 'File Inbox',
