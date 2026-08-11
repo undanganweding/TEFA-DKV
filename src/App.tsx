@@ -55,6 +55,7 @@ import { PengadaanView } from './components/views/PengadaanView';
 import { PengaturanView } from './components/views/PengaturanView';
 import { ProfileView } from './components/views/ProfileView';
 import { KelolaLoginView } from './components/views/KelolaLoginView';
+import { UserManagementView } from './components/views/UserManagementView';
 
 import { ReceiptModal } from './components/modals/ReceiptModal';
 import { NewOrderModal } from './components/modals/NewOrderModal';
@@ -180,6 +181,21 @@ export function App() {
     cartPaidAmount,
     cartNotes,
   ]);
+
+  // Warn user on reload if they have an active cart
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (cartItems.length > 0) {
+        e.preventDefault();
+        e.returnValue = 'Ada transaksi aktif di keranjang Anda yang belum selesai.';
+        return e.returnValue;
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [cartItems]);
 
   // Persistent Cart Confirmation Handlers
   const handleContinuePersistentCart = () => {
@@ -976,6 +992,10 @@ export function App() {
             />
           )}
 
+          {currentPage === 'manajemen_user' && (
+            <UserManagementView currentUser={currentUser} />
+          )}
+
           {currentPage === 'inventaris_alat' && (
             <InventarisAlatView
               tools={tools.filter((t) => !t.isArchived)}
@@ -1081,10 +1101,12 @@ export function App() {
       {/* Global Modals */}
       {showPersistentCartModal && restoredCartData && (
         <PersistentCartConfirmModal
-          restoredData={restoredCartData}
-          onContinueOrder={handleContinuePersistentCart}
+          isOpen={showPersistentCartModal}
+          restoredCartItems={restoredCartData.items || []}
+          customerName={restoredCartData.customerName || ''}
+          onContinue={handleContinuePersistentCart}
           onSaveDraft={handleSaveDraftPersistentCart}
-          onDiscardOrder={handleDiscardPersistentCart}
+          onDiscard={handleDiscardPersistentCart}
         />
       )}
 

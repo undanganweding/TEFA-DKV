@@ -77,6 +77,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'laporan', label: 'Laporan', icon: 'assessment' },
     { id: 'pengadaan', label: 'Pengadaan Tahunan', icon: 'calendar_add_on' },
     { id: 'pengaturan', label: 'Pengaturan', icon: 'settings' },
+    { id: 'manajemen_user', label: 'Manajemen User', icon: 'group' },
     { id: 'kelola_login', label: 'Kelola Login Page', icon: 'slideshow' },
   ];
 

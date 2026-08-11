@@ -275,7 +275,7 @@ export const KasirView: React.FC<KasirViewProps> = ({
     setCurrentPage(1);
   }, [selectedCategory, searchQuery]);
 
-  const ITEMS_PER_PAGE = 8;
+  const ITEMS_PER_PAGE = 6;
   const totalPages = Math.ceil(filteredProducts.length / ITEMS_PER_PAGE) || 1;
   const paginatedProducts = filteredProducts.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
