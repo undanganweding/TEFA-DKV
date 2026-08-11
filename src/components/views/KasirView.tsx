@@ -248,8 +248,13 @@ export const KasirView: React.FC<KasirViewProps> = ({
         category: newItem.category,
       });
       showToast(`File Inbox "${prefilledFile.fileName}" dimuat ke keranjang!`);
+      
+      // Clear prefilled file from parent state to prevent infinite triggers or duplicate additions
+      if (onClearPrefilledFile) {
+        onClearPrefilledFile();
+      }
     }
-  }, [prefilledFile, products]);
+  }, [prefilledFile, products, onAddToCart, onClearPrefilledFile]);
 
   // Categories list
   const categories = ['Semua', 'Cetak Outdoor', 'Cetak Indoor / A3+', 'Merchandise', 'Desain & Creative'];

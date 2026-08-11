@@ -275,8 +275,8 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
             }}
             className="flex items-center gap-3 cursor-pointer text-left focus:outline-none"
           >
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#5B4BFF] via-purple-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-purple-500/20">
-              <span className="material-symbols-outlined text-white text-xl">palette</span>
+            <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-md shadow-purple-500/5 overflow-hidden">
+              <img src="/src/assets/logo_smknu.jpg" alt="Logo SMK NU Ungaran" className="w-full h-full object-cover" />
             </div>
             <div>
               <h1 className="font-black text-slate-900 text-base leading-tight tracking-tight">TEFA DKV</h1>

@@ -262,8 +262,8 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
           {/* Header Brand Badge */}
           <div className="relative z-10 flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-3 bg-white/10 backdrop-blur-xl border border-white/15 px-4 py-2.5 rounded-2xl shadow-lg">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#5B4BFF] via-purple-600 to-[#3BA7FF] flex items-center justify-center text-white shadow-md font-black shrink-0 border border-white/30">
-                <span className="material-symbols-outlined text-lg">palette</span>
+              <div className="w-9 h-9 rounded-xl bg-white flex items-center justify-center shrink-0 border border-white/30 overflow-hidden">
+                <img src="/src/assets/logo_smknu.jpg" alt="Logo SMK NU Ungaran" className="w-full h-full object-cover" />
               </div>
               <div>
                 <h2 className="text-sm font-black text-white tracking-tight leading-none">
