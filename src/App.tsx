@@ -172,7 +172,8 @@ export function App() {
         if (isMounted) {
           setIsLoggedIn(false);
           setCurrentUser(null);
-          if (currentPage !== 'public_upload' && currentPage !== 'login') {
+          // Only redirect to login if auth initialization has completed or explicit signout
+          if (!authInitializing && currentPage !== 'public_upload' && currentPage !== 'login') {
             setCurrentPage('login');
             window.history.replaceState({}, '', '/login');
           }
@@ -189,32 +190,41 @@ export function App() {
           if (profile) {
             setCurrentUser(profile);
             setIsLoggedIn(true);
-            // Redirect if they land on login but are already authenticated
+            // If they are on public_upload or login, keep them on public_upload for Student role
             if (currentPage === 'login') {
               setCurrentPage(profile.role === 'Siswa' ? 'public_upload' : 'dashboard');
             }
           } else {
-            // Valid token but profile missing/inactive
-            setIsLoggedIn(false);
-            setCurrentUser(null);
-            if (currentPage !== 'public_upload' && currentPage !== 'login') {
-              setCurrentPage('login');
-              window.history.replaceState({}, '', '/login');
-            }
+            // Valid token but profile missing/inactive -> fallback profile from auth metadata
+            const fallbackProfile = authService.mapProfileToUserProfile({
+              id: rawSession.user.id,
+              full_name: rawSession.user.user_metadata?.full_name || rawSession.user.email || 'Siswa TEFA',
+              role: rawSession.user.user_metadata?.role || 'Student',
+              status: rawSession.user.user_metadata?.status || 'Active',
+              school_class: rawSession.user.user_metadata?.school_class || null,
+              phone: rawSession.user.user_metadata?.phone || null,
+              address: null,
+              avatar_path: rawSession.user.user_metadata?.avatar_path || null,
+              nis: rawSession.user.user_metadata?.nis || null,
+              major: rawSession.user.user_metadata?.major || null,
+              whatsapp: rawSession.user.user_metadata?.whatsapp || null,
+              position: null,
+              nip: null,
+              employee_id: null,
+              reject_reason: null,
+              created_at: rawSession.user.created_at || new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            }, rawSession.user.email || '');
+
+            setCurrentUser(fallbackProfile);
+            setIsLoggedIn(true);
           }
           setAuthInitializing(false);
         }
       } catch (err: any) {
-        if (err.message === 'NETWORK_ERROR') {
-          console.warn('Network error while hydrating profile. Retaining session state but showing error UI.');
-          // Don't log the user out! Keep them logged in so they can retry, but maybe they see an error message.
-          if (isMounted) {
-            // We just keep authInitializing false, so it renders the app, but they might not have full profile.
-            // Depending on architecture, we might want to still set isLoggedIn(true) and a minimal currentUser 
-            // or just leave isLoggedIn false but don't redirect to login so it doesn't loop.
-            // It's safest to leave isLoggedIn false but NOT clear the session or redirect.
-            setAuthInitializing(false);
-          }
+        console.warn('Error hydrating profile:', err);
+        if (isMounted) {
+          setAuthInitializing(false);
         }
       }
     };
@@ -733,37 +743,50 @@ export function App() {
   };
 
   // Handlers for Orders
-  const handleAddOrder = (newOrder: ProductionOrder) => {
+  const handleAddOrder = async (newOrder: ProductionOrder) => {
     setOrders((prev) => [newOrder, ...prev]);
 
-    // Persist order directly to Supabase DB
-    orderServiceModule.createOrder({
-      items: newOrder.items.map((it, idx) => ({
-        id: it.id || `item-${Date.now()}-${idx}`,
-        productId: it.productId,
-        productName: it.productName,
-        category: it.category || 'Cetak Outdoor',
-        unitPrice: it.unitPrice,
-        costPrice: it.costPrice || 0,
-        qty: it.qty,
-        unit: it.unit as any,
-        totalPrice: it.totalPrice,
-        notes: it.notes,
-        fileName: it.fileName,
-      })),
-      customerName: newOrder.customerName,
-      customerPhone: newOrder.customerPhone || '',
-      discount: newOrder.discount || 0,
-      paidAmount: newOrder.paidAmount || 0,
-      paymentMethod: newOrder.paymentMethod || 'Cash',
-      operatorName: newOrder.operatorName || 'Sistem Portal Siswa',
-      priority: newOrder.priority || 'Normal',
-      notes: newOrder.notes || '',
-      status: newOrder.status || 'Menunggu Admin',
-      createdBy: currentUser?.id || undefined,
-    }).catch((err) => {
-      console.error('Failed to save order to Supabase:', err);
-    });
+    // Persist order directly to Supabase DB via RPC
+    try {
+      const isUuid = (str?: string) => str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+      const res = await orderServiceModule.createOrder({
+        items: newOrder.items.map((it, idx) => ({
+          id: it.id || `item-${Date.now()}-${idx}`,
+          productId: isUuid(it.productId) ? it.productId : undefined,
+          productName: it.productName,
+          category: it.category || 'Cetak Outdoor',
+          unitPrice: it.unitPrice,
+          costPrice: it.costPrice || 0,
+          qty: it.qty,
+          unit: it.unit as any,
+          totalPrice: it.totalPrice,
+          notes: it.notes,
+          fileName: it.fileName,
+        })),
+        customerName: newOrder.customerName,
+        customerPhone: newOrder.customerPhone || '',
+        discount: newOrder.discount || 0,
+        paidAmount: newOrder.paidAmount || 0,
+        paymentMethod: newOrder.paymentMethod || 'Cash',
+        operatorName: newOrder.operatorName || 'Sistem Portal Siswa',
+        priority: newOrder.priority || 'Normal',
+        notes: newOrder.notes || '',
+        status: newOrder.status || 'Menunggu Admin',
+        createdBy: currentUser?.id || undefined,
+      });
+
+      if (res.success && res.orderId) {
+        // Refresh full orders list from Supabase DB so both Admin & Student have the persisted order with DB UUID
+        const dbOrders = await orderServiceModule.fetchOrders();
+        if (dbOrders && dbOrders.length > 0) {
+          setOrders(dbOrders);
+        }
+      } else {
+        console.error('Failed to create order in Supabase:', res.error);
+      }
+    } catch (err) {
+      console.error('Error creating order in Supabase:', err);
+    }
 
     // Auto add transaction if paid
     if (newOrder.paidAmount > 0) {
