@@ -156,21 +156,26 @@ export async function signOut(): Promise<void> {
   await supabase.auth.signOut();
 }
 
-export async function getSession(): Promise<UserProfile | null> {
+export async function getSession(): Promise<any> {
   try {
-    // 5-second timeout for session fetch to prevent infinite loading
-    const sessionPromise = supabase.auth.getSession();
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error('Supabase auth session timeout')), 5000);
-    });
-    
-    const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]) as any;
-    if (!session?.user) return null;
+    const { data: { session }, error } = await supabase.auth.getSession();
+    if (error) {
+      console.warn('getSession error:', error);
+      return null;
+    }
+    return session;
+  } catch (err) {
+    console.error('getSession exception:', err);
+    return null;
+  }
+}
 
+export async function fetchUserProfile(user: any): Promise<UserProfile | null> {
+  try {
     const { data: profileData, error } = await supabase
       .from('profiles')
       .select('*')
-      .eq('id', session.user.id)
+      .eq('id', user.id)
       .single();
 
     if (error || !profileData) {
@@ -181,46 +186,16 @@ export async function getSession(): Promise<UserProfile | null> {
     const profile = profileData as ProfileRow;
     if (profile.status !== 'Active') return null;
 
-    return mapProfileToUserProfile(profile, session.user.email || '');
+    return mapProfileToUserProfile(profile, user.email || '');
   } catch (err) {
-    console.error('getSession error:', err);
+    console.error('fetchUserProfile error:', err);
     return null;
   }
 }
 
-export function onAuthStateChange(callback: (user: UserProfile | null) => void) {
-  return supabase.auth.onAuthStateChange(async (event, session) => {
-    if (event === 'SIGNED_OUT' || !session?.user) {
-      callback(null);
-      return;
-    }
-
-    // Do profile fetching without blocking the auth event loop directly
-    // This prevents potential deadlocks if the profile fetch hangs
-    try {
-      const { data: profileData, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', session.user.id)
-        .single();
-
-      if (error || !profileData) {
-        console.warn('Profile not found or error fetching profile in auth change:', error);
-        callback(null);
-        return;
-      }
-
-      const profile = profileData as ProfileRow;
-      if (profile.status !== 'Active') {
-        callback(null);
-        return;
-      }
-
-      callback(mapProfileToUserProfile(profile, session.user.email || ''));
-    } catch (err) {
-      console.error('onAuthStateChange error:', err);
-      callback(null);
-    }
+export function onAuthStateChange(callback: (event: string, session: any) => void) {
+  return supabase.auth.onAuthStateChange((event, session) => {
+    callback(event, session);
   });
 }
 

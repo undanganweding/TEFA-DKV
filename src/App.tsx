@@ -147,54 +147,70 @@ export function App() {
   const activeTools = React.useMemo(() => tools.filter((t) => !t.isArchived), [tools]);
   const pendingInboxCount = React.useMemo(() => inboxFiles.filter((f) => f.status === 'Menunggu Pemeriksaan' && !f.isArchived).length, [inboxFiles]);
 
-  // Restore Active User Auth Session on Mount (Supabase only)
+  // Controlled Hydration: Depend entirely on Supabase onAuthStateChange
+  const [rawSession, setRawSession] = useState<any>(undefined);
+
   useEffect(() => {
-    const initAuth = async () => {
-      try {
-        // Fetch Supabase session
-        const supabaseUser = await authService.getSession();
-        
-        if (supabaseUser) {
-          setCurrentUser(supabaseUser);
+    const { data: { subscription } } = authService.onAuthStateChange((event, session) => {
+      if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+        setRawSession(session || null);
+      } else if (event === 'SIGNED_OUT') {
+        setRawSession(null);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Fetch Profile independently when rawSession changes
+  useEffect(() => {
+    let isMounted = true;
+
+    const hydrateProfile = async () => {
+      if (rawSession === undefined) return; // Wait for initial event
+      
+      if (!rawSession?.user) {
+        if (isMounted) {
+          setIsLoggedIn(false);
+          setCurrentUser(null);
+          if (currentPage !== 'public_upload' && currentPage !== 'login') {
+            setCurrentPage('login');
+            window.history.replaceState({}, '', '/login');
+          }
+          setAuthInitializing(false);
+        }
+        return;
+      }
+
+      // We have a valid session. Now fetch the profile safely.
+      const profile = await authService.fetchUserProfile(rawSession.user);
+      
+      if (isMounted) {
+        if (profile) {
+          setCurrentUser(profile);
           setIsLoggedIn(true);
-          
-          // DO NOT auto-redirect from '/' to dashboard here!
-          // We only redirect if they are on '/login' and already logged in
+          // Redirect if they land on login but are already authenticated
           if (currentPage === 'login') {
-            setCurrentPage(supabaseUser.role === 'Siswa' ? 'public_upload' : 'dashboard');
+            setCurrentPage(profile.role === 'Siswa' ? 'public_upload' : 'dashboard');
           }
         } else {
-          // No session: enforce routing protection for admin routes
+          // Valid token but profile missing/inactive
+          setIsLoggedIn(false);
+          setCurrentUser(null);
           if (currentPage !== 'public_upload' && currentPage !== 'login') {
             setCurrentPage('login');
             window.history.replaceState({}, '', '/login');
           }
         }
-      } catch (err) {
-        // Error handling fallback
-        if (currentPage !== 'public_upload' && currentPage !== 'login') {
-          setCurrentPage('login');
-          window.history.replaceState({}, '', '/login');
-        }
-      } finally {
         setAuthInitializing(false);
       }
     };
-    initAuth();
 
-    // Listen for Supabase auth state changes
-    const { data: { subscription } } = authService.onAuthStateChange((user) => {
-      if (user) {
-        setCurrentUser(user);
-        setIsLoggedIn(true);
-      } else {
-        // Only log out if not initializing to prevent loop
-        setIsLoggedIn(false);
-        setCurrentUser(null);
-      }
-    });
-    return () => subscription.unsubscribe();
-  }, []);
+    hydrateProfile();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [rawSession]);
 
   // Load all data from Supabase on mount / after login
   useEffect(() => {
