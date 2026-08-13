@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { InboxFile, Product, ProductionOrder, UserProfile } from '../../types';
+import * as profileService from '../../services/profileService';
 
 interface StudentPortalViewProps {
   products: Product[];
@@ -109,6 +110,8 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
   );
   const [showAvatarCropModal, setShowAvatarCropModal] = useState<boolean>(false);
   const [tempAvatarPreview, setTempAvatarPreview] = useState<string | null>(null);
+  const [avatarFileToUpload, setAvatarFileToUpload] = useState<File | null>(null);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState<boolean>(false);
 
   // Filter Active Products from Admin Database
   const activeProducts = products.filter((p) => p.status === 'Aktif' && !p.isArchived && p.showInCustomerPlatform !== false);
@@ -263,17 +266,31 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
       }
       const imageUrl = URL.createObjectURL(file);
       setTempAvatarPreview(imageUrl);
+      setAvatarFileToUpload(file);
       setShowAvatarCropModal(true);
     }
   };
 
-  const handleSaveAvatar = () => {
-    if (tempAvatarPreview) {
-      setProfileAvatar(tempAvatarPreview);
-      if (currentUser && onUpdateProfile) {
+  const handleSaveAvatar = async () => {
+    if (!avatarFileToUpload || !currentUser) {
+      alert('Silakan pilih file foto terlebih dahulu.');
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+    try {
+      const res = await profileService.uploadAvatar(currentUser.id, avatarFileToUpload);
+      if (!res.success || !res.url) {
+        alert(res.message || 'Gagal menyimpan foto profil ke server.');
+        setIsUploadingAvatar(false);
+        return;
+      }
+
+      setProfileAvatar(res.url);
+      if (onUpdateProfile) {
         onUpdateProfile({
           ...currentUser,
-          avatar: tempAvatarPreview,
+          avatar: res.url,
           name: customerName,
           phone: phone,
           email: email,
@@ -282,8 +299,16 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
           major: major,
         });
       }
+
       setShowAvatarCropModal(false);
-      alert('Foto profil berhasil diperbarui!');
+      setAvatarFileToUpload(null);
+      setTempAvatarPreview(null);
+      alert('Foto profil siswa berhasil diperbarui!');
+    } catch (err: any) {
+      console.error('Error in handleSaveAvatar:', err);
+      alert(err.message || 'Terjadi kesalahan saat mengunggah foto profil.');
+    } finally {
+      setIsUploadingAvatar(false);
     }
   };
 
@@ -1578,21 +1603,33 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
 
                 {/* Profile Form Details */}
                 <form
-                  onSubmit={(e) => {
+                  onSubmit={async (e) => {
                     e.preventDefault();
                     if (currentUser && onUpdateProfile) {
-                      onUpdateProfile({
-                        ...currentUser,
-                        name: customerName,
+                      const success = await profileService.updateProfile(currentUser.id, {
+                        full_name: customerName,
                         phone: phone,
-                        email: email,
-                        nis: nis,
-                        studentClass: classGrade,
+                        school_class: classGrade,
                         major: major,
-                        avatar: profileAvatar,
+                        nis: nis,
                       });
+
+                      if (success) {
+                        onUpdateProfile({
+                          ...currentUser,
+                          name: customerName,
+                          phone: phone,
+                          email: email,
+                          nis: nis,
+                          studentClass: classGrade,
+                          major: major,
+                          avatar: profileAvatar,
+                        });
+                        alert('Data profil siswa berhasil diperbarui!');
+                      } else {
+                        alert('Gagal memperbarui profil di database.');
+                      }
                     }
-                    alert('Data profil siswa berhasil diperbarui!');
                   }}
                   className="space-y-4"
                 >
