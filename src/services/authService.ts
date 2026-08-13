@@ -85,37 +85,33 @@ export async function signIn(email: string, password: string): Promise<{ success
     return { success: false, message: 'Login gagal. Silakan coba lagi.' };
   }
 
-  // Fetch profile
-  const { data: profileData, error: profileError } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', data.user.id)
-    .single();
+  try {
+    // Fetch profile using the deduplicated method
+    const userProfile = await fetchUserProfile(data.user);
 
-  if (profileError || !profileData) {
-    if (profileError?.code === 'PGRST116') {
+    if (!userProfile) {
+      // It might be a network error or missing profile.
+      // We rely on fetchUserProfile to throw if it's a network error, otherwise it returns null if missing or inactive.
       return { success: false, message: 'Profil tidak ditemukan. Registrasi mungkin tidak selesai sempurna. Hubungi admin.' };
     }
-    if (profileError?.message?.includes('Failed to fetch') || profileError?.message?.includes('Network')) {
+
+    // Check account status
+    if (userProfile.statusAkun === 'Pending') {
+      await supabase.auth.signOut();
+      return { success: false, message: 'Akun Anda sedang menunggu persetujuan admin TEFA. Silakan hubungi pengelola.' };
+    }
+    if (userProfile.statusAkun === 'Rejected') {
+      await supabase.auth.signOut();
+      return { success: false, message: `Akun Anda ditolak. Silakan hubungi Admin untuk informasi lebih lanjut.` };
+    }
+
+    return { success: true, user: userProfile };
+  } catch (err: any) {
+    if (err.message === 'NETWORK_ERROR') {
       return { success: false, message: 'Koneksi terputus saat mengambil data profil.' };
     }
-    return { success: false, message: 'Gagal memuat profil: ' + (profileError?.message || 'Data kosong') };
+    return { success: false, message: 'Gagal memuat profil: ' + (err.message || 'Data kosong') };
   }
-
-  const profile = profileData as ProfileRow;
-
-  // Check account status
-  if (profile.status === 'Pending') {
-    await supabase.auth.signOut();
-    return { success: false, message: 'Akun Anda sedang menunggu persetujuan admin TEFA. Silakan hubungi pengelola.' };
-  }
-  if (profile.status === 'Rejected') {
-    await supabase.auth.signOut();
-    return { success: false, message: `Akun Anda ditolak. ${profile.reject_reason ? 'Alasan: ' + profile.reject_reason : 'Silakan hubungi Admin untuk informasi lebih lanjut.'}` };
-  }
-
-  const userProfile = mapProfileToUserProfile(profile, data.user.email || email);
-  return { success: true, user: userProfile };
 }
 
 export async function signUp(input: {
@@ -226,27 +222,53 @@ export async function getSession(): Promise<any> {
   }
 }
 
+// Single-flight deduplication tracker for profile fetches
+let inFlightProfileRequest: Promise<UserProfile | null> | null = null;
+
 export async function fetchUserProfile(user: any): Promise<UserProfile | null> {
-  try {
-    const { data: profileData, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single();
-
-    if (error || !profileData) {
-      console.warn('Profile not found or error fetching profile:', error);
-      return null;
-    }
-
-    const profile = profileData as ProfileRow;
-    if (profile.status !== 'Active') return null;
-
-    return mapProfileToUserProfile(profile, user.email || '');
-  } catch (err) {
-    console.error('fetchUserProfile error:', err);
-    return null;
+  // If there's an ongoing fetch for a profile, return that same promise
+  if (inFlightProfileRequest) {
+    return inFlightProfileRequest;
   }
+
+  inFlightProfileRequest = (async () => {
+    try {
+      const { data: profileData, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (error || !profileData) {
+        // Distinguish between network errors and not found
+        if (error?.message?.includes('Failed to fetch') || error?.message?.includes('Network') || error?.message?.includes('ERR_CONNECTION_CLOSED')) {
+          console.error('NETWORK_ERROR: Koneksi terputus saat mengambil data profil:', error);
+          throw new Error('NETWORK_ERROR'); 
+        }
+        if (error?.code === 'PGRST116') {
+          console.warn('PROFILE_NOT_FOUND: Profil tidak ditemukan di database.', error);
+          return null;
+        }
+        
+        console.warn('DB_ERROR: Error fetching profile:', error);
+        return null;
+      }
+
+      const profile = profileData as ProfileRow;
+      if (profile.status !== 'Active') return null;
+
+      return mapProfileToUserProfile(profile, user.email || '');
+    } catch (err: any) {
+      console.error('fetchUserProfile error:', err);
+      if (err.message === 'NETWORK_ERROR') throw err; // propagate network error
+      return null;
+    } finally {
+      // Clear the in-flight request when done
+      inFlightProfileRequest = null;
+    }
+  })();
+
+  return inFlightProfileRequest;
 }
 
 export function onAuthStateChange(callback: (event: string, session: any) => void) {

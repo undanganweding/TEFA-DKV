@@ -182,26 +182,40 @@ export function App() {
       }
 
       // We have a valid session. Now fetch the profile safely.
-      const profile = await authService.fetchUserProfile(rawSession.user);
-      
-      if (isMounted) {
-        if (profile) {
-          setCurrentUser(profile);
-          setIsLoggedIn(true);
-          // Redirect if they land on login but are already authenticated
-          if (currentPage === 'login') {
-            setCurrentPage(profile.role === 'Siswa' ? 'public_upload' : 'dashboard');
+      try {
+        const profile = await authService.fetchUserProfile(rawSession.user);
+        
+        if (isMounted) {
+          if (profile) {
+            setCurrentUser(profile);
+            setIsLoggedIn(true);
+            // Redirect if they land on login but are already authenticated
+            if (currentPage === 'login') {
+              setCurrentPage(profile.role === 'Siswa' ? 'public_upload' : 'dashboard');
+            }
+          } else {
+            // Valid token but profile missing/inactive
+            setIsLoggedIn(false);
+            setCurrentUser(null);
+            if (currentPage !== 'public_upload' && currentPage !== 'login') {
+              setCurrentPage('login');
+              window.history.replaceState({}, '', '/login');
+            }
           }
-        } else {
-          // Valid token but profile missing/inactive
-          setIsLoggedIn(false);
-          setCurrentUser(null);
-          if (currentPage !== 'public_upload' && currentPage !== 'login') {
-            setCurrentPage('login');
-            window.history.replaceState({}, '', '/login');
+          setAuthInitializing(false);
+        }
+      } catch (err: any) {
+        if (err.message === 'NETWORK_ERROR') {
+          console.warn('Network error while hydrating profile. Retaining session state but showing error UI.');
+          // Don't log the user out! Keep them logged in so they can retry, but maybe they see an error message.
+          if (isMounted) {
+            // We just keep authInitializing false, so it renders the app, but they might not have full profile.
+            // Depending on architecture, we might want to still set isLoggedIn(true) and a minimal currentUser 
+            // or just leave isLoggedIn false but don't redirect to login so it doesn't loop.
+            // It's safest to leave isLoggedIn false but NOT clear the session or redirect.
+            setAuthInitializing(false);
           }
         }
-        setAuthInitializing(false);
       }
     };
 
