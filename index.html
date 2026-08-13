@@ -1,26 +1,7 @@
 <!doctype html>
 <html lang="id">
   <head>
-    <script>
-      (function () {
-        try {
-          var originalFetch = window.fetch;
-          var fetchVal = originalFetch;
-          Object.defineProperty(window, 'fetch', {
-            get: function () {
-              return fetchVal || originalFetch;
-            },
-            set: function (val) {
-              fetchVal = val;
-            },
-            configurable: true,
-            enumerable: true
-          });
-        } catch (e) {
-          // Ignore
-        }
-      })();
-    </script>
+
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>TEFA DKV - SMK NU</title>

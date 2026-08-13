@@ -163,92 +163,122 @@ export async function createOrder(orderData: {
     folderPath?: string;
   };
 }): Promise<{ success: boolean; orderId?: string; orderNo?: string; error?: string }> {
-  const { data, error } = await supabase.rpc('create_order', {
-    order_data: {
-      items: orderData.items.map(item => ({
-        product_id: item.productId || null,
-        product_name: item.productName,
-        variant_id: item.variantId || null,
-        variant_name: item.variantName || null,
-        unit_price: item.unitPrice,
-        cost_price: item.costPrice || 0,
-        qty: item.qty,
-        unit: item.unit,
-        length_meters: item.lengthMeters || null,
-        width_meters: item.widthMeters || null,
-        calculated_area: item.calculatedArea || null,
-        total_price: item.totalPrice,
-        notes: item.notes || null,
-        is_custom_order: item.isCustomOrder || false,
-        custom_description: item.customDescription || null,
-        file_url: item.fileUrl || null,
-        file_name: item.fileName || null,
-      })),
-      customer_name: orderData.customerName,
-      customer_phone: orderData.customerPhone,
-      discount: orderData.discount,
-      paid_amount: orderData.paidAmount,
-      payment_method: orderData.paymentMethod,
-      operator_name: orderData.operatorName,
-      priority: orderData.priority,
-      notes: orderData.notes,
-      status: orderData.status || 'Menunggu Admin',
-      created_by: orderData.createdBy || null,
-      idempotency_key: orderData.idempotencyKey || null,
-      inbox_file: orderData.inboxFile ? {
-        upload_date: orderData.inboxFile.uploadDate || null,
-        customer_name: orderData.inboxFile.customerName || orderData.customerName,
-        class_grade: orderData.inboxFile.classGrade || null,
-        major: orderData.inboxFile.major || null,
-        phone: orderData.inboxFile.phone || orderData.customerPhone,
-        service_type: orderData.inboxFile.serviceType || null,
-        print_size: orderData.inboxFile.printSize || null,
-        qty: orderData.inboxFile.qty || 1,
-        notes: orderData.inboxFile.notes || null,
-        file_name: orderData.inboxFile.fileName,
-        file_type: orderData.inboxFile.fileType,
-        file_size: orderData.inboxFile.fileSize,
-        preview_url: orderData.inboxFile.previewUrl || null,
-        storage_path: orderData.inboxFile.storagePath || null,
-        folder_path: orderData.inboxFile.folderPath || null,
-      } : null,
-    },
-  });
+  const keyToUse = orderData.idempotencyKey || `IDEMP-${orderData.createdBy || 'STUDENT'}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+  console.log('[ORDER] submit started with idempotency key:', keyToUse);
 
-  if (error) {
-    console.error('Error creating order:', error);
-    return { success: false, error: error.message };
+  try {
+    const { data, error } = await supabase.rpc('create_order', {
+      order_data: {
+        items: orderData.items.map(item => ({
+          product_id: item.productId || null,
+          product_name: item.productName,
+          variant_id: item.variantId || null,
+          variant_name: item.variantName || null,
+          unit_price: item.unitPrice,
+          cost_price: item.costPrice || 0,
+          qty: item.qty,
+          unit: item.unit,
+          length_meters: item.lengthMeters || null,
+          width_meters: item.widthMeters || null,
+          calculated_area: item.calculatedArea || null,
+          total_price: item.totalPrice,
+          notes: item.notes || null,
+          is_custom_order: item.isCustomOrder || false,
+          custom_description: item.customDescription || null,
+          file_url: item.fileUrl || null,
+          file_name: item.fileName || null,
+        })),
+        customer_name: orderData.customerName,
+        customer_phone: orderData.customerPhone,
+        discount: orderData.discount,
+        paid_amount: orderData.paidAmount,
+        payment_method: orderData.paymentMethod,
+        operator_name: orderData.operatorName,
+        priority: orderData.priority,
+        notes: orderData.notes,
+        status: orderData.status || 'Menunggu Admin',
+        created_by: orderData.createdBy || null,
+        idempotency_key: keyToUse,
+        inbox_file: orderData.inboxFile ? {
+          upload_date: orderData.inboxFile.uploadDate || null,
+          customer_name: orderData.inboxFile.customerName || orderData.customerName,
+          class_grade: orderData.inboxFile.classGrade || null,
+          major: orderData.inboxFile.major || null,
+          phone: orderData.inboxFile.phone || orderData.customerPhone,
+          service_type: orderData.inboxFile.serviceType || null,
+          print_size: orderData.inboxFile.printSize || null,
+          qty: orderData.inboxFile.qty || 1,
+          notes: orderData.inboxFile.notes || null,
+          file_name: orderData.inboxFile.fileName,
+          file_type: orderData.inboxFile.fileType,
+          file_size: orderData.inboxFile.fileSize,
+          preview_url: orderData.inboxFile.previewUrl || null,
+          storage_path: orderData.inboxFile.storagePath || null,
+          folder_path: orderData.inboxFile.folderPath || null,
+        } : null,
+      },
+    });
+
+    if (!error && data && (data as any).success) {
+      console.log('[ORDER] create_order RPC success:', (data as any).order_no);
+      return {
+        success: true,
+        orderId: (data as any).order_id,
+        orderNo: (data as any).order_no,
+      };
+    }
+
+    console.warn('[ORDER] create_order returned error/invalid data, starting recovery...', error);
+    const recovered = await recoverOrderByKey(keyToUse);
+    if (recovered && recovered.success) {
+      console.log('[ORDER] Order recovered successfully after RPC error:', recovered.orderNo);
+      return { success: true, orderId: recovered.orderId, orderNo: recovered.orderNo };
+    }
+
+    return { success: false, error: error?.message || 'Gagal menyimpan pesanan ke database.' };
+  } catch (err: any) {
+    console.warn('[ORDER] Exception occurred during create_order, executing recovery query...', err.message);
+    const recovered = await recoverOrderByKey(keyToUse);
+    if (recovered && recovered.success) {
+      console.log('[ORDER] Order recovered successfully after exception:', recovered.orderNo);
+      return { success: true, orderId: recovered.orderId, orderNo: recovered.orderNo };
+    }
+    return { success: false, error: err.message || 'Status pesanan belum dapat diverifikasi.' };
   }
-
-  const result = data as any;
-  return {
-    success: result?.success || false,
-    orderId: result?.order_id,
-    orderNo: result?.order_no,
-    error: result?.error,
-  };
 }
 
 export async function recoverOrderByKey(idempotencyKey: string): Promise<{ success: boolean; orderId?: string; orderNo?: string; guestAccessToken?: string } | null> {
   if (!idempotencyKey) return null;
-  try {
-    const { data, error } = await supabase
-      .from('orders')
-      .select('id, order_no, guest_access_token')
-      .eq('idempotency_key', idempotencyKey)
-      .maybeSingle();
+  const delays = [0, 500, 1000, 2000];
 
-    if (error || !data) return null;
-    return {
-      success: true,
-      orderId: data.id,
-      orderNo: data.order_no,
-      guestAccessToken: data.guest_access_token,
-    };
-  } catch (err) {
-    console.error('Error recovering order by key:', err);
-    return null;
+  for (let attempt = 0; attempt < delays.length; attempt++) {
+    if (delays[attempt] > 0) {
+      await new Promise((res) => setTimeout(res, delays[attempt]));
+    }
+    console.log(`[ORDER] Recovery query attempt #${attempt + 1} for key:`, idempotencyKey);
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('id, order_no, guest_access_token')
+        .eq('idempotency_key', idempotencyKey)
+        .maybeSingle();
+
+      if (!error && data) {
+        console.log('[ORDER] Recovery query FOUND order:', data.order_no);
+        return {
+          success: true,
+          orderId: data.id,
+          orderNo: data.order_no,
+          guestAccessToken: data.guest_access_token,
+        };
+      }
+    } catch (err) {
+      console.warn(`[ORDER] Recovery attempt #${attempt + 1} encountered error:`, err);
+    }
   }
+
+  console.warn('[ORDER] Recovery attempts exhausted. Order not found for key:', idempotencyKey);
+  return null;
 }
 
 export async function createGuestOrder(orderData: {
