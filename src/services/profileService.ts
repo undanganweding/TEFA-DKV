@@ -73,6 +73,40 @@ export async function suspendUser(userId: string, reason: string = 'Melanggar ke
   return true;
 }
 
+export async function uploadAvatar(userId: string, file: File): Promise<{ success: boolean; url?: string; message?: string }> {
+  try {
+    const ext = file.name.split('.').pop() || 'png';
+    const path = `${userId}/avatar-${Date.now()}.${ext}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('profile-images')
+      .upload(path, file, { upsert: true });
+
+    if (uploadError) {
+      console.error('Error uploading avatar:', uploadError);
+      return { success: false, message: 'Gagal mengunggah gambar ke storage: ' + uploadError.message };
+    }
+
+    const { data: publicData } = supabase.storage.from('profile-images').getPublicUrl(path);
+    const publicUrl = publicData.publicUrl;
+
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({ avatar_path: publicUrl })
+      .eq('id', userId);
+
+    if (updateError) {
+      console.error('Error updating avatar_path in profile:', updateError);
+      return { success: false, message: 'Gagal memperbarui profil di database: ' + updateError.message };
+    }
+
+    return { success: true, url: publicUrl };
+  } catch (err: any) {
+    console.error('Unexpected avatar upload error:', err);
+    return { success: false, message: 'Terjadi kesalahan saat mengunggah foto profil.' };
+  }
+}
+
 export async function updateProfile(userId: string, updates: {
   full_name?: string;
   phone?: string;
@@ -81,7 +115,7 @@ export async function updateProfile(userId: string, updates: {
   major?: string;
   whatsapp?: string;
   nis?: string;
-  avatar_path?: string;
+  avatar_path?: string | null;
   position?: string;
   nip?: string;
   employee_id?: string;

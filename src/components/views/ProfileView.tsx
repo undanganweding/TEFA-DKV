@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile, UserRole, InstitutionProfile, PageId } from '../../types';
+import * as profileService from '../../services/profileService';
 
 interface ProfileViewProps {
   currentUser: UserProfile;
@@ -174,19 +175,50 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   };
 
   // Save Cropped/Edited Avatar
-  const handleSaveAvatar = () => {
-    if (!previewImage) {
+  const handleSaveAvatar = async () => {
+    if (!selectedFile && !previewImage) {
       setUploadError('Silakan pilih file foto terlebih dahulu.');
       return;
     }
 
     setIsSavingPhoto(true);
+    setUploadError(null);
 
-    // Simulate canvas crop / rotation processing
-    setTimeout(() => {
+    try {
+      let fileToUpload: File | null = selectedFile;
+
+      // If user selected file via reader or canvas, convert previewImage data URL to File if selectedFile is missing
+      if (!fileToUpload && previewImage && previewImage.startsWith('data:image')) {
+        const arr = previewImage.split(',');
+        const mimeMatch = arr[0].match(/:(.*?);/);
+        if (mimeMatch) {
+          const mime = mimeMatch[1];
+          const bstr = atob(arr[1]);
+          let n = bstr.length;
+          const u8arr = new Uint8Array(n);
+          while (n--) {
+            u8arr[n] = bstr.charCodeAt(n);
+          }
+          fileToUpload = new File([u8arr], `avatar-${Date.now()}.${mime.split('/')[1] || 'png'}`, { type: mime });
+        }
+      }
+
+      if (!fileToUpload) {
+        setUploadError('File tidak valid.');
+        setIsSavingPhoto(false);
+        return;
+      }
+
+      const res = await profileService.uploadAvatar(currentUser.id, fileToUpload);
+      if (!res.success || !res.url) {
+        setUploadError(res.message || 'Gagal menyimpan foto profil ke server.');
+        setIsSavingPhoto(false);
+        return;
+      }
+
       const updated = {
         ...formData,
-        avatar: previewImage,
+        avatar: res.url,
       };
       setFormData(updated);
       onUpdateProfile(updated);
@@ -198,12 +230,22 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       setZoomLevel(1);
       setRotationAngle(0);
 
-      showToast('Foto profil berhasil diperbarui');
-    }, 600);
+      showToast('Foto profil berhasil diperbarui!');
+    } catch (err: any) {
+      console.error('Error in handleSaveAvatar:', err);
+      setUploadError(err.message || 'Terjadi kesalahan saat mengunggah foto.');
+      setIsSavingPhoto(false);
+    }
   };
 
   // Remove Avatar (Use Default Initials)
-  const handleRemoveAvatar = () => {
+  const handleRemoveAvatar = async () => {
+    const success = await profileService.updateProfile(currentUser.id, { avatar_path: null });
+    if (!success) {
+      showToast('Gagal menghapus foto profil di server.', 'error');
+      return;
+    }
+
     const updated = {
       ...formData,
       avatar: '',
@@ -214,10 +256,27 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   };
 
   // Save Personal & Professional Profile Changes
-  const handleSavePersonalData = (e: React.FormEvent) => {
+  const handleSavePersonalData = async (e: React.FormEvent) => {
     e.preventDefault();
-    onUpdateProfile(formData);
-    showToast('Informasi profil berhasil diperbarui!');
+    const success = await profileService.updateProfile(currentUser.id, {
+      full_name: formData.name,
+      phone: formData.phone,
+      address: formData.address,
+      school_class: formData.studentClass,
+      major: formData.major,
+      whatsapp: formData.whatsapp,
+      nis: formData.nis,
+      position: formData.position,
+      nip: formData.nip,
+      employee_id: formData.employeeId,
+    });
+
+    if (success) {
+      onUpdateProfile(formData);
+      showToast('Informasi profil berhasil diperbarui!');
+    } else {
+      showToast('Gagal memperbarui informasi profil di server.', 'error');
+    }
   };
 
   // Save Password Changes
