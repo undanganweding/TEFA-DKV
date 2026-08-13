@@ -236,12 +236,14 @@ export function App() {
     };
   }, [rawSession]);
 
-  // Load all data from Supabase on mount / after login in safe sequential batches
+  // Load all data from Supabase on mount / after login based on user role
   useEffect(() => {
     if (!isLoggedIn || dataLoaded) return;
     const loadData = async () => {
       try {
-        // Fetch core essentials first
+        const isStudent = currentUser?.role === 'Siswa';
+
+        // 1. Core tables needed for both Student & Admin
         const prods = await productService.fetchProducts().catch(() => []);
         setProducts(prods);
 
@@ -251,24 +253,26 @@ export function App() {
         const inbox = await fileService.fetchInboxFiles().catch(() => []);
         setInboxFiles(inbox);
 
-        // Fetch remaining tables sequentially to avoid HTTP2 socket overload
-        const mats = await materialService.fetchMaterials().catch(() => []);
-        setMaterials(mats);
+        // 2. Heavy admin tables — ONLY fetch if role is Admin to protect student network bandwidth
+        if (!isStudent) {
+          const mats = await materialService.fetchMaterials().catch(() => []);
+          setMaterials(mats);
 
-        const movs = await materialService.fetchStockMovements().catch(() => []);
-        setStockMovements(movs);
+          const movs = await materialService.fetchStockMovements().catch(() => []);
+          setStockMovements(movs);
 
-        const trxs = await financeService.fetchTransactions().catch(() => []);
-        setTransactions(trxs);
+          const trxs = await financeService.fetchTransactions().catch(() => []);
+          setTransactions(trxs);
 
-        const tools_ = await inventoryService.fetchInventory().catch(() => []);
-        setTools(tools_);
+          const tools_ = await inventoryService.fetchInventory().catch(() => []);
+          setTools(tools_);
 
-        const procs = await procurementService.fetchProcurements().catch(() => []);
-        setProcurements(procs);
+          const procs = await procurementService.fetchProcurements().catch(() => []);
+          setProcurements(procs);
 
-        const custFiles = await fileService.fetchCustomerFiles().catch(() => []);
-        setCustomerFiles(custFiles);
+          const custFiles = await fileService.fetchCustomerFiles().catch(() => []);
+          setCustomerFiles(custFiles);
+        }
 
         setDataLoaded(true);
       } catch (err) {
@@ -277,7 +281,7 @@ export function App() {
       }
     };
     loadData();
-  }, [isLoggedIn, dataLoaded]);
+  }, [isLoggedIn, currentUser, dataLoaded]);
 
   // Load products for Guest users (does not require login)
   // RLS allows anonymous SELECT on visible, non-archived products
