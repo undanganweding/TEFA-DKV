@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ProductionOrder, Product } from '../../types';
 import { trackGuestOrder } from '../../services/orderService';
+import logoSmkNu from '../../assets/logo_smknu.png';
 
 interface GuestPlatformViewProps {
   products?: Product[];
@@ -430,7 +431,7 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
             className="flex items-center gap-3 cursor-pointer text-left focus:outline-none"
           >
             <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-md shadow-purple-500/5 overflow-hidden">
-              <img src="/src/assets/logo_smknu.png" alt="Logo SMK NU Ungaran" className="w-full h-full object-cover" />
+              <img src={logoSmkNu} alt="Logo SMK NU Ungaran" className="w-full h-full object-cover" />
             </div>
             <div>
               <h1 className="font-black text-slate-900 text-base leading-tight tracking-tight">TEFA DKV</h1>

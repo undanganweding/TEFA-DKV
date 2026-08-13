@@ -5,6 +5,7 @@ import { createGuestUser } from '../../utils/authStore';
 import * as authService from '../../services/authService';
 import { AvatarCropModal } from '../AvatarCropModal';
 import { getLoginSlides, SlideItem } from '../../utils/loginContentStore';
+import logoSmkNu from '../../assets/logo_smknu.png';
 
 interface LoginViewProps {
   onLoginSuccess: (user: UserProfile) => void;
@@ -269,7 +270,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onBackToHo
           <div className="relative z-10 flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-3 bg-white/10 backdrop-blur-xl border border-white/15 px-4 py-2.5 rounded-2xl shadow-lg">
               <div className="w-9 h-9 rounded-xl bg-white flex items-center justify-center shrink-0 border border-white/30 overflow-hidden">
-                <img src="/src/assets/logo_smknu.png" alt="Logo SMK NU Ungaran" className="w-full h-full object-cover" />
+                <img src={logoSmkNu} alt="Logo SMK NU Ungaran" className="w-full h-full object-cover" />
               </div>
               <div>
                 <h2 className="text-sm font-black text-white tracking-tight leading-none">
