@@ -45,18 +45,19 @@ import { KasirView } from './components/views/KasirView';
 import { FileInboxView } from './components/views/FileInboxView';
 import { StudentPortalView } from './components/views/StudentPortalView';
 import { GuestPlatformView } from './components/views/GuestPlatformView';
-import { PesananView } from './components/views/PesananView';
-import { ProdukView } from './components/views/ProdukView';
-import { CustomerFileView } from './components/views/CustomerFileView';
-import { InventarisAlatView } from './components/views/InventarisAlatView';
-import { StokBahanView } from './components/views/StokBahanView';
-import { KeuanganView } from './components/views/KeuanganView';
-import { LaporanView } from './components/views/LaporanView';
-import { PengadaanView } from './components/views/PengadaanView';
-import { PengaturanView } from './components/views/PengaturanView';
-import { ProfileView } from './components/views/ProfileView';
-import { KelolaLoginView } from './components/views/KelolaLoginView';
-import { UserManagementView } from './components/views/UserManagementView';
+// Lazy loaded views for performance
+const PesananView = React.lazy(() => import('./components/views/PesananView').then(m => ({ default: m.PesananView })));
+const ProdukView = React.lazy(() => import('./components/views/ProdukView').then(m => ({ default: m.ProdukView })));
+const CustomerFileView = React.lazy(() => import('./components/views/CustomerFileView').then(m => ({ default: m.CustomerFileView })));
+const InventarisAlatView = React.lazy(() => import('./components/views/InventarisAlatView').then(m => ({ default: m.InventarisAlatView })));
+const StokBahanView = React.lazy(() => import('./components/views/StokBahanView').then(m => ({ default: m.StokBahanView })));
+const KeuanganView = React.lazy(() => import('./components/views/KeuanganView').then(m => ({ default: m.KeuanganView })));
+const LaporanView = React.lazy(() => import('./components/views/LaporanView').then(m => ({ default: m.LaporanView })));
+const PengadaanView = React.lazy(() => import('./components/views/PengadaanView').then(m => ({ default: m.PengadaanView })));
+const PengaturanView = React.lazy(() => import('./components/views/PengaturanView').then(m => ({ default: m.PengaturanView })));
+const ProfileView = React.lazy(() => import('./components/views/ProfileView').then(m => ({ default: m.ProfileView })));
+const KelolaLoginView = React.lazy(() => import('./components/views/KelolaLoginView').then(m => ({ default: m.KelolaLoginView })));
+const UserManagementView = React.lazy(() => import('./components/views/UserManagementView').then(m => ({ default: m.UserManagementView })));
 
 import { ReceiptModal } from './components/modals/ReceiptModal';
 import { NewOrderModal } from './components/modals/NewOrderModal';
@@ -114,11 +115,24 @@ export function App() {
   const [showAiAssistantModal, setShowAiAssistantModal] = useState<boolean>(false);
 
   // Active Orders Count & Low Stock Count
-  const activeOrdersCount = orders.filter(
-    (o) => o.status !== 'Selesai' && o.status !== 'Dibatalkan'
-  ).length;
+  const activeOrdersCount = React.useMemo(() => 
+    orders.filter((o) => o.status !== 'Selesai' && o.status !== 'Dibatalkan').length,
+    [orders]
+  );
 
-  const lowStockCount = materials.filter((m) => m.status !== 'Aman').length;
+  const lowStockCount = React.useMemo(() => 
+    materials.filter((m) => m.status !== 'Aman').length,
+    [materials]
+  );
+
+  // Memoized Filtered Arrays for Views
+  const activeOrders = React.useMemo(() => orders.filter((o) => !o.isArchived), [orders]);
+  const activeMaterials = React.useMemo(() => materials.filter((m) => !m.isArchived), [materials]);
+  const activeInboxFiles = React.useMemo(() => inboxFiles.filter((f) => !f.isArchived), [inboxFiles]);
+  const activeTransactions = React.useMemo(() => transactions.filter((t) => !t.isArchived), [transactions]);
+  const activeProducts = React.useMemo(() => products.filter((p) => !p.isArchived), [products]);
+  const activeTools = React.useMemo(() => tools.filter((t) => !t.isArchived), [tools]);
+  const pendingInboxCount = React.useMemo(() => inboxFiles.filter((f) => f.status === 'Menunggu Pemeriksaan' && !f.isArchived).length, [inboxFiles]);
 
   // Restore Active User Auth Session on Mount (Supabase + fallback to localStorage)
   useEffect(() => {
@@ -1223,7 +1237,7 @@ export function App() {
           onSearchChange={setGlobalSearchQuery}
           activeOrdersCount={activeOrdersCount}
           lowStockCount={lowStockCount}
-          inboxCount={inboxFiles.filter((f) => f.status === 'Menunggu Pemeriksaan' && !f.isArchived).length}
+          inboxCount={pendingInboxCount}
           onPageChange={setCurrentPage}
           products={products}
           orders={orders}
@@ -1239,10 +1253,10 @@ export function App() {
         <main className="flex-1 p-4 md:p-6">
           {currentPage === 'dashboard' && (
             <DashboardView
-              orders={orders.filter((o) => !o.isArchived)}
-              materials={materials.filter((m) => !m.isArchived)}
-              inboxFiles={inboxFiles.filter((f) => !f.isArchived)}
-              transactions={transactions.filter((t) => !t.isArchived)}
+              orders={activeOrders}
+              materials={activeMaterials}
+              inboxFiles={activeInboxFiles}
+              transactions={activeTransactions}
               onPageChange={setCurrentPage}
               onOpenOrderReceipt={(ord) => setActiveReceiptOrder(ord)}
               onOpenNewOrderModal={() => setShowNewOrderModal(true)}
@@ -1253,8 +1267,8 @@ export function App() {
 
           {currentPage === 'kasir' && (
             <KasirView
-              products={products.filter((p) => !p.isArchived)}
-              orders={orders.filter((o) => !o.isArchived)}
+              products={activeProducts}
+              orders={activeOrders}
               onCheckoutOrder={handleAddOrder}
               operatorName={settings.activeShiftOperator}
               prefilledFile={prefilledFile}
@@ -1267,7 +1281,7 @@ export function App() {
 
           {currentPage === 'file_inbox' && (
             <FileInboxView
-              inboxFiles={inboxFiles.filter((f) => !f.isArchived)}
+              inboxFiles={activeInboxFiles}
               onUpdateFileStatus={handleUpdateInboxFileStatus}
               onCreateTransactionFromFile={handleCreateTransactionFromFile}
               onOpenPublicUpload={() => setCurrentPage('public_upload')}
@@ -1277,7 +1291,7 @@ export function App() {
 
           {currentPage === 'pesanan' && (
             <PesananView
-              orders={orders.filter((o) => !o.isArchived)}
+              orders={activeOrders}
               onUpdateOrderStatus={handleUpdateOrderStatus}
               onRecordPayment={handleRecordPayment}
               onRefundOrder={handleRefundOrder}
@@ -1290,7 +1304,7 @@ export function App() {
 
           {currentPage === 'produk' && (
             <ProdukView
-              products={products.filter((p) => !p.isArchived)}
+              products={activeProducts}
               onAddProduct={handleAddProduct}
               onUpdateProduct={handleUpdateProduct}
               onArchiveProduct={handleArchiveProduct}
@@ -1310,7 +1324,7 @@ export function App() {
 
           {currentPage === 'inventaris_alat' && (
             <InventarisAlatView
-              tools={tools.filter((t) => !t.isArchived)}
+              tools={activeTools}
               onArchiveTool={handleArchiveTool}
               onAddTool={handleAddTool}
               onUpdateTool={handleUpdateTool}
@@ -1319,7 +1333,7 @@ export function App() {
 
           {currentPage === 'stok_bahan' && (
             <StokBahanView
-              materials={materials.filter((m) => !m.isArchived)}
+              materials={activeMaterials}
               stockMovements={stockMovements}
               onArchiveMaterial={handleArchiveMaterial}
               onRestockMaterial={handleRestockMaterial}
@@ -1334,7 +1348,7 @@ export function App() {
 
           {currentPage === 'keuangan' && (
             <KeuanganView
-              transactions={transactions.filter((t) => !t.isArchived)}
+              transactions={activeTransactions}
               onAddTransaction={handleAddTransaction}
               operatorName={settings.activeShiftOperator}
               onArchiveTransaction={handleArchiveTransaction}
@@ -1343,8 +1357,8 @@ export function App() {
 
           {currentPage === 'laporan' && (
             <LaporanView
-              orders={orders.filter((o) => !o.isArchived)}
-              transactions={transactions.filter((t) => !t.isArchived)}
+              orders={activeOrders}
+              transactions={activeTransactions}
             />
           )}
 

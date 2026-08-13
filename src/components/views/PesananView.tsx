@@ -30,6 +30,7 @@ export const PesananView: React.FC<PesananViewProps> = ({
   // Payment modal state
   const [showPaymentModal, setShowPaymentModal] = useState<boolean>(false);
   const [payAmountInput, setPayAmountInput] = useState<number>(0);
+  const [isPaymentProcessing, setIsPaymentProcessing] = useState<boolean>(false);
 
   // Refund modal state
   const [showRefundModal, setShowRefundModal] = useState<boolean>(false);
@@ -132,12 +133,23 @@ export const PesananView: React.FC<PesananViewProps> = ({
 
   const handleRecordPaymentSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activeOrderDetail || payAmountInput <= 0) return;
-    onRecordPayment(activeOrderDetail.id, payAmountInput);
-    setShowPaymentModal(false);
-    setPayAmountInput(0);
-    const updated = orders.find((o) => o.id === activeOrderDetail.id);
-    if (updated) setActiveOrderDetail(updated);
+    if (!activeOrderDetail || payAmountInput <= 0 || isPaymentProcessing) return;
+    
+    setIsPaymentProcessing(true);
+    setTimeout(() => {
+      onRecordPayment(activeOrderDetail.id, payAmountInput);
+      setIsPaymentProcessing(false);
+      setShowPaymentModal(false);
+      setPayAmountInput(0);
+      const updated = orders.find((o) => o.id === activeOrderDetail.id);
+      if (updated) {
+        setActiveOrderDetail({
+          ...updated,
+          paidAmount: updated.paidAmount + payAmountInput,
+          balanceDue: Math.max(0, updated.totalAmount - (updated.paidAmount + payAmountInput))
+        });
+      }
+    }, 400);
   };
 
   const formatRupiah = (val: number) => 'Rp ' + val.toLocaleString('id-ID');
@@ -547,7 +559,7 @@ export const PesananView: React.FC<PesananViewProps> = ({
                   <option value="Lainnya">Lainnya</option>
                 </select>
               </div>
-            </div>
+          </div>
 
             <div className="flex justify-end gap-2 pt-2">
               <button

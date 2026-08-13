@@ -50,6 +50,7 @@ export const GlobalCartSidebar: React.FC<GlobalCartSidebarProps> = ({
   operatorName = 'Kepala TEFA',
 }) => {
   const [isCustomerExpanded, setIsCustomerExpanded] = useState<boolean>(true);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   // Calculations
   const subtotal = cartItems.reduce((sum, item) => sum + item.totalPrice, 0);
@@ -422,11 +423,31 @@ export const GlobalCartSidebar: React.FC<GlobalCartSidebarProps> = ({
 
             <button
               type="button"
-              onClick={onCheckoutOrder}
-              className="w-full bg-[#5B4BFF] hover:bg-purple-700 text-white py-2.5 rounded-2xl font-black text-xs transition-all flex items-center justify-center gap-1 cursor-pointer active:scale-95 shadow-md shadow-purple-500/20"
+              disabled={isSubmitting || cartItems.length === 0}
+              onClick={async () => {
+                setIsSubmitting(true);
+                try {
+                  // Tambahkan sedikit jeda buatan agar terlihat ada proses dan mencegah double click cepat
+                  await new Promise((res) => setTimeout(res, 400));
+                  onCheckoutOrder();
+                } finally {
+                  setIsSubmitting(false);
+                }
+              }}
+              className={`w-full py-2.5 rounded-2xl font-black text-xs transition-all flex items-center justify-center gap-1 shadow-md
+                ${isSubmitting || cartItems.length === 0 
+                  ? 'bg-slate-300 text-slate-500 cursor-not-allowed shadow-none' 
+                  : 'bg-[#5B4BFF] hover:bg-purple-700 text-white cursor-pointer active:scale-95 shadow-purple-500/20'
+                }`}
             >
-              <span className="material-symbols-outlined text-base">print</span>
-              <span>Cetak Nota</span>
+              {isSubmitting ? (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              ) : (
+                <>
+                  <span className="material-symbols-outlined text-base">print</span>
+                  <span>Cetak Nota</span>
+                </>
+              )}
             </button>
           </div>
         </div>
