@@ -100,7 +100,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Brand Header */}
         <div className="p-5 flex items-center gap-3.5 border-b border-slate-800/60">
           <div className="w-10 h-10 rounded-2xl bg-white flex items-center justify-center shadow-lg shadow-purple-900/10 shrink-0 border border-white/20 overflow-hidden">
-            <img src="/src/assets/logo_smknu.jpg" alt="Logo SMK NU Ungaran" className="w-full h-full object-cover" />
+            <img src="/src/assets/logo_smknu.png" alt="Logo SMK NU Ungaran" className="w-full h-full object-cover" />
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">

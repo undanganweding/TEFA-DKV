@@ -48,6 +48,13 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
           >
             {/* Header */}
             <div className="text-center pb-3 border-b border-dashed border-slate-300">
+              <div className="flex justify-center mb-2">
+                <img
+                  src="/logo_smknu.png"
+                  alt="Logo SMK NU"
+                  className="w-12 h-12 object-contain"
+                />
+              </div>
               <h2 className="font-extrabold text-sm uppercase text-slate-900">
                 {settings.tefaName}
               </h2>
