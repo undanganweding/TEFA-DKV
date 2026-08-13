@@ -260,17 +260,33 @@ export async function fetchUserProfile(user: any): Promise<UserProfile | null> {
             error?.message?.includes('ERR_CONNECTION_ABORTED');
 
           if (isTransientNetworkError) {
-            if (attempt < MAX_RETRIES) {
-              attempt++;
-              await new Promise((res) => setTimeout(res, 800 * attempt));
-              continue;
+            console.warn('Transient network issue on profile fetch. Falling back to auth user metadata.');
+            if (user && user.user_metadata) {
+              const meta = user.user_metadata;
+              const fallbackProfile: ProfileRow = {
+                id: user.id,
+                full_name: meta.full_name || user.email || 'Siswa TEFA',
+                role: meta.role || 'Student',
+                status: meta.status || 'Active',
+                school_class: meta.school_class || null,
+                phone: meta.phone || null,
+                address: null,
+                avatar_path: meta.avatar_path || null,
+                nis: meta.nis || null,
+                major: meta.major || null,
+                whatsapp: meta.whatsapp || null,
+                position: null,
+                nip: null,
+                employee_id: null,
+                reject_reason: null,
+                created_at: user.created_at || new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              };
+              return mapProfileToUserProfile(fallbackProfile, user.email || '');
             }
-            console.error('NETWORK_ERROR: Koneksi terputus saat mengambil data profil:', error);
-            throw new Error('NETWORK_ERROR');
           }
 
           if (error?.code === 'PGRST116' || !profileData) {
-            console.warn('PROFILE_NOT_FOUND: Profil tidak ditemukan di database table profiles, mencoba fallback dari metadata user auth.', error);
             if (user && user.user_metadata) {
               const meta = user.user_metadata;
               const fallbackProfile: ProfileRow = {
