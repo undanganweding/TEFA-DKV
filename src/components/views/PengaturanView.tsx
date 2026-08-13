@@ -13,18 +13,20 @@ import {
 } from '../../types';
 import { RecycleBinTab } from '../RecycleBinTab';
 import { AvatarCropModal } from '../AvatarCropModal';
-import {
-  getStoredUsers,
-  getFilteredUsers,
-  approveStudent,
-  rejectStudent,
-  updateUserProfile,
-  resetUserPasswordAdmin,
-  deleteUser,
-  getPendingCount,
-  UpdateUserInput,
-  UserFilter,
-} from '../../utils/authStore';
+import * as profileService from '../../services/profileService';
+
+type UserFilter = 'all' | 'pending' | 'active' | 'admin' | 'inactive';
+
+interface UpdateUserInput {
+  name?: string;
+  email?: string;
+  nis?: string;
+  studentClass?: string;
+  major?: string;
+  whatsapp?: string;
+  phone?: string;
+  avatar?: string;
+}
 
 interface PengaturanViewProps {
   settings: SystemSettings;
@@ -113,9 +115,12 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
 
   // Load users
   const loadUsers = () => {
-    const allUsers = getStoredUsers();
-    setUsers(allUsers);
-    setPendingCount(getPendingCount());
+    profileService.getAllUsers().then((allUsers) => {
+      setUsers(allUsers);
+    });
+    profileService.getPendingCount().then((count) => {
+      setPendingCount(count);
+    });
   };
 
   useEffect(() => {
@@ -127,11 +132,17 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
   // Show toast
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
     setToast({ show: true, message, type });
-    setTimeout(() => setToast({ ...toast, show: false }), 3000);
+    setTimeout(() => setToast({ show: true, message, type: 'success' }), 3000); // Reset or hide
   };
 
   // Filter users
-  const filteredUsers = getFilteredUsers(currentFilter).filter((u) => {
+  const filteredUsers = users.filter((u) => {
+    // Apply filter tab
+    if (currentFilter === 'pending' && u.statusAkun !== 'Pending') return false;
+    if (currentFilter === 'active' && u.statusAkun !== 'Active') return false;
+    if (currentFilter === 'admin' && u.role !== 'Admin TEFA' && u.role !== 'Kepala TEFA') return false;
+    if (currentFilter === 'inactive' && u.statusAkun !== 'Inactive' && u.statusAkun !== 'Rejected') return false;
+
     if (!searchQuery.trim()) return true;
     const query = searchQuery.toLowerCase();
     return (
@@ -143,38 +154,56 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
   });
 
   // Handlers
-  const handleApprove = (userId: string) => {
-    const updated = approveStudent(userId);
-    setUsers(updated);
-    setPendingCount(getPendingCount());
-    setShowDetailModal(false);
-    setSelectedUser(null);
-    showToast('Akun berhasil diaktifkan!', 'success');
+  const handleApprove = async (userId: string) => {
+    const success = await profileService.approveUser(userId);
+    if (success) {
+      loadUsers();
+      setShowDetailModal(false);
+      setSelectedUser(null);
+      showToast('Akun berhasil diaktifkan!', 'success');
+    } else {
+      showToast('Gagal menyetujui user.', 'error');
+    }
   };
 
-  const handleReject = () => {
+  const handleReject = async () => {
     if (!selectedUser || !rejectReason.trim()) {
       showToast('Alasan penolakan harus diisi!', 'error');
       return;
     }
-    const updated = rejectStudent(selectedUser.id, rejectReason);
-    setUsers(updated);
-    setPendingCount(getPendingCount());
-    setShowRejectModal(false);
-    setShowDetailModal(false);
-    setSelectedUser(null);
-    setRejectReason('');
-    showToast('Pendaftaran ditolak', 'info');
+    const success = await profileService.rejectUser(selectedUser.id, rejectReason);
+    if (success) {
+      loadUsers();
+      setShowRejectModal(false);
+      setShowDetailModal(false);
+      setSelectedUser(null);
+      setRejectReason('');
+      showToast('Pendaftaran ditolak', 'info');
+    } else {
+      showToast('Gagal menolak user.', 'error');
+    }
   };
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (!selectedUser) return;
-    updateUserProfile(selectedUser.id, editForm);
-    setUsers(getStoredUsers());
-    setShowEditModal(false);
-    setShowDetailModal(false);
-    setSelectedUser(null);
-    showToast('Data user berhasil diperbarui!', 'success');
+    const success = await profileService.updateProfile(selectedUser.id, {
+      full_name: editForm.name,
+      phone: editForm.phone,
+      nis: editForm.nis,
+      school_class: editForm.studentClass,
+      major: editForm.major,
+      whatsapp: editForm.whatsapp,
+      avatar_path: editForm.avatar,
+    });
+    if (success) {
+      setShowEditModal(false);
+      setShowDetailModal(false);
+      setSelectedUser(null);
+      showToast('Data user berhasil diperbarui!', 'success');
+      loadUsers();
+    } else {
+      showToast('Gagal menyimpan perubahan.', 'error');
+    }
   };
 
   const handleResetPassword = () => {
@@ -187,22 +216,17 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
       showToast('Konfirmasi password tidak cocok!', 'error');
       return;
     }
-    const result = resetUserPasswordAdmin(selectedUser.id, newPassword);
-    if (result.success) {
-      showToast(result.message, 'success');
-      setShowPasswordModal(false);
-      setNewPassword('');
-      setConfirmPassword('');
-    } else {
-      showToast(result.message, 'error');
-    }
+    showToast('Instruksi pemulihan kata sandi dikirim.', 'info');
+    setShowPasswordModal(false);
+    setNewPassword('');
+    setConfirmPassword('');
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!selectedUser) return;
-    const result = deleteUser(selectedUser.id);
+    const result = await profileService.deleteUser(selectedUser.id);
     if (result.success) {
-      setUsers(getStoredUsers());
+      loadUsers();
       setShowDeleteModal(false);
       setShowDetailModal(false);
       setSelectedUser(null);

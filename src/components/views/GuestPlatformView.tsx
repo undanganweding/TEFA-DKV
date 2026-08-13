@@ -125,6 +125,7 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
   // Tracking State
   const [trackInput, setTrackInput] = useState('');
   const [trackResult, setTrackResult] = useState<any>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // File Upload Handlers
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -190,21 +191,27 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
     );
   };
 
-  const handleSubmitOrder = (e: React.FormEvent) => {
+  const handleSubmitOrder = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+
     if (!orderForm.name.trim() || !orderForm.whatsapp.trim()) {
       alert('Nama dan Nomor WhatsApp wajib diisi!');
       return;
     }
 
-    const todayStr = new Date().toISOString().split('T')[0];
-    const now = new Date();
-    const dateStr = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
-    const randomSuffix = String(Math.floor(Math.random() * 900) + 100);
-    const orderNo = `TEFA-${dateStr}-${randomSuffix}`;
+    setIsSubmitting(true);
 
-    let productName = '';
-    let unitPrice = 0;
+    try {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const now = new Date();
+      const dateStr = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
+      const randomSuffix = String(Math.floor(Math.random() * 900) + 100);
+      const orderNo = `TEFA-${dateStr}-${randomSuffix}`;
+      const idempotencyKey = `GUEST-${orderNo}-${Date.now()}`;
+
+      let productName = '';
+      let unitPrice = 0;
     let qty = 1;
     let subtotal = 0;
 
@@ -243,60 +250,66 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
         ]
       : [];
 
-    const newOrder: ProductionOrder = {
-      id: 'ORD-GUEST-' + Date.now(),
-      orderNo: orderNo,
-      customerName: orderForm.name.trim(),
-      customerPhone: orderForm.whatsapp.trim(),
-      customerEmail: orderForm.email.trim() || undefined,
-      orderDate: todayStr,
-      dueDate: todayStr + ' 16:00',
-      status: 'Menunggu Admin',
-      paymentStatus: 'Belum Bayar',
-      items: [
-        {
-          id: 'ITEM-' + Date.now(),
-          productId: selectedOrderProduct ? selectedOrderProduct.id : orderForm.service,
-          productName: productName,
-          category: 'Cetak',
-          price: unitPrice,
-          quantity: qty,
-          totalPrice: subtotal,
-          notes: orderForm.notes || undefined,
-        },
-      ],
-      subtotal: subtotal,
-      discount: 0,
-      taxAmount: 0,
-      totalAmount: subtotal,
-      paidAmount: 0,
-      balanceDue: subtotal,
-      operatorName: 'Guest Customer',
-      priority: 'Normal',
-      notes: orderForm.notes || undefined,
-      artworkFiles: artworkFiles.length > 0 ? artworkFiles : undefined,
-      statusHistory: [
-        {
-          status: 'Menunggu Admin',
-          timestamp: new Date().toLocaleString('id-ID'),
-          updatedBy: 'System',
-          note: 'Pesanan dibuat oleh Guest Customer',
-        },
-      ],
-    };
+      const newOrder: ProductionOrder = {
+        id: 'ORD-GUEST-' + Date.now(),
+        orderNo: orderNo,
+        customerName: orderForm.name.trim(),
+        customerPhone: orderForm.whatsapp.trim(),
+        customerEmail: orderForm.email.trim() || undefined,
+        orderDate: todayStr,
+        dueDate: todayStr + ' 16:00',
+        status: 'Menunggu Admin',
+        paymentStatus: 'Belum Bayar',
+        items: [
+          {
+            id: 'ITEM-' + Date.now(),
+            productId: selectedOrderProduct ? selectedOrderProduct.id : orderForm.service,
+            productName: productName,
+            category: 'Cetak',
+            unit: selectedOrderProduct ? selectedOrderProduct.unit : 'pcs',
+            unitPrice: unitPrice,
+            qty: qty,
+            totalPrice: subtotal,
+            notes: orderForm.notes || undefined,
+          },
+        ],
+        subtotal: subtotal,
+        discount: 0,
+        taxAmount: 0,
+        totalAmount: subtotal,
+        paidAmount: 0,
+        balanceDue: subtotal,
+        operatorName: 'Guest Customer',
+        priority: 'Normal',
+        notes: orderForm.notes || undefined,
+        artworkFiles: artworkFiles.length > 0 ? artworkFiles : undefined,
+        idempotency_key: idempotencyKey,
+        statusHistory: [
+          {
+            status: 'Menunggu Admin',
+            timestamp: new Date().toLocaleString('id-ID'),
+            updatedBy: 'System',
+            note: 'Pesanan dibuat oleh Guest Customer',
+          },
+        ],
+      };
 
-    onAddOrder(newOrder);
-    setOrderSuccess(orderNo);
-    setOrderSuccessData({
-      orderNo: orderNo,
-      productName: productName,
-      qty: qty,
-      totalPrice: subtotal > 0 ? `Rp ${subtotal.toLocaleString('id-ID')}` : 'Akan dihitung oleh Admin',
-    });
+      await onAddOrder(newOrder);
+      setOrderSuccess(orderNo);
+      setOrderSuccessData({
+        orderNo: orderNo,
+        productName: productName,
+        qty: qty,
+        totalPrice: subtotal > 0 ? `Rp ${subtotal.toLocaleString('id-ID')}` : 'Akan dihitung oleh Admin',
+      });
 
-    // Reset forms
-    setOrderForm({ name: '', whatsapp: '', email: '', service: '', notes: '' });
-    setSelectedFile(null);
+      // Reset forms
+      setOrderForm({ name: '', whatsapp: '', email: '', service: '', notes: '' });
+      setSelectedFile(null);
+    } catch (err: any) {
+      alert('Gagal mengirim pesanan: ' + err.message);
+      setIsSubmitting(false);
+    }
   };
 
   const handleTrack = () => {
@@ -1096,10 +1109,20 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
 
                   <button
                     type="submit"
-                    className="w-full py-4 bg-[#5B4BFF] hover:bg-[#4a3ce0] text-white font-black text-sm rounded-2xl shadow-lg shadow-purple-500/20 hover:scale-[1.01] active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    disabled={isSubmitting}
+                    className="w-full py-4 bg-[#5B4BFF] hover:bg-[#4a3ce0] text-white font-black text-sm rounded-2xl shadow-lg shadow-purple-500/20 hover:scale-[1.01] active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
                   >
-                    <span className="material-symbols-outlined text-base">send</span>
-                    Kirim Pesanan
+                    {isSubmitting ? (
+                      <>
+                        <span className="material-symbols-outlined text-base animate-spin">sync</span>
+                        Mengirim Pesanan...
+                      </>
+                    ) : (
+                      <>
+                        <span className="material-symbols-outlined text-base">send</span>
+                        Kirim Pesanan
+                      </>
+                    )}
                   </button>
                 </form>
               )}

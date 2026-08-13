@@ -15,24 +15,25 @@ import {
   InboxFileStatus,
   CartItem,
   PaymentMethod,
+  PaymentStatus,
   UserProfile,
 } from './types';
 import {
   getStoredSession,
   setStoredSession,
 } from './utils/authStore';
-import {
-  initialSettings,
-  initialProducts,
-  initialOrders,
-  initialCustomerFiles,
-  initialTools,
-  initialMaterials,
-  initialStockMovements,
-  initialTransactions,
-  initialProcurements,
-  initialInboxFiles,
-} from './data/mockData';
+import { initialSettings } from './data/mockData';
+
+// Supabase Services
+import * as authService from './services/authService';
+import * as productService from './services/productService';
+import * as materialService from './services/materialService';
+import * as orderServiceModule from './services/orderService';
+import * as financeService from './services/financeService';
+import * as inventoryService from './services/inventoryService';
+import * as procurementService from './services/procurementService';
+import * as fileService from './services/fileService';
+import { logActivity } from './services/notificationService';
 
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
@@ -71,18 +72,19 @@ export function App() {
   // Global View Navigation State
   const [currentPage, setCurrentPage] = useState<PageId>('dashboard');
 
-  // Master Data State
+  // Master Data State — initialized empty, loaded from Supabase
   const [settings, setSettings] = useState<SystemSettings>(initialSettings);
-  const [products, setProducts] = useState<Product[]>(initialProducts);
-  const [orders, setOrders] = useState<ProductionOrder[]>(initialOrders);
-  const [inboxFiles, setInboxFiles] = useState<InboxFile[]>(initialInboxFiles);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [orders, setOrders] = useState<ProductionOrder[]>([]);
+  const [inboxFiles, setInboxFiles] = useState<InboxFile[]>([]);
   const [prefilledFile, setPrefilledFile] = useState<InboxFile | null>(null);
-  const [customerFiles, setCustomerFiles] = useState<CustomerFile[]>(initialCustomerFiles);
-  const [tools, setTools] = useState<ToolInventory[]>(initialTools);
-  const [materials, setMaterials] = useState<MaterialStock[]>(initialMaterials);
-  const [stockMovements, setStockMovements] = useState<StockMovement[]>(initialStockMovements);
-  const [transactions, setTransactions] = useState<FinanceTransaction[]>(initialTransactions);
-  const [procurements, setProcurements] = useState<AnnualProcurement[]>(initialProcurements);
+  const [customerFiles, setCustomerFiles] = useState<CustomerFile[]>([]);
+  const [tools, setTools] = useState<ToolInventory[]>([]);
+  const [materials, setMaterials] = useState<MaterialStock[]>([]);
+  const [stockMovements, setStockMovements] = useState<StockMovement[]>([]);
+  const [transactions, setTransactions] = useState<FinanceTransaction[]>([]);
+  const [procurements, setProcurements] = useState<AnnualProcurement[]>([]);
+  const [dataLoaded, setDataLoaded] = useState<boolean>(false);
 
   // GLOBAL PERSISTENT CART STATE
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
@@ -118,19 +120,79 @@ export function App() {
 
   const lowStockCount = materials.filter((m) => m.status !== 'Aman').length;
 
-  // Restore Active User Auth Session on Mount
+  // Restore Active User Auth Session on Mount (Supabase + fallback to localStorage)
   useEffect(() => {
-    const savedSession = getStoredSession();
-    if (savedSession) {
-      setCurrentUser(savedSession);
-      setIsLoggedIn(true);
-      if (savedSession.role === 'Siswa' || savedSession.role === 'Guest') {
-        setCurrentPage('public_upload');
-      } else {
-        setCurrentPage(savedSession.defaultPage || 'dashboard');
+    const initAuth = async () => {
+      // Try Supabase session first
+      const supabaseUser = await authService.getSession();
+      if (supabaseUser) {
+        setCurrentUser(supabaseUser);
+        setIsLoggedIn(true);
+        if (supabaseUser.role === 'Siswa' || supabaseUser.role === 'Guest') {
+          setCurrentPage('public_upload');
+        } else {
+          setCurrentPage(supabaseUser.defaultPage || 'dashboard');
+        }
+        return;
       }
-    }
+      // Fallback to localStorage session (for Guest access)
+      const savedSession = getStoredSession();
+      if (savedSession) {
+        setCurrentUser(savedSession);
+        setIsLoggedIn(true);
+        if (savedSession.role === 'Siswa' || savedSession.role === 'Guest') {
+          setCurrentPage('public_upload');
+        } else {
+          setCurrentPage(savedSession.defaultPage || 'dashboard');
+        }
+      }
+    };
+    initAuth();
+
+    // Listen for Supabase auth state changes
+    const { data: { subscription } } = authService.onAuthStateChange((user) => {
+      if (user) {
+        setCurrentUser(user);
+        setIsLoggedIn(true);
+      }
+    });
+    return () => subscription.unsubscribe();
   }, []);
+
+  // Load all data from Supabase on mount / after login
+  useEffect(() => {
+    if (!isLoggedIn || dataLoaded) return;
+    const loadData = async () => {
+      try {
+        const [prods, mats, movs, ords, trxs, tools_, procs, inbox, custFiles] = await Promise.all([
+          productService.fetchProducts(),
+          materialService.fetchMaterials(),
+          materialService.fetchStockMovements(),
+          orderServiceModule.fetchOrders(),
+          financeService.fetchTransactions(),
+          inventoryService.fetchInventory(),
+          procurementService.fetchProcurements(),
+          fileService.fetchInboxFiles(),
+          fileService.fetchCustomerFiles(),
+        ]);
+        setProducts(prods);
+        setMaterials(mats);
+        setStockMovements(movs);
+        setOrders(ords);
+        setTransactions(trxs);
+        setTools(tools_);
+        setProcurements(procs);
+        setInboxFiles(inbox);
+        setCustomerFiles(custFiles);
+        setDataLoaded(true);
+      } catch (err) {
+        console.error('Error loading data from Supabase:', err);
+        // Data will remain as empty arrays — UI still renders
+        setDataLoaded(true);
+      }
+    };
+    loadData();
+  }, [isLoggedIn, dataLoaded]);
 
   // 1. Check for persisted active transaction session on mount
   useEffect(() => {
@@ -792,24 +854,31 @@ export function App() {
     setCurrentPage('kasir');
   };
 
-  const handleAddInboxFile = (newFile: InboxFile) => {
+  const handleAddInboxFile = async (newFile: InboxFile) => {
     setInboxFiles((prev) => [newFile, ...prev]);
+    // Persist to Supabase
+    fileService.addInboxFile(newFile).catch(err => console.error('Error persisting inbox file:', err));
   };
 
   // Master Data Add Handlers
-  const handleAddProduct = (newProd: Product) => {
+  const handleAddProduct = async (newProd: Product) => {
     setProducts((prev) => [newProd, ...prev]);
+    // Persist to Supabase
+    productService.createProduct(newProd).catch(err => console.error('Error persisting product:', err));
   };
 
-  const handleUpdateProduct = (updatedProd: Product) => {
+  const handleUpdateProduct = async (updatedProd: Product) => {
     setProducts((prev) => prev.map((p) => (p.id === updatedProd.id ? updatedProd : p)));
+    productService.updateProduct(updatedProd).catch(err => console.error('Error updating product:', err));
   };
 
-  const handleAddTransaction = (newTrx: FinanceTransaction) => {
+  const handleAddTransaction = async (newTrx: FinanceTransaction) => {
     setTransactions((prev) => [newTrx, ...prev]);
+    financeService.createTransaction(newTrx).catch(err => console.error('Error persisting transaction:', err));
   };
 
-  const handleRestockMaterial = (materialId: string, addedQty: number, totalPrice: number) => {
+  const handleRestockMaterial = async (materialId: string, addedQty: number, totalPrice: number) => {
+    // Optimistic local update
     setMaterials((prev) =>
       prev.map((m) => {
         if (m.id === materialId) {
@@ -830,14 +899,19 @@ export function App() {
         return m;
       })
     );
+    // Persist to Supabase
+    materialService.restockMaterial(materialId, addedQty, totalPrice, settings.activeShiftOperator)
+      .catch(err => console.error('Error persisting restock:', err));
   };
 
-  const handleAddMaterial = (newMat: MaterialStock) => {
+  const handleAddMaterial = async (newMat: MaterialStock) => {
     setMaterials((prev) => [newMat, ...prev]);
+    materialService.createMaterial(newMat).catch(err => console.error('Error persisting material:', err));
   };
 
-  const handleAddProcurement = (newProc: AnnualProcurement) => {
+  const handleAddProcurement = async (newProc: AnnualProcurement) => {
     setProcurements((prev) => [newProc, ...prev]);
+    procurementService.createProcurement(newProc).catch(err => console.error('Error persisting procurement:', err));
   };
 
   // Soft Archiving Handlers (Global Trash Management)
@@ -901,7 +975,7 @@ export function App() {
     setDeleteModalDetails({
       id,
       title: `Folder Arsip: ${item.customerName}`,
-      subtitle: `Instansi: ${item.institution || '-'} | ${item.totalFiles} File`,
+      subtitle: `Instansi: ${item.email || '-'} | ${item.files?.length || item.totalOrdersCount || 0} File`,
       category: 'Folder Berkas Customer',
       impact: 'Folder arsip customer akan dipindahkan ke Sampah.',
     });
@@ -913,12 +987,14 @@ export function App() {
     setDeleteModalOpen(true);
   };
 
-  const handleAddTool = (newTool: ToolInventory) => {
+  const handleAddTool = async (newTool: ToolInventory) => {
     setTools((prev) => [newTool, ...prev]);
+    inventoryService.createInventoryAsset(newTool).catch(err => console.error('Error persisting tool:', err));
   };
 
-  const handleUpdateTool = (updatedTool: ToolInventory) => {
+  const handleUpdateTool = async (updatedTool: ToolInventory) => {
     setTools((prev) => prev.map((t) => (t.id === updatedTool.id ? updatedTool : t)));
+    inventoryService.updateInventoryAsset(updatedTool).catch(err => console.error('Error updating tool:', err));
   };
 
   const handleArchiveTool = (id: string) => {
@@ -927,7 +1003,7 @@ export function App() {
     setDeleteModalDetails({
       id,
       title: `Alat Studio: ${item.name}`,
-      subtitle: `Merk: ${item.brandModel} | Lokasi: ${item.location}`,
+      subtitle: `Merk: ${item.brand || ''} ${item.model || ''} | Lokasi: ${item.location}`,
       category: 'Inventaris & Mesin Studio',
       impact: 'Inventaris mesin akan dipindahkan ke Sampah.',
     });
@@ -1041,10 +1117,13 @@ export function App() {
     );
   }
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    // Sign out from Supabase auth
+    await authService.signOut().catch(() => {});
     setStoredSession(null);
     setIsLoggedIn(false);
     setCurrentUser(null);
+    setDataLoaded(false); // Reset so data reloads on next login
   };
 
   const handleUpdateProfile = (updatedUser: UserProfile) => {

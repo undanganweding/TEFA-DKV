@@ -1,6 +1,18 @@
 import React, { useState } from 'react';
-import { registerStudentAccount, RegisterStudentInput } from '../utils/authStore';
-import { AvatarCropModal } from '../components/AvatarCropModal';
+import * as authService from '../../services/authService';
+import { AvatarCropModal } from '../AvatarCropModal';
+
+interface RegisterStudentInput {
+  name: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
+  nis: string;
+  studentClass: string;
+  major: string;
+  whatsapp: string;
+  avatar?: string;
+}
 
 interface StudentRegisterViewProps {
   onSwitchToLogin: () => void;
@@ -74,21 +86,30 @@ export const StudentRegisterView: React.FC<StudentRegisterViewProps> = ({
 
     setLoading(true);
 
-    // Simulate network delay
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    try {
+      const result = await authService.signUp({
+        name: form.name,
+        email: form.email,
+        password: form.password,
+        nis: form.nis,
+        studentClass: form.studentClass,
+        major: form.major,
+        whatsapp: form.whatsapp,
+      });
 
-    const result = registerStudentAccount(form);
-
-    if (result.success) {
-      setShowSuccess(true);
-      setTimeout(() => {
-        onRegisterSuccess();
-      }, 3000);
-    } else {
-      setError(result.message || 'Terjadi kesalahan saat registrasi');
+      if (result.success) {
+        setShowSuccess(true);
+        setTimeout(() => {
+          onRegisterSuccess();
+        }, 3000);
+      } else {
+        setError(result.message || 'Terjadi kesalahan saat registrasi');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Terjadi kesalahan sistem');
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   const majorOptions = [

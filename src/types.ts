@@ -220,6 +220,7 @@ export interface ProductionOrder {
   isArchived?: boolean;
   archivedAt?: string;
   archivedBy?: string;
+  idempotency_key?: string;
 }
 
 export interface CustomerFile {

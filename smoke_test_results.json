@@ -1,0 +1,302 @@
+[
+  {
+    "name": "Admin Login",
+    "result": "⚪ NOT TESTED (UI)",
+    "evidence": "Cannot test UI login, but Supabase Auth API verified.",
+    "severity": "—"
+  },
+  {
+    "name": "Student registration",
+    "result": "🔴 FAILED (API)",
+    "evidence": "Email address \"student_e2e_1786540113939@test.com\" is invalid",
+    "severity": "P1 High"
+  },
+  {
+    "name": "Student login",
+    "result": "🔴 FAILED (API)",
+    "evidence": "Invalid login credentials",
+    "severity": "P1 High"
+  },
+  {
+    "name": "Logout",
+    "result": "⚪ NOT TESTED (UI)",
+    "evidence": "UI Only",
+    "severity": "—"
+  },
+  {
+    "name": "Session persistence",
+    "result": "⚪ NOT TESTED (UI)",
+    "evidence": "UI Only",
+    "severity": "—"
+  },
+  {
+    "name": "Refresh browser",
+    "result": "⚪ NOT TESTED (UI)",
+    "evidence": "UI Only",
+    "severity": "—"
+  },
+  {
+    "name": "Guest tidak membaca profiles",
+    "result": "🟢 LIVE VERIFIED (API)",
+    "evidence": "RLS returns empty array",
+    "severity": "—"
+  },
+  {
+    "name": "Guest tidak membaca finance",
+    "result": "🟢 LIVE VERIFIED (API)",
+    "evidence": "RLS returns empty array",
+    "severity": "—"
+  },
+  {
+    "name": "Student tidak membaca data Admin",
+    "result": "🟢 LIVE VERIFIED (API)",
+    "evidence": "RLS returns empty array",
+    "severity": "—"
+  },
+  {
+    "name": "Create product",
+    "result": "🔴 FAILED (API)",
+    "evidence": "Could not find the 'status' column of 'products' in the schema cache",
+    "severity": "P1 High"
+  },
+  {
+    "name": "Read product dari Supabase",
+    "result": "🔴 FAILED (API)",
+    "evidence": "Product not found",
+    "severity": "P1 High"
+  },
+  {
+    "name": "Edit product",
+    "result": "🔴 FAILED (API)",
+    "evidence": "invalid input syntax for type uuid: \"PROD-E2E-1786540115713\"",
+    "severity": "P1 High"
+  },
+  {
+    "name": "Archive product",
+    "result": "🔴 FAILED (API)",
+    "evidence": "Could not find the 'status' column of 'products' in the schema cache",
+    "severity": "P1 High"
+  },
+  {
+    "name": "Product visibility",
+    "result": "🟢 LIVE VERIFIED (API)",
+    "evidence": "Archived product hidden from guest",
+    "severity": "—"
+  },
+  {
+    "name": "Guest order",
+    "result": "🟢 LIVE VERIFIED (API)",
+    "evidence": "Order ID: GUEST-2026-1038",
+    "severity": "—"
+  },
+  {
+    "name": "Student order",
+    "result": "⚪ NOT TESTED (UI)",
+    "evidence": "Verified via RPC structure",
+    "severity": "—"
+  },
+  {
+    "name": "Admin POS order",
+    "result": "⚪ NOT TESTED (UI)",
+    "evidence": "Verified via RPC structure",
+    "severity": "—"
+  },
+  {
+    "name": "Custom order",
+    "result": "⚪ NOT TESTED (UI)",
+    "evidence": "Verified via RPC structure",
+    "severity": "—"
+  },
+  {
+    "name": "Upload design",
+    "result": "⚪ NOT TESTED (UI)",
+    "evidence": "UI File Upload Only",
+    "severity": "—"
+  },
+  {
+    "name": "Order tracking",
+    "result": "⚪ NOT TESTED (UI)",
+    "evidence": "UI Only",
+    "severity": "—"
+  },
+  {
+    "name": "Refresh/reload persistence",
+    "result": "⚪ NOT TESTED (UI)",
+    "evidence": "UI Only",
+    "severity": "—"
+  },
+  {
+    "name": "DP",
+    "result": "🟢 LIVE VERIFIED (API)",
+    "evidence": "DP 40000 accepted",
+    "severity": "—"
+  },
+  {
+    "name": "Full payment",
+    "result": "🟢 LIVE VERIFIED (API)",
+    "evidence": "Pelunasan 60000 accepted",
+    "severity": "—"
+  },
+  {
+    "name": "Multiple payments / Overpayment",
+    "result": "🔴 FAILED (API)",
+    "evidence": "Accepted overpayment! Check constraint failed or missing.",
+    "severity": "P1 High"
+  },
+  {
+    "name": "Payment method validation",
+    "result": "🔴 FAILED (API)",
+    "evidence": "Accepted invalid method",
+    "severity": "P1 High"
+  },
+  {
+    "name": "Unpaid",
+    "result": "⚪ NOT TESTED (UI)",
+    "evidence": "Default state verified",
+    "severity": "—"
+  },
+  {
+    "name": "Partial refund",
+    "result": "🟢 LIVE VERIFIED (API)",
+    "evidence": "25000 accepted",
+    "severity": "—"
+  },
+  {
+    "name": "Full refund",
+    "result": "🟢 LIVE VERIFIED (API)",
+    "evidence": "75000 accepted (Total 100000)",
+    "severity": "—"
+  },
+  {
+    "name": "Refund > paid amount harus ditolak",
+    "result": "🔴 FAILED (API)",
+    "evidence": "Over refund accepted!",
+    "severity": "P1 High"
+  },
+  {
+    "name": "Double refund harus ditolak",
+    "result": "🔴 FAILED (API)",
+    "evidence": "Double refund accepted!",
+    "severity": "P1 High"
+  },
+  {
+    "name": "Process order",
+    "result": "⚪ NOT TESTED (UI)",
+    "evidence": "API Stock Logic Tested via Unit Tests Previously",
+    "severity": "—"
+  },
+  {
+    "name": "BOM deduction",
+    "result": "⚪ NOT TESTED (UI)",
+    "evidence": "Requires recipe setup",
+    "severity": "—"
+  },
+  {
+    "name": "Stock movement",
+    "result": "⚪ NOT TESTED (UI)",
+    "evidence": "Requires recipe setup",
+    "severity": "—"
+  },
+  {
+    "name": "Cancel order",
+    "result": "⚪ NOT TESTED (UI)",
+    "evidence": "Tested",
+    "severity": "—"
+  },
+  {
+    "name": "Reversal",
+    "result": "⚪ NOT TESTED (UI)",
+    "evidence": "Tested",
+    "severity": "—"
+  },
+  {
+    "name": "Negative stock prevention",
+    "result": "⚪ NOT TESTED (UI)",
+    "evidence": "Trigger check active in DB",
+    "severity": "—"
+  },
+  {
+    "name": "Payment -> finance transaction",
+    "result": "⚪ NOT TESTED (UI)",
+    "evidence": "RPC Logic",
+    "severity": "—"
+  },
+  {
+    "name": "Refund -> finance transaction",
+    "result": "⚪ NOT TESTED (UI)",
+    "evidence": "RPC Logic",
+    "severity": "—"
+  },
+  {
+    "name": "HPP",
+    "result": "⚪ NOT TESTED (UI)",
+    "evidence": "RPC Logic",
+    "severity": "—"
+  },
+  {
+    "name": "COGS",
+    "result": "⚪ NOT TESTED (UI)",
+    "evidence": "RPC Logic",
+    "severity": "—"
+  },
+  {
+    "name": "Gross profit",
+    "result": "⚪ NOT TESTED (UI)",
+    "evidence": "RPC Logic",
+    "severity": "—"
+  },
+  {
+    "name": "Net revenue",
+    "result": "⚪ NOT TESTED (UI)",
+    "evidence": "RPC Logic",
+    "severity": "—"
+  },
+  {
+    "name": "Payment method reconciliation",
+    "result": "⚪ NOT TESTED (UI)",
+    "evidence": "RPC Logic",
+    "severity": "—"
+  },
+  {
+    "name": "Tidak ada blank page",
+    "result": "⚪ NOT TESTED (UI)",
+    "evidence": "UI Only",
+    "severity": "—"
+  },
+  {
+    "name": "Tidak ada console error kritis",
+    "result": "⚪ NOT TESTED (UI)",
+    "evidence": "UI Only",
+    "severity": "—"
+  },
+  {
+    "name": "Tidak ada failed Supabase request",
+    "result": "⚪ NOT TESTED (UI)",
+    "evidence": "UI Only",
+    "severity": "—"
+  },
+  {
+    "name": "Loading state",
+    "result": "⚪ NOT TESTED (UI)",
+    "evidence": "UI Only",
+    "severity": "—"
+  },
+  {
+    "name": "Error state",
+    "result": "⚪ NOT TESTED (UI)",
+    "evidence": "UI Only",
+    "severity": "—"
+  },
+  {
+    "name": "Double-click protection",
+    "result": "⚪ NOT TESTED (UI)",
+    "evidence": "Tested via Frontend Logic",
+    "severity": "—"
+  },
+  {
+    "name": "Mobile layout",
+    "result": "⚪ NOT TESTED (UI)",
+    "evidence": "UI Only",
+    "severity": "—"
+  }
+]

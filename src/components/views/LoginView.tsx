@@ -1,12 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile } from '../../types';
-import {
-  authenticateUser,
-  registerStudentAccount,
-  resetUserPassword,
-  createGuestUser,
-} from '../../utils/authStore';
+import { createGuestUser } from '../../utils/authStore';
+import * as authService from '../../services/authService';
 import { AvatarCropModal } from '../AvatarCropModal';
 import { getLoginSlides, SlideItem } from '../../utils/loginContentStore';
 
@@ -94,10 +90,9 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
 
     setIsLoading(true);
 
-    setTimeout(() => {
-      const result = authenticateUser(emailOrUsername, password);
+    // Async login with Supabase
+    authService.signIn(emailOrUsername, password).then((result) => {
       setIsLoading(false);
-
       if (!result.success || !result.user) {
         setErrorMessage(result.message || 'Otentikasi gagal.');
         return;
@@ -109,7 +104,10 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
       setTimeout(() => {
         onLoginSuccess(user);
       }, 800);
-    }, 900);
+    }).catch((err) => {
+      setIsLoading(false);
+      setErrorMessage(err.message || 'Terjadi kesalahan sistem.');
+    });
   };
 
   // Submit Student Registration
@@ -134,25 +132,28 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
       setErrorMessage('Nomor WhatsApp wajib diisi.');
       return;
     }
+    if (!regPassword || regPassword.length < 8) {
+      setErrorMessage('Password minimal 8 karakter.');
+      return;
+    }
+    if (regPassword !== regConfirmPassword) {
+      setErrorMessage('Konfirmasi password tidak cocok.');
+      return;
+    }
 
     setIsLoading(true);
 
-    setTimeout(() => {
-      const result = registerStudentAccount({
-        name: regName,
-        email: regEmail,
-        password: regPassword,
-        confirmPassword: regConfirmPassword,
-        nis: regNis,
-        studentClass: regClass,
-        major: regMajor,
-        whatsapp: regWhatsapp,
-        avatar: regAvatarUrl,
-      });
-
+    authService.signUp({
+      name: regName,
+      email: regEmail,
+      password: regPassword,
+      nis: regNis,
+      studentClass: regClass,
+      major: regMajor,
+      whatsapp: regWhatsapp,
+    }).then((result) => {
       setIsLoading(false);
-
-      if (!result.success || !result.user) {
+      if (!result.success) {
         setErrorMessage(result.message || 'Pendaftaran gagal.');
         return;
       }
@@ -161,12 +162,15 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
 
       // Reset form & redirect to login after short delay
       setTimeout(() => {
-        setEmailOrUsername(result.user!.email);
+        setEmailOrUsername(regEmail);
         setPassword(regPassword);
         setActiveTab('login');
         setSuccessToast('Akun Anda telah terdaftar dan menunggu persetujuan admin.');
       }, 2000);
-    }, 900);
+    }).catch((err) => {
+      setIsLoading(false);
+      setErrorMessage(err.message || 'Terjadi kesalahan sistem.');
+    });
   };
 
   // Submit Forgot Password Step 1
@@ -179,7 +183,19 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
       return;
     }
 
-    setForgotStep(2);
+    setIsLoading(true);
+    authService.resetPassword(forgotEmail).then((res) => {
+      setIsLoading(false);
+      if (!res.success) {
+        setErrorMessage(res.message);
+        return;
+      }
+      setSuccessToast(res.message);
+      setForgotStep(2);
+    }).catch((err) => {
+      setIsLoading(false);
+      setErrorMessage(err.message || 'Gagal mengirim email reset.');
+    });
   };
 
   // Submit Forgot Password Step 2 (Reset)
@@ -187,16 +203,9 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
     e.preventDefault();
     setErrorMessage(null);
 
-    const res = resetUserPassword(forgotEmail, newPasswordInput);
-    if (!res.success) {
-      setErrorMessage(res.message);
-      return;
-    }
-
-    setSuccessToast(res.message);
+    // Prompt user that password can be updated in profiles on next login or via dashboard
+    setSuccessToast('Reset password berhasil! Silakan periksa inbox email Anda untuk memulihkan sandi.');
     setTimeout(() => {
-      setEmailOrUsername(forgotEmail);
-      setPassword(newPasswordInput);
       setActiveTab('login');
       setForgotStep(1);
       setForgotEmail('');

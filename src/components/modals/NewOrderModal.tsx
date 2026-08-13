@@ -105,7 +105,7 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
       institution,
       orderDate: todayStr,
       dueDate: dueDateStr,
-      status: 'Antrian',
+      status: 'Menunggu Admin',
       paymentStatus,
       paymentMethod,
       items,
@@ -120,7 +120,7 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
       designNotes,
       statusHistory: [
         { status: 'Draft', timestamp: now.toLocaleString('id-ID'), updatedBy: operatorName },
-        { status: 'Antrian', timestamp: now.toLocaleString('id-ID'), updatedBy: operatorName },
+        { status: 'Menunggu Admin', timestamp: now.toLocaleString('id-ID'), updatedBy: operatorName },
       ],
     };
 

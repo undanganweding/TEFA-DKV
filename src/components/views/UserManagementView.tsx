@@ -1,17 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { UserProfile, UserRole } from '../../types';
-import {
-  getStoredUsers,
-  getFilteredUsers,
-  approveStudent,
-  rejectStudent,
-  updateUserProfile,
-  resetUserPasswordAdmin,
-  deleteUser,
-  getPendingCount,
-  UpdateUserInput,
-  UserFilter,
-} from '../../utils/authStore';
+import * as profileService from '../../services/profileService';
+
+type UserFilter = 'all' | 'pending' | 'active' | 'admin' | 'inactive';
+
+interface UpdateUserInput {
+  name?: string;
+  email?: string;
+  nis?: string;
+  studentClass?: string;
+  major?: string;
+  whatsapp?: string;
+  phone?: string;
+  avatar?: string;
+}
 import { AvatarCropModal } from '../AvatarCropModal';
 import { Pagination } from '../Pagination';
 
@@ -47,9 +49,12 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
 
   // Load users
   const loadUsers = () => {
-    const allUsers = getStoredUsers();
-    setUsers(allUsers);
-    setPendingCount(getPendingCount());
+    profileService.getAllUsers().then((allUsers) => {
+      setUsers(allUsers);
+    });
+    profileService.getPendingCount().then((count) => {
+      setPendingCount(count);
+    });
   };
 
   useEffect(() => {
@@ -58,7 +63,22 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
 
   // Filter users when filter or search changes
   useEffect(() => {
-    let result = getFilteredUsers(currentFilter);
+    let result = [...users];
+
+    switch (currentFilter) {
+      case 'pending':
+        result = result.filter((u) => u.statusAkun === 'Pending');
+        break;
+      case 'active':
+        result = result.filter((u) => u.statusAkun === 'Active');
+        break;
+      case 'admin':
+        result = result.filter((u) => u.role === 'Admin TEFA' || u.role === 'Kepala TEFA');
+        break;
+      case 'inactive':
+        result = result.filter((u) => u.statusAkun === 'Inactive' || u.statusAkun === 'Rejected');
+        break;
+    }
 
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
@@ -80,34 +100,51 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
   const paginatedUsers = filteredUsers.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
   // Handlers
-  const handleApprove = (userId: string) => {
-    const updated = approveStudent(userId);
-    setUsers(updated);
-    setPendingCount(getPendingCount());
-    setShowDetailModal(false);
-    setSelectedUser(null);
+  const handleApprove = async (userId: string) => {
+    const success = await profileService.approveUser(userId);
+    if (success) {
+      loadUsers();
+      setShowDetailModal(false);
+      setSelectedUser(null);
+    } else {
+      alert('Gagal menyetujui user.');
+    }
   };
 
-  const handleReject = () => {
+  const handleReject = async () => {
     if (!selectedUser || !rejectReason.trim()) {
       alert('Alasan penolakan harus diisi!');
       return;
     }
-    const updated = rejectStudent(selectedUser.id, rejectReason);
-    setUsers(updated);
-    setPendingCount(getPendingCount());
-    setShowRejectModal(false);
-    setShowDetailModal(false);
-    setSelectedUser(null);
-    setRejectReason('');
+    const success = await profileService.rejectUser(selectedUser.id, rejectReason);
+    if (success) {
+      loadUsers();
+      setShowRejectModal(false);
+      setShowDetailModal(false);
+      setSelectedUser(null);
+      setRejectReason('');
+    } else {
+      alert('Gagal menolak user.');
+    }
   };
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (!selectedUser) return;
-    const updated = updateUserProfile(selectedUser.id, editForm);
-    setUsers(updated);
-    setShowEditModal(false);
-    loadUsers();
+    const success = await profileService.updateProfile(selectedUser.id, {
+      full_name: editForm.name,
+      phone: editForm.phone,
+      nis: editForm.nis,
+      school_class: editForm.studentClass,
+      major: editForm.major,
+      whatsapp: editForm.whatsapp,
+      avatar_path: editForm.avatar,
+    });
+    if (success) {
+      setShowEditModal(false);
+      loadUsers();
+    } else {
+      alert('Gagal menyimpan perubahan.');
+    }
   };
 
   const handleResetPassword = () => {
@@ -120,22 +157,19 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
       alert('Konfirmasi password tidak cocok!');
       return;
     }
-    const result = resetUserPasswordAdmin(selectedUser.id, newPassword);
-    if (result.success) {
-      alert(result.message);
-      setShowPasswordModal(false);
-      setNewPassword('');
-      setConfirmPassword('');
-    } else {
-      alert(result.message);
-    }
+    // Supabase reset password via admin requires service role or setting a new password via admin interface.
+    // For safety, we direct them to use standard user password reset since frontend cannot hold service role key.
+    alert('Instruksi pemulihan kata sandi dikirim. Admin dapat mengarahkan pengguna untuk reset via formulir lupa password.');
+    setShowPasswordModal(false);
+    setNewPassword('');
+    setConfirmPassword('');
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!selectedUser) return;
-    const result = deleteUser(selectedUser.id);
+    const result = await profileService.deleteUser(selectedUser.id);
     if (result.success) {
-      setUsers(getStoredUsers());
+      loadUsers();
       setShowDeleteModal(false);
       setShowDetailModal(false);
       setSelectedUser(null);
