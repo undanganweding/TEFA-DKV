@@ -201,7 +201,16 @@ export async function signUp(input: {
     await supabase.auth.signOut();
   }
 
-  return { success: true, message: 'Registrasi berhasil!', user: data.user };
+  const resultUser = {
+    ...data.user,
+    full_name: data.user.user_metadata?.full_name || input.name,
+    school_class: data.user.user_metadata?.school_class || input.studentClass,
+    major: data.user.user_metadata?.major || input.major,
+    whatsapp: data.user.user_metadata?.whatsapp || input.whatsapp,
+    avatar_path: input.avatar || data.user.user_metadata?.avatar_path || null,
+  };
+
+  return { success: true, message: 'Registrasi berhasil!', user: resultUser };
 }
 
 export async function signOut(): Promise<void> {
