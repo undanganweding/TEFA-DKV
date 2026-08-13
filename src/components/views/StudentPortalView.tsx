@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { InboxFile, Product, ProductionOrder, UserProfile } from '../../types';
 import * as profileService from '../../services/profileService';
+import { initialProducts } from '../../data/mockData';
 import logoSmkNu from '../../assets/logo_smknu.png';
 
 interface StudentPortalViewProps {
@@ -191,8 +192,9 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
   const [avatarFileToUpload, setAvatarFileToUpload] = useState<File | null>(null);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState<boolean>(false);
 
-  // Filter Active Products from Admin Database
-  const activeProducts = products.filter((p) => p.status === 'Aktif' && !p.isArchived && p.showInCustomerPlatform !== false);
+  // Active Products & Fallback jika database Supabase belum di-seed
+  const sourceProducts = products && products.length > 0 ? products : initialProducts;
+  const activeProducts = sourceProducts.filter((p) => (p.status === 'Aktif' || !p.status) && !p.isArchived);
 
   // Categories Mapping
   const categoriesList = ['All', 'Printing', 'Foto', 'Sublim', 'Merchandise', 'Desain'];
