@@ -15,4 +15,12 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     persistSession: true,
     detectSessionInUrl: true,
   },
+  global: {
+    fetch: (url, options) => {
+      return fetch(url, {
+        ...options,
+        keepalive: true,
+      });
+    },
+  },
 });

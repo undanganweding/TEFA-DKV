@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { InboxFile, Product, ProductionOrder, UserProfile } from '../../types';
 import * as profileService from '../../services/profileService';
+import logoSmkNu from '../../assets/logo_smknu.png';
 
 interface StudentPortalViewProps {
   products: Product[];
@@ -96,20 +97,16 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
     totalAmount: number;
   } | null>(null);
 
-  // Notification Drawer State
+  // Notification Drawer State - Dynamic & Real-time from Student Orders & Inbox
   const [showNotificationDrawer, setShowNotificationDrawer] = useState<boolean>(false);
-  const [notifications, setNotifications] = useState([
-    { id: 'n1', title: 'Order TEFA-2026-88123 Diterima', text: 'File desain kamu telah diverifikasi oleh tim operator TEFA.', time: '10 menit yang lalu', unread: true },
-    { id: 'n2', title: 'Pesanan Masuk Tahap Produksi', text: 'Cetak Banner Flexi 3x1m sedang diproses pada mesin outdoor.', time: '2 jam yang lalu', unread: true },
-    { id: 'n3', title: 'Pesanan Selesai!', text: 'Order TEFA-2026-77341 siap diambil di Studio TEFA DKV.', time: '1 hari yang lalu', unread: false },
-  ]);
+  const [notifications, setNotifications] = useState<Array<{ id: string; title: string; text: string; time: string; unread: boolean }>>([]);
 
   // Profile Edit State & Avatar Upload Modal
   const [profileAvatar, setProfileAvatar] = useState<string>(
     currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&q=80'
   );
 
-  // Sync state with currentUser changes (important after hydration or fetch completes)
+  // Sync state with currentUser changes & generate Real-time Notifications from actual student orders
   useEffect(() => {
     if (currentUser) {
       setCustomerName(currentUser.name || 'Ahmad Fauzi');
@@ -123,6 +120,71 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
       );
     }
   }, [currentUser]);
+
+  // Generate Realtime Notifications based on real student orders & inbox files
+  useEffect(() => {
+    const studentEmail = currentUser?.email?.toLowerCase().trim();
+    const studentName = currentUser?.name?.toLowerCase().trim();
+
+    // Filter orders matching current student
+    const myOrders = orders.filter((o) => {
+      if (!o) return false;
+      const matchEmail = studentEmail && o.customerEmail?.toLowerCase().trim() === studentEmail;
+      const matchName = studentName && o.customerName?.toLowerCase().trim() === studentName;
+      return matchEmail || matchName;
+    });
+
+    const generatedNotifs: Array<{ id: string; title: string; text: string; time: string; unread: boolean }> = [];
+
+    myOrders.forEach((o) => {
+      const itemsText = o.items.map((i) => i.productName).join(', ');
+      if (o.status === 'Selesai') {
+        generatedNotifs.push({
+          id: `notif-done-${o.id}`,
+          title: `Pesanan ${o.orderNo} Selesai! 🎉`,
+          text: `Pesanan (${itemsText}) telah selesai dikerjakan dan siap diambil di Studio TEFA DKV.`,
+          time: o.orderDate || 'Baru saja',
+          unread: true,
+        });
+      } else if (o.status === 'Proses Cetak' || o.status === 'Finishing') {
+        generatedNotifs.push({
+          id: `notif-prod-${o.id}`,
+          title: `Pesanan ${o.orderNo} Dalam Produksi`,
+          text: `Pesanan (${itemsText}) sedang diproses pada tahap ${o.status}.`,
+          time: o.orderDate || 'Hari ini',
+          unread: true,
+        });
+      } else if (o.status === 'File Disetujui') {
+        generatedNotifs.push({
+          id: `notif-app-${o.id}`,
+          title: `File ${o.orderNo} Disetujui`,
+          text: `File desain kamu telah diverifikasi & disetujui operator TEFA.`,
+          time: o.orderDate || 'Hari ini',
+          unread: true,
+        });
+      } else {
+        generatedNotifs.push({
+          id: `notif-recv-${o.id}`,
+          title: `Pesanan ${o.orderNo} Diterima`,
+          text: `Pesanan kamu (${itemsText}) dalam antrean status: ${o.status}.`,
+          time: o.orderDate || 'Baru saja',
+          unread: false,
+        });
+      }
+    });
+
+    if (generatedNotifs.length === 0) {
+      generatedNotifs.push({
+        id: 'notif-welcome',
+        title: 'Selamat Datang di Portal Siswa TEFA!',
+        text: 'Setiap perkembangan status pesanan cetak kamu akan diperbarui secara otomatis di sini.',
+        time: 'Baru saja',
+        unread: false,
+      });
+    }
+
+    setNotifications(generatedNotifs);
+  }, [orders, inboxFiles, currentUser]);
 
   const [showAvatarCropModal, setShowAvatarCropModal] = useState<boolean>(false);
   const [tempAvatarPreview, setTempAvatarPreview] = useState<string | null>(null);
@@ -346,8 +408,8 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
               onClick={() => setActiveNav('dashboard')}
               className="flex items-center gap-3 cursor-pointer group"
             >
-              <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#5B4BFF] via-purple-600 to-[#3BA7FF] flex items-center justify-center text-white shadow-lg shadow-purple-900/40 border border-white/20 group-hover:scale-105 transition-all">
-                <span className="material-symbols-outlined text-xl">school</span>
+              <div className="w-10 h-10 rounded-2xl bg-white flex items-center justify-center text-white shadow-lg shadow-purple-900/40 border border-white/20 group-hover:scale-105 transition-all overflow-hidden shrink-0">
+                <img src={logoSmkNu} alt="Logo SMK NU Ungaran" className="w-full h-full object-cover" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
@@ -448,17 +510,7 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
               </div>
             </div>
 
-            {/* Switch to Admin Platform */}
-            {onSwitchToAdmin && (
-              <button
-                onClick={onSwitchToAdmin}
-                className="bg-gradient-to-r from-[#5B4BFF] to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white font-extrabold text-xs px-3.5 py-2 rounded-2xl transition-all flex items-center gap-1.5 shadow-md shadow-purple-900/30 cursor-pointer shrink-0"
-                title="Buka Platform Admin TEFA"
-              >
-                <span className="material-symbols-outlined text-base">admin_panel_settings</span>
-                <span className="hidden lg:inline">Admin Mode</span>
-              </button>
-            )}
+
 
             {/* Logout Button */}
             {onLogout && (
