@@ -88,8 +88,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       return true; // Full Access
     }
     if (role === 'Admin TEFA' || role === 'Guru / Operator') {
-      // Management Access: Produk, Order (Pesanan), File (Inbox & Customer File), Produksi, Customer, Inventaris (Alat & Stok), Kasir, Dashboard, Kelola Login
-      return ['dashboard', 'kasir', 'file_inbox', 'pesanan', 'produk', 'inventaris_alat', 'stok_bahan', 'kelola_login'].includes(item.id);
+      // Management Access: Produk, Order (Pesanan), File (Inbox & Customer File), Produksi, Customer, Inventaris (Alat & Stok), Kasir, Dashboard, Kelola Login, Manajemen User
+      return ['dashboard', 'kasir', 'file_inbox', 'pesanan', 'produk', 'inventaris_alat', 'stok_bahan', 'kelola_login', 'manajemen_user'].includes(item.id);
     }
     return true;
   });
@@ -278,4 +278,3 @@ export const Sidebar: React.FC<SidebarProps> = ({
     </aside>
   );
 };
-
