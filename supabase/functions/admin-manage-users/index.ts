@@ -62,27 +62,11 @@ serve(async (req) => {
     const { action } = body
 
     if (action === 'list') {
-      // Get all auth users
-      const { data: authData, error: authErr } = await supabaseAdmin.auth.admin.listUsers()
-      if (authErr) throw authErr
+      // Execute the RPC to safely get all users with their auth data via Postgres
+      const { data: mergedData, error: rpcErr } = await supabaseAdmin.rpc('get_all_users_admin')
+      if (rpcErr) throw rpcErr
 
-      // Get all profiles
-      const { data: profiles, error: profErr } = await supabaseAdmin.from('profiles').select('*')
-      if (profErr) throw profErr
-
-      // Merge data
-      const merged = profiles.map(p => {
-        const authUser = authData.users.find(u => u.id === p.id)
-        return {
-          ...p,
-          email: authUser?.email || '',
-          email_confirmed_at: authUser?.email_confirmed_at || null,
-          last_sign_in_at: authUser?.last_sign_in_at || null,
-          created_at: authUser?.created_at || p.created_at
-        }
-      })
-
-      return new Response(JSON.stringify({ success: true, data: merged }), {
+      return new Response(JSON.stringify({ success: true, data: mergedData }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     } 
