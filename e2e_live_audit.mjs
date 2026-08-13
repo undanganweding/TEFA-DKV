@@ -86,7 +86,7 @@ async function runAudit() {
 
   console.log("\n=== PHASE 8, 9, 10, 11, 12: POS, PAYMENT, REFUND & FINANCE AUDIT ===");
   // Using service role to bypass auth for POS actions
-  const serviceRoleKey = 'process.env.SUPABASE_SERVICE_ROLE_KEY';
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const adminClient = createClient(supabaseUrl, serviceRoleKey);
   // I can use the admin password: 'punyadkv123' and admin email from INITIAL_ACCOUNTS to login via Auth!
   
