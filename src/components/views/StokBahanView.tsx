@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MaterialStock, StockMovement, FinanceTransaction } from '../../types';
 import { Pagination } from '../Pagination';
@@ -127,34 +127,36 @@ export const StokBahanView: React.FC<StokBahanViewProps> = ({
   // ==========================================
   // DASHBOARD CALCULATIONS
   // ==========================================
-  const totalMaterialTypes = materials.length;
-  const totalInventoryValue = materials.reduce((acc, m) => {
+  const totalMaterialTypes = useMemo(() => materials.length, [materials]);
+  const totalInventoryValue = useMemo(() => materials.reduce((acc, m) => {
     const cost = m.costPrice ?? m.unitPrice ?? 0;
     return acc + m.currentStock * cost;
-  }, 0);
+  }, 0), [materials]);
 
-  const lowStockCount = materials.filter(
+  const lowStockCount = useMemo(() => materials.filter(
     (m) => m.status === 'Menipis' || (m.currentStock > 0 && m.currentStock <= m.minStock)
-  ).length;
+  ).length, [materials]);
 
-  const criticalStockCount = materials.filter(
+  const criticalStockCount = useMemo(() => materials.filter(
     (m) => m.status === 'Kritis' || m.currentStock === 0
-  ).length;
+  ).length, [materials]);
 
   // ==========================================
   // FILTERING LOGIC
   // ==========================================
-  const filteredMaterials = materials.filter((m) => {
-    const matchStatus = selectedStatus === 'Semua' || m.status === selectedStatus;
-    const matchCategory = selectedCategory === 'Semua' || m.category === selectedCategory;
-    const q = searchQuery.toLowerCase();
-    const matchSearch =
-      m.name.toLowerCase().includes(q) ||
-      m.code.toLowerCase().includes(q) ||
-      m.supplier.toLowerCase().includes(q) ||
-      m.location.toLowerCase().includes(q);
-    return matchStatus && matchCategory && matchSearch;
-  });
+  const filteredMaterials = useMemo(() => {
+    return materials.filter((m) => {
+      const matchStatus = selectedStatus === 'Semua' || m.status === selectedStatus;
+      const matchCategory = selectedCategory === 'Semua' || m.category === selectedCategory;
+      const q = searchQuery.toLowerCase();
+      const matchSearch =
+        m.name.toLowerCase().includes(q) ||
+        m.code.toLowerCase().includes(q) ||
+        m.supplier.toLowerCase().includes(q) ||
+        m.location.toLowerCase().includes(q);
+      return matchStatus && matchCategory && matchSearch;
+    });
+  }, [materials, selectedStatus, selectedCategory, searchQuery]);
 
   useEffect(() => {
     setCurrentPage(1);

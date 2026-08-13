@@ -56,6 +56,7 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const [showNotifMenu, setShowNotifMenu] = useState<boolean>(false);
   const [isSearchFocused, setIsSearchFocused] = useState<boolean>(false);
+  const [localQuery, setLocalQuery] = useState<string>(searchQuery);
   const [addedNotice, setAddedNotice] = useState<string | null>(null);
   const [recentSearches, setRecentSearches] = useState<string[]>([
     'Banner Flexi',
@@ -80,6 +81,20 @@ export const Header: React.FC<HeaderProps> = ({
       }, 50);
     }
   }, [isSearchFocused]);
+
+  // Debounce search query
+  useEffect(() => {
+    setLocalQuery(searchQuery);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      if (localQuery !== searchQuery) {
+        onSearchChange(localQuery);
+      }
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [localQuery, searchQuery, onSearchChange]);
 
   // Keyboard shortcut listener (Ctrl+K or / or ESC)
   useEffect(() => {
@@ -148,7 +163,7 @@ export const Header: React.FC<HeaderProps> = ({
   ];
 
   // Safe Smart Search Computations (Protected against exceptions)
-  const q = searchQuery.trim().toLowerCase();
+  const q = localQuery.trim().toLowerCase();
 
   const recentProducts = useMemo(() => {
     try {
@@ -563,8 +578,8 @@ export const Header: React.FC<HeaderProps> = ({
               <input
                 ref={searchModalInputRef}
                 type="text"
-                value={searchQuery}
-                onChange={(e) => onSearchChange(e.target.value)}
+                value={localQuery}
+                onChange={(e) => setLocalQuery(e.target.value)}
                 placeholder={
                   currentPage === 'kasir'
                     ? 'Cari produk, jasa, atau kode produk TEFA...'
@@ -574,10 +589,10 @@ export const Header: React.FC<HeaderProps> = ({
               />
 
               <div className="flex items-center gap-2 shrink-0">
-                {searchQuery ? (
+                {localQuery ? (
                   <button
                     type="button"
-                    onClick={() => onSearchChange('')}
+                    onClick={() => { setLocalQuery(''); onSearchChange(''); }}
                     className="w-6 h-6 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center text-xs transition-colors cursor-pointer"
                     title="Bersihkan"
                   >

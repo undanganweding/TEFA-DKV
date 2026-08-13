@@ -211,6 +211,7 @@ export const KasirView: React.FC<KasirViewProps> = ({
   const [customCostPrice, setCustomCostPrice] = useState<number>(0);
   const [customFileName, setCustomFileName] = useState<string>('');
   const [customSaveAsProduct, setCustomSaveAsProduct] = useState<boolean>(false);
+  const [isSubmittingCustom, setIsSubmittingCustom] = useState<boolean>(false);
 
   // Banner Dimension Modal
   const [activeBannerProduct, setActiveBannerProduct] = useState<Product | null>(null);
@@ -261,16 +262,18 @@ export const KasirView: React.FC<KasirViewProps> = ({
   const categories = ['Semua', 'Cetak Outdoor', 'Cetak Indoor / A3+', 'Merchandise', 'Desain & Creative'];
 
   // Filtered Catalog using global searchQuery and selected category
-  const filteredProducts = products.filter((p) => {
-    const matchCategory = selectedCategory === 'Semua' || p.category === selectedCategory;
-    const q = searchQuery.trim().toLowerCase();
-    const matchSearch =
-      !q ||
-      p.name.toLowerCase().includes(q) ||
-      p.code.toLowerCase().includes(q) ||
-      p.category.toLowerCase().includes(q);
-    return matchCategory && matchSearch && p.status === 'Aktif' && !p.isArchived;
-  });
+  const filteredProducts = useMemo(() => {
+    return products.filter((p) => {
+      const matchCategory = selectedCategory === 'Semua' || p.category === selectedCategory;
+      const q = searchQuery.trim().toLowerCase();
+      const matchSearch =
+        !q ||
+        p.name.toLowerCase().includes(q) ||
+        p.code.toLowerCase().includes(q) ||
+        p.category.toLowerCase().includes(q);
+      return matchCategory && matchSearch && p.status === 'Aktif' && !p.isArchived;
+    });
+  }, [products, selectedCategory, searchQuery]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -432,6 +435,7 @@ export const KasirView: React.FC<KasirViewProps> = ({
   // Custom Order Submit Handler
   const handleAddCustomOrderSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmittingCustom) return;
     if (!customProductName.trim()) {
       alert('Nama Layanan Custom tidak boleh kosong.');
       return;
@@ -441,7 +445,9 @@ export const KasirView: React.FC<KasirViewProps> = ({
       return;
     }
 
-    const itemCategory = mapCategoryToProductCategory(customCategory);
+    setIsSubmittingCustom(true);
+    setTimeout(() => {
+      const itemCategory = mapCategoryToProductCategory(customCategory);
 
     const newItem: CartItem = {
       id: 'CART-CUSTOM-' + Date.now(),
@@ -507,6 +513,8 @@ export const KasirView: React.FC<KasirViewProps> = ({
     setCustomCostPrice(0);
     setCustomFileName('');
     setCustomSaveAsProduct(false);
+    setIsSubmittingCustom(false);
+    }, 300); // give a small realistic delay
   };
 
   // Command Palette Results
@@ -998,19 +1006,26 @@ export const KasirView: React.FC<KasirViewProps> = ({
                   </label>
                 </div>
 
-                <div className="pt-3 flex items-center justify-end gap-2 border-t border-slate-100">
+                <div className="flex justify-end gap-2 pt-2">
                   <button
                     type="button"
                     onClick={() => setIsCustomModalOpen(false)}
-                    className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 font-extrabold text-slate-700 cursor-pointer"
+                    className="px-4 py-2 text-slate-500 hover:bg-slate-100 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                    disabled={isSubmittingCustom}
                   >
                     Batal
                   </button>
                   <button
                     type="submit"
-                    className="px-5 py-2 rounded-xl bg-[#5B4BFF] hover:bg-[#4a3ce6] text-white font-black shadow-xs cursor-pointer"
+                    disabled={isSubmittingCustom}
+                    className="bg-[#5B4BFF] hover:bg-purple-700 text-white px-5 py-2 rounded-xl text-xs font-black shadow-md shadow-purple-500/20 flex items-center gap-2 cursor-pointer disabled:bg-slate-400 disabled:cursor-not-allowed"
                   >
-                    + Masukkan Keranjang
+                    {isSubmittingCustom ? (
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    ) : (
+                      <span className="material-symbols-outlined text-sm">add_shopping_cart</span>
+                    )}
+                    <span>{isSubmittingCustom ? 'Menambahkan...' : 'Tambah ke Keranjang'}</span>
                   </button>
                 </div>
               </form>

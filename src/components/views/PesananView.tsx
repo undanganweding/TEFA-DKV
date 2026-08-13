@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion } from 'motion/react';
 import { ProductionOrder, OrderStatus } from '../../types';
 
@@ -64,36 +64,36 @@ export const PesananView: React.FC<PesananViewProps> = ({
     return 'Baru';
   };
 
-  // Stat Counters
-  const countBaru = orders.filter((o) => getSimpleStatus(o.status) === 'Baru').length;
-  const countDiproses = orders.filter((o) => getSimpleStatus(o.status) === 'Diproses').length;
-  const countSelesai = orders.filter((o) => getSimpleStatus(o.status) === 'Selesai').length;
-  const countDiterima = orders.filter(
-    (o) => getSimpleStatus(o.status) === 'Diterima'
-  ).length;
+  // Stat Counters (Memoized)
+  const countBaru = useMemo(() => orders.filter((o) => getSimpleStatus(o.status) === 'Baru').length, [orders]);
+  const countDiproses = useMemo(() => orders.filter((o) => getSimpleStatus(o.status) === 'Diproses').length, [orders]);
+  const countSelesai = useMemo(() => orders.filter((o) => getSimpleStatus(o.status) === 'Selesai').length, [orders]);
+  const countDiterima = useMemo(() => orders.filter((o) => getSimpleStatus(o.status) === 'Diterima').length, [orders]);
 
-  // Filter logic
-  const filteredOrders = orders.filter((order) => {
-    const simpleStatus = getSimpleStatus(order.status);
+  // Filter logic (Memoized)
+  const filteredOrders = useMemo(() => {
+    return orders.filter((order) => {
+      const simpleStatus = getSimpleStatus(order.status);
 
-    let matchStatus = true;
-    if (selectedFilter === 'Baru') matchStatus = simpleStatus === 'Baru';
-    else if (selectedFilter === 'Diproses') matchStatus = simpleStatus === 'Diproses';
-    else if (selectedFilter === 'Selesai') matchStatus = simpleStatus === 'Selesai';
-    else if (selectedFilter === 'Diterima') matchStatus = simpleStatus === 'Diterima';
+      let matchStatus = true;
+      if (selectedFilter === 'Baru') matchStatus = simpleStatus === 'Baru';
+      else if (selectedFilter === 'Diproses') matchStatus = simpleStatus === 'Diproses';
+      else if (selectedFilter === 'Selesai') matchStatus = simpleStatus === 'Selesai';
+      else if (selectedFilter === 'Diterima') matchStatus = simpleStatus === 'Diterima';
 
-    const mainProduct = order.items[0]?.productName || '';
-    const mainFile = order.items.find((i) => i.fileName)?.fileName || '';
+      const mainProduct = order.items[0]?.productName || '';
+      const mainFile = order.items.find((i) => i.fileName)?.fileName || '';
 
-    const matchSearch =
-      order.orderNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      order.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (order.institution && order.institution.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      mainProduct.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      mainFile.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchSearch =
+        order.orderNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        order.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (order.institution && order.institution.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        mainProduct.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        mainFile.toLowerCase().includes(searchQuery.toLowerCase());
 
-    return matchStatus && matchSearch;
-  });
+      return matchStatus && matchSearch;
+    });
+  }, [orders, selectedFilter, searchQuery]);
 
   const getStatusBadge = (status: OrderStatus) => {
     const simple = getSimpleStatus(status);
