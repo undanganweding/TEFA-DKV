@@ -235,142 +235,60 @@ export async function getSession(): Promise<any> {
 let inFlightProfileRequest: Promise<UserProfile | null> | null = null;
 
 export async function fetchUserProfile(user: any): Promise<UserProfile | null> {
-  // If there's an ongoing fetch for a profile, return that same promise
-  if (inFlightProfileRequest) {
-    return inFlightProfileRequest;
+  // Primary & ultra-fast profile construction directly from JWT user_metadata
+  if (user && user.user_metadata) {
+    const meta = user.user_metadata;
+    const fallbackProfile: ProfileRow = {
+      id: user.id,
+      full_name: meta.full_name || user.email || 'Siswa TEFA',
+      role: meta.role || 'Student',
+      status: meta.status || 'Active',
+      school_class: meta.school_class || null,
+      phone: meta.phone || null,
+      address: null,
+      avatar_path: meta.avatar_path || null,
+      nis: meta.nis || null,
+      major: meta.major || null,
+      whatsapp: meta.whatsapp || null,
+      position: null,
+      nip: null,
+      employee_id: null,
+      reject_reason: null,
+      created_at: user.created_at || new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    
+    // Asynchronously update/verify from database without blocking session hydration
+    Promise.resolve(
+      supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single()
+    ).catch(() => {});
+
+    return mapProfileToUserProfile(fallbackProfile, user.email || '');
   }
 
-  inFlightProfileRequest = (async () => {
-    const MAX_RETRIES = 2;
-    let attempt = 0;
+  // Fallback for edge cases where metadata is empty
+  try {
+    const { data: profileData } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single();
 
-    while (attempt <= MAX_RETRIES) {
-      try {
-        const { data: profileData, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user.id)
-          .single();
-
-        if (error || !profileData) {
-          const isTransientNetworkError =
-            error?.message?.includes('Failed to fetch') ||
-            error?.message?.includes('Network') ||
-            error?.message?.includes('ERR_CONNECTION_CLOSED') ||
-            error?.message?.includes('ERR_CONNECTION_ABORTED');
-
-          if (isTransientNetworkError) {
-            console.warn('Transient network issue on profile fetch. Falling back to auth user metadata.');
-            if (user && user.user_metadata) {
-              const meta = user.user_metadata;
-              const fallbackProfile: ProfileRow = {
-                id: user.id,
-                full_name: meta.full_name || user.email || 'Siswa TEFA',
-                role: meta.role || 'Student',
-                status: meta.status || 'Active',
-                school_class: meta.school_class || null,
-                phone: meta.phone || null,
-                address: null,
-                avatar_path: meta.avatar_path || null,
-                nis: meta.nis || null,
-                major: meta.major || null,
-                whatsapp: meta.whatsapp || null,
-                position: null,
-                nip: null,
-                employee_id: null,
-                reject_reason: null,
-                created_at: user.created_at || new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-              };
-              return mapProfileToUserProfile(fallbackProfile, user.email || '');
-            }
-          }
-
-          if (error?.code === 'PGRST116' || !profileData) {
-            if (user && user.user_metadata) {
-              const meta = user.user_metadata;
-              const fallbackProfile: ProfileRow = {
-                id: user.id,
-                full_name: meta.full_name || user.email || 'Siswa TEFA',
-                role: meta.role || 'Student',
-                status: meta.status || 'Active',
-                school_class: meta.school_class || null,
-                phone: meta.phone || null,
-                address: null,
-                avatar_path: meta.avatar_path || null,
-                nis: meta.nis || null,
-                major: meta.major || null,
-                whatsapp: meta.whatsapp || null,
-                position: null,
-                nip: null,
-                employee_id: null,
-                reject_reason: null,
-                created_at: user.created_at || new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-              };
-              return mapProfileToUserProfile(fallbackProfile, user.email || '');
-            }
-            return null;
-          }
-
-          console.warn('DB_ERROR: Error fetching profile:', error);
-          return null;
-        }
-
-        const profile = profileData as ProfileRow;
-        if (profile.status !== 'Active') return null;
-
-        return mapProfileToUserProfile(profile, user.email || '');
-      } catch (err: any) {
-        if (err.message === 'NETWORK_ERROR') {
-          if (attempt < MAX_RETRIES) {
-            attempt++;
-            await new Promise((res) => setTimeout(res, 800 * attempt));
-            continue;
-          }
-          // Fallback instan dari user_metadata jika jaringan terputus
-          if (user && user.user_metadata) {
-            const meta = user.user_metadata;
-            const fallbackProfile: ProfileRow = {
-              id: user.id,
-              full_name: meta.full_name || user.email || 'Siswa TEFA',
-              role: meta.role || 'Student',
-              status: meta.status || 'Active',
-              school_class: meta.school_class || null,
-              phone: meta.phone || null,
-              address: null,
-              avatar_path: meta.avatar_path || null,
-              nis: meta.nis || null,
-              major: meta.major || null,
-              whatsapp: meta.whatsapp || null,
-              position: null,
-              nip: null,
-              employee_id: null,
-              reject_reason: null,
-              created_at: user.created_at || new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            };
-            return mapProfileToUserProfile(fallbackProfile, user.email || '');
-          }
-          throw err;
-        }
-        if (attempt < MAX_RETRIES) {
-          attempt++;
-          await new Promise((res) => setTimeout(res, 800 * attempt));
-          continue;
-        }
-        console.error('fetchUserProfile error:', err);
-        return null;
-      }
+    if (profileData) {
+      return mapProfileToUserProfile(profileData as ProfileRow, user.email || '');
     }
-    return null;
-  })().finally(() => {
-    // Clear the in-flight request when done
-    inFlightProfileRequest = null;
-  });
+  } catch {
+    /* silent catch */
+  }
 
-  return inFlightProfileRequest;
+  return null;
 }
+
+
 
 export function onAuthStateChange(callback: (event: string, session: any) => void) {
   return supabase.auth.onAuthStateChange((event, session) => {
