@@ -147,38 +147,40 @@ export function App() {
         targetPage = route || 'dashboard'; // e.g. /admin/pesanan -> pesanan
       }
 
-      // 2. Fetch Supabase session
-      const supabaseUser = await authService.getSession();
-      
-      if (supabaseUser) {
-        setCurrentUser(supabaseUser);
-        setIsLoggedIn(true);
-        // If they are on a public path or login, redirect to their default
-        if (targetPage === 'public_upload' || targetPage === 'login') {
-          if (supabaseUser.role === 'Siswa' || supabaseUser.role === 'Guest') {
-            setCurrentPage('public_upload');
+      try {
+        // 2. Fetch Supabase session
+        const supabaseUser = await authService.getSession();
+        
+        if (supabaseUser) {
+          setCurrentUser(supabaseUser);
+          setIsLoggedIn(true);
+          // If they are on a public path or login, redirect to their default
+          if (targetPage === 'public_upload' || targetPage === 'login') {
+            if (supabaseUser.role === 'Siswa' || supabaseUser.role === 'Guest') {
+              setCurrentPage('public_upload');
+            } else {
+              setCurrentPage(supabaseUser.defaultPage || 'dashboard');
+            }
           } else {
-            setCurrentPage(supabaseUser.defaultPage || 'dashboard');
+            // If they are already on /admin/something, keep them there if allowed
+            if (supabaseUser.role === 'Siswa' || supabaseUser.role === 'Guest') {
+              setCurrentPage('public_upload');
+            } else {
+              setCurrentPage(targetPage);
+            }
           }
         } else {
-          // If they are already on /admin/something, keep them there if allowed
-          if (supabaseUser.role === 'Siswa' || supabaseUser.role === 'Guest') {
-            setCurrentPage('public_upload');
+          // No session: enforce routing protection
+          if (path.startsWith('/admin')) {
+            setCurrentPage('login');
+            window.history.replaceState({}, '', '/login');
           } else {
             setCurrentPage(targetPage);
           }
         }
-      } else {
-        // No session: enforce routing protection
-        if (path.startsWith('/admin')) {
-          setCurrentPage('login');
-          window.history.replaceState({}, '', '/login');
-        } else {
-          setCurrentPage(targetPage);
-        }
+      } finally {
+        setAuthInitializing(false);
       }
-      
-      setAuthInitializing(false);
     };
     initAuth();
 

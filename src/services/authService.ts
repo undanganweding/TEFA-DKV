@@ -158,7 +158,13 @@ export async function signOut(): Promise<void> {
 
 export async function getSession(): Promise<UserProfile | null> {
   try {
-    const { data: { session } } = await supabase.auth.getSession();
+    // 5-second timeout for session fetch to prevent infinite loading
+    const sessionPromise = supabase.auth.getSession();
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('Supabase auth session timeout')), 5000);
+    });
+    
+    const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]) as any;
     if (!session?.user) return null;
 
     const { data: profileData, error } = await supabase
@@ -184,12 +190,14 @@ export async function getSession(): Promise<UserProfile | null> {
 
 export function onAuthStateChange(callback: (user: UserProfile | null) => void) {
   return supabase.auth.onAuthStateChange(async (event, session) => {
-    try {
-      if (event === 'SIGNED_OUT' || !session?.user) {
-        callback(null);
-        return;
-      }
+    if (event === 'SIGNED_OUT' || !session?.user) {
+      callback(null);
+      return;
+    }
 
+    // Do profile fetching without blocking the auth event loop directly
+    // This prevents potential deadlocks if the profile fetch hangs
+    try {
       const { data: profileData, error } = await supabase
         .from('profiles')
         .select('*')
