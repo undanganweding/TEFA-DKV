@@ -65,13 +65,25 @@ import { AiAssistantModal } from './components/modals/AiAssistantModal';
 import { PersistentCartConfirmModal } from './components/modals/PersistentCartConfirmModal';
 import { GlobalDeleteModal, DeleteModalItemDetails } from './components/GlobalDeleteModal';
 
+// Helper to determine initial page from URL
+const getInitialPage = (): PageId | 'login' => {
+  const path = window.location.pathname;
+  if (path === '/login') return 'login';
+  if (path === '/') return 'public_upload';
+  if (path.startsWith('/admin')) {
+    const route = path.replace('/admin', '').substring(1) as PageId;
+    return route || 'dashboard';
+  }
+  return 'public_upload';
+};
+
 export function App() {
   // Global Auth State
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
 
   // Global View Navigation State
-  const [currentPage, setCurrentPage] = useState<PageId | 'login'>('dashboard');
+  const [currentPage, setCurrentPage] = useState<PageId | 'login'>(getInitialPage());
   const [authInitializing, setAuthInitializing] = useState<boolean>(true);
 
   // Master Data State — initialized empty, loaded from Supabase
@@ -138,45 +150,31 @@ export function App() {
   // Restore Active User Auth Session on Mount (Supabase only)
   useEffect(() => {
     const initAuth = async () => {
-      // 1. Determine target page from URL path
-      const path = window.location.pathname;
-      let targetPage: PageId | 'login' = 'public_upload'; // Default Student Platform Homepage
-      if (path === '/login') targetPage = 'login';
-      else if (path.startsWith('/admin')) {
-        const route = path.replace('/admin', '').substring(1) as PageId;
-        targetPage = route || 'dashboard'; // e.g. /admin/pesanan -> pesanan
-      }
-
       try {
-        // 2. Fetch Supabase session
+        // Fetch Supabase session
         const supabaseUser = await authService.getSession();
         
         if (supabaseUser) {
           setCurrentUser(supabaseUser);
           setIsLoggedIn(true);
-          // If they are on a public path or login, redirect to their default
-          if (targetPage === 'public_upload' || targetPage === 'login') {
-            if (supabaseUser.role === 'Siswa' || supabaseUser.role === 'Guest') {
-              setCurrentPage('public_upload');
-            } else {
-              setCurrentPage(supabaseUser.defaultPage || 'dashboard');
-            }
-          } else {
-            // If they are already on /admin/something, keep them there if allowed
-            if (supabaseUser.role === 'Siswa' || supabaseUser.role === 'Guest') {
-              setCurrentPage('public_upload');
-            } else {
-              setCurrentPage(targetPage);
-            }
+          
+          // DO NOT auto-redirect from '/' to dashboard here!
+          // We only redirect if they are on '/login' and already logged in
+          if (currentPage === 'login') {
+            setCurrentPage(supabaseUser.role === 'Siswa' ? 'public_upload' : 'dashboard');
           }
         } else {
-          // No session: enforce routing protection
-          if (path.startsWith('/admin')) {
+          // No session: enforce routing protection for admin routes
+          if (currentPage !== 'public_upload' && currentPage !== 'login') {
             setCurrentPage('login');
             window.history.replaceState({}, '', '/login');
-          } else {
-            setCurrentPage(targetPage);
           }
+        }
+      } catch (err) {
+        // Error handling fallback
+        if (currentPage !== 'public_upload' && currentPage !== 'login') {
+          setCurrentPage('login');
+          window.history.replaceState({}, '', '/login');
         }
       } finally {
         setAuthInitializing(false);
@@ -1170,7 +1168,9 @@ export function App() {
     }
   };
 
-  if (authInitializing) {
+  // Only show the global loading screen if the page requires authentication.
+  // Guest Platform (public_upload) and Login do NOT wait for Auth.
+  if (authInitializing && currentPage !== 'public_upload' && currentPage !== 'login') {
     return (
       <div className="min-h-screen bg-[#0F1322] flex flex-col items-center justify-center p-6 text-white font-sans selection:bg-[#5B4BFF]/30">
         <div className="w-16 h-16 relative flex items-center justify-center mb-6">
@@ -1218,8 +1218,9 @@ export function App() {
   // - Registered students see StudentPortalView with full dashboard
   // - Guest users see simple landing page style GuestPlatformView
   if (currentPage === 'public_upload') {
-    // If Guest user, show simple Guest Platform
-    if (!currentUser || currentUser?.role === 'Guest') {
+    // If Guest user, Admin, or if auth is STILL initializing, show simple Guest Platform!
+    // This allows the homepage to load in < 2 seconds regardless of auth status.
+    if (authInitializing || !currentUser || currentUser?.role === 'Guest' || currentUser?.role === 'Admin' || currentUser?.role === 'Kepala TEFA') {
       return (
         <GuestPlatformView
           products={products.filter((p) => !p.isArchived)}
