@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { InboxFile, Product, ProductionOrder, UserProfile } from '../../types';
 import * as profileService from '../../services/profileService';
 
@@ -108,6 +108,22 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
   const [profileAvatar, setProfileAvatar] = useState<string>(
     currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&q=80'
   );
+
+  // Sync state with currentUser changes (important after hydration or fetch completes)
+  useEffect(() => {
+    if (currentUser) {
+      setCustomerName(currentUser.name || 'Ahmad Fauzi');
+      setPhone(currentUser.phone || '081234567890');
+      setEmail(currentUser.email || 'ahmad.fauzi@smknuungaran.sch.id');
+      setNis(currentUser.nis || '202611045');
+      setClassGrade(currentUser.studentClass || 'XI DKV 1');
+      setMajor(currentUser.major || 'DKV');
+      setProfileAvatar(
+        currentUser.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&q=80'
+      );
+    }
+  }, [currentUser]);
+
   const [showAvatarCropModal, setShowAvatarCropModal] = useState<boolean>(false);
   const [tempAvatarPreview, setTempAvatarPreview] = useState<string | null>(null);
   const [avatarFileToUpload, setAvatarFileToUpload] = useState<File | null>(null);

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile, UserRole, InstitutionProfile, PageId } from '../../types';
 import * as profileService from '../../services/profileService';
@@ -83,6 +83,13 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   // Form States initialized with currentUser
   const [formData, setFormData] = useState<UserProfile>({ ...currentUser });
   const [instData, setInstData] = useState<InstitutionProfile>({ ...institutionInfo });
+
+  // Sync state with currentUser changes (important after hydration or fetch completes)
+  useEffect(() => {
+    if (currentUser) {
+      setFormData({ ...currentUser });
+    }
+  }, [currentUser]);
 
   // Password Security Form State
   const [oldPassword, setOldPassword] = useState<string>('');
