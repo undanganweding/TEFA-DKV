@@ -838,7 +838,7 @@ export function App() {
         const updatedTrx = await financeService.fetchTransactions();
         setTransactions(updatedTrx);
       } else {
-        alert(`Gagal mencatat pembayaran: ${res.message}`);
+        alert(`Gagal mencatat pembayaran: ${res.error}`);
       }
     } catch (err) {
       console.error('Payment error', err);
