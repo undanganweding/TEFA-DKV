@@ -38,6 +38,11 @@ export const PesananView: React.FC<PesananViewProps> = ({
   const [refundReasonInput, setRefundReasonInput] = useState<string>('Order dibatalkan');
   const [isRefundProcessing, setIsRefundProcessing] = useState<boolean>(false);
 
+  // Reject modal state
+  const [showRejectModal, setShowRejectModal] = useState<boolean>(false);
+  const [rejectReasonInput, setRejectReasonInput] = useState<string>('');
+  const [isRejectProcessing, setIsRejectProcessing] = useState<boolean>(false);
+
   // Simple Status helper & progress calculation
   const getProgressPercentage = (status: OrderStatus): number => {
     switch (status) {
@@ -449,6 +454,18 @@ export const PesananView: React.FC<PesananViewProps> = ({
               </div>
             </div>
 
+            <div className="flex gap-2 flex-wrap">
+              <button
+                onClick={() => {
+                  setShowRejectModal(true);
+                }}
+                className="py-2 px-4 rounded-xl text-xs font-bold bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors"
+                disabled={activeOrderDetail.status === 'Dibatalkan' || activeOrderDetail.status === 'Ditolak'}
+              >
+                {activeOrderDetail.status === 'Dibatalkan' ? 'Pesanan Dibatalkan' : 'Batalkan / Tolak Pesanan'}
+              </button>
+            </div>
+
             <div className="pt-4 border-t border-slate-100 flex items-center justify-between gap-2 flex-wrap">
               <div className="flex gap-2">
                 <button
@@ -610,6 +627,66 @@ export const PesananView: React.FC<PesananViewProps> = ({
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Reject Order Modal */}
+      {showRejectModal && activeOrderDetail && (
+        <div className="fixed inset-0 z-[60] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-white w-full max-w-sm rounded-[24px] shadow-2xl p-6"
+          >
+            <h3 className="text-lg font-black text-slate-900 mb-2">Batalkan Pesanan</h3>
+            <p className="text-sm text-slate-600 mb-4">
+              Apakah Anda yakin ingin menolak atau membatalkan pesanan <span className="font-bold">{activeOrderDetail.orderNo}</span>?
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-700 mb-1 block">Alasan Pembatalan / Penolakan</label>
+                <textarea
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-rose-500 outline-none"
+                  rows={3}
+                  placeholder="Misal: Stok bahan habis, tidak bisa cetak..."
+                  value={rejectReasonInput}
+                  onChange={(e) => setRejectReasonInput(e.target.value)}
+                ></textarea>
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowRejectModal(false)}
+                  className="flex-1 py-3 px-4 rounded-xl text-sm font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
+                  disabled={isRejectProcessing}
+                >
+                  Batal
+                </button>
+                <button
+                  onClick={async () => {
+                    if (!rejectReasonInput.trim()) {
+                      alert('Alasan pembatalan harus diisi');
+                      return;
+                    }
+                    setIsRejectProcessing(true);
+                    try {
+                      onUpdateOrderStatus(activeOrderDetail.id, 'Dibatalkan', rejectReasonInput);
+                      setActiveOrderDetail({ ...activeOrderDetail, status: 'Dibatalkan' });
+                      setShowRejectModal(false);
+                      setRejectReasonInput('');
+                    } finally {
+                      setIsRejectProcessing(false);
+                    }
+                  }}
+                  disabled={isRejectProcessing}
+                  className="flex-1 py-3 px-4 rounded-xl text-sm font-bold bg-rose-600 text-white hover:bg-rose-700 transition-colors"
+                >
+                  {isRejectProcessing ? 'Memproses...' : 'Konfirmasi Batal'}
+                </button>
+              </div>
+            </div>
+          </motion.div>
         </div>
       )}
     </div>

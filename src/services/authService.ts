@@ -128,6 +128,11 @@ export async function signUp(input: {
     return { success: false, message: 'Registrasi gagal. Silakan coba lagi.' };
   }
 
+  // Handle Supabase Email Enumeration Protection: if identities is empty, the email was already taken
+  if (data.user.identities && data.user.identities.length === 0) {
+    return { success: false, message: 'Email sudah terdaftar. Silakan gunakan email lain atau login.' };
+  }
+
   // Create profile with Pending status
   const { error: profileError } = await supabase.from('profiles').insert({
     id: data.user.id,

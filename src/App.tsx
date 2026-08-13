@@ -784,66 +784,39 @@ export function App() {
     );
   };
 
-  const handleRecordPayment = (orderId: string, additionalAmount: number) => {
-    setOrders((prev) =>
-      prev.map((ord) => {
-        if (ord.id === orderId) {
-          const actualAdditional = additionalAmount > ord.balanceDue ? ord.balanceDue : additionalAmount;
-          if (actualAdditional <= 0) return ord; // Nothing left to pay
+  const handleRecordPayment = async (orderId: string, additionalAmount: number) => {
+    try {
+      const orderToPay = orders.find(o => o.id === orderId);
+      if (!orderToPay) return;
+      
+      const actualAdditional = Math.min(additionalAmount, orderToPay.balanceDue);
+      if (actualAdditional <= 0) {
+        alert('Nominal pembayaran tidak valid atau pesanan sudah lunas.');
+        return;
+      }
 
-          const newPaid = ord.paidAmount + actualAdditional;
-          const newBalance = Math.max(0, ord.totalAmount - newPaid);
-          let newPayStatus: 'Belum Bayar' | 'DP' | 'Lunas' = ord.paymentStatus;
-          if (newPaid >= ord.totalAmount) {
-            newPayStatus = 'Lunas';
-          } else if (newPaid > 0) {
-            newPayStatus = 'DP';
-          }
+      const res = await orderServiceModule.recordPayment(
+        orderId, 
+        actualAdditional, 
+        'Cash', // Should ideally come from UI, defaulting to Cash for now or we need to pass it
+        currentUser?.name || 'Kasir'
+      );
 
-          // Also record transaction
-          const now = new Date();
-          const transNo =
-            'TRX-' +
-            now.getFullYear() +
-            String(now.getMonth() + 1).padStart(2, '0') +
-            String(now.getDate()).padStart(2, '0') +
-            '-' +
-            Math.floor(10 + Math.random() * 90);
-
-          const paymentRatio = actualAdditional / (ord.totalAmount || 1);
-          const transactionCogs = Math.round((ord.totalHpp || 0) * paymentRatio);
-          const transactionProfit = actualAdditional - transactionCogs;
-
-          const newTrx: FinanceTransaction = {
-            id: 'TRX-' + Date.now(),
-            transNo,
-            date:
-              now.toISOString().split('T')[0] +
-              ' ' +
-              now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
-            type: 'Pemasukan',
-            category: 'Pelunasan / Angsuran',
-            description: `Pelunasan Order No ${ord.orderNo} (${ord.customerName})`,
-            amount: actualAdditional,
-            cogsAmount: transactionCogs,
-            profitAmount: transactionProfit,
-            refOrderNo: ord.orderNo,
-            paymentMethod: ord.paymentMethod || 'Cash',
-            operator: settings.activeShiftOperator,
-            status: 'Berhasil',
-          };
-          setTransactions((prevTrx) => [newTrx, ...prevTrx]);
-
-          return {
-            ...ord,
-            paidAmount: newPaid,
-            balanceDue: newBalance,
-            paymentStatus: newPayStatus,
-          };
-        }
-        return ord;
-      })
-    );
+      if (res.success) {
+        // Refresh orders from DB to get the new payment status, transactions, etc.
+        const updatedOrders = await orderServiceModule.fetchOrders();
+        setOrders(updatedOrders);
+        
+        // Also refresh transactions
+        const updatedTrx = await financeService.fetchTransactions();
+        setTransactions(updatedTrx);
+      } else {
+        alert(`Gagal mencatat pembayaran: ${res.message}`);
+      }
+    } catch (err) {
+      console.error('Payment error', err);
+      alert('Terjadi kesalahan saat memproses pembayaran.');
+    }
   };
 
   const handleRefundOrder = (orderId: string, refundAmount: number, reason: string) => {
@@ -1241,7 +1214,30 @@ export function App() {
         <GuestPlatformView
           products={products.filter((p) => !p.isArchived)}
           orders={orders}
-          onAddOrder={(newOrder) => setOrders((prev) => [newOrder, ...prev])}
+          onAddOrder={async (newOrder) => {
+            try {
+              // 1. Call API to create Guest Order in Supabase
+              const res = await orderServiceModule.createGuestOrder({
+                items: newOrder.items,
+                customerName: newOrder.customerName,
+                customerPhone: newOrder.customerPhone,
+                customerEmail: newOrder.customerEmail,
+                notes: newOrder.notes,
+              });
+
+              if (res.success && res.orderId) {
+                // 2. Fetch the newly created order from Supabase so it has all correct DB fields (status, etc.)
+                // Or simply refetch all orders to keep state in sync
+                const updatedOrders = await orderServiceModule.fetchOrders();
+                setOrders(updatedOrders);
+              } else {
+                alert(`Gagal membuat pesanan: ${res.error || 'Server error'}`);
+              }
+            } catch (err) {
+              console.error('Failed to submit guest order', err);
+              alert('Terjadi kesalahan saat memproses pesanan.');
+            }
+          }}
           onSwitchToAdmin={() => setCurrentPage('login')}
           onLogout={handleLogout}
         />
