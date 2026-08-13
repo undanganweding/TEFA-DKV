@@ -4,7 +4,7 @@ import * as profileService from '../../services/profileService';
 import { AvatarCropModal } from '../AvatarCropModal';
 import { Pagination } from '../Pagination';
 
-type SortConfig = 'Terbaru' | 'Terlama' | 'Nama A-Z' | 'Nama Z-A';
+type SortConfig = 'Terbaru' | 'Terlama' | 'Nama A-Z' | 'Nama Z-A' | 'Last Login';
 
 interface UpdateUserInput {
   name?: string;
@@ -35,6 +35,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
   const [filterRole, setFilterRole] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterClass, setFilterClass] = useState<string>('all');
+  const [filterIsNew, setFilterIsNew] = useState<boolean>(false);
   const [sortBy, setSortBy] = useState<SortConfig>('Terbaru');
   
   const [currentPage, setCurrentPage] = useState(1);
@@ -116,14 +117,21 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
     if (filterStatus !== 'all') {
       if (filterStatus === 'Active') {
         result = result.filter(u => u.statusAkun === 'Active');
-      } else {
+      } else if (filterStatus === 'Inactive') {
         result = result.filter(u => u.statusAkun !== 'Active');
+      } else if (filterStatus === 'Unverified') {
+        result = result.filter(u => !u.emailConfirmedAt);
       }
     }
 
     // Class
     if (filterClass !== 'all') {
       result = result.filter(u => u.studentClass === filterClass);
+    }
+
+    // New User
+    if (filterIsNew) {
+      result = result.filter(u => u.isNewUser);
     }
 
     // Sort
@@ -137,6 +145,8 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
           return a.name.localeCompare(b.name);
         case 'Nama Z-A':
           return b.name.localeCompare(a.name);
+        case 'Last Login':
+          return new Date(b.lastSignInAt || 0).getTime() - new Date(a.lastSignInAt || 0).getTime();
         default:
           return 0;
       }
@@ -144,13 +154,15 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
 
     setFilteredUsers(result);
     setCurrentPage(1);
-  }, [users, debouncedSearch, filterRole, filterStatus, filterClass, sortBy]);
+  }, [users, debouncedSearch, filterRole, filterStatus, filterClass, filterIsNew, sortBy]);
 
   // Summary stats
   const totalStudents = users.filter(u => u.role === 'Siswa').length;
   const totalActive = users.filter(u => u.statusAkun === 'Active').length;
   const totalInactive = users.length - totalActive;
-  const totalAdmin = users.filter(u => u.role.includes('Admin') || u.role.includes('Kepala')).length;
+  const totalNew = users.filter(u => u.isNewUser).length;
+  const totalUnverified = users.filter(u => !u.emailConfirmedAt).length;
+  const totalAdmin = users.filter(u => u.role.includes('Admin') || u.role.includes('Kepala') || u.role.includes('Guru')).length;
 
   const totalPages = Math.ceil(filteredUsers.length / ITEMS_PER_PAGE);
   const paginatedUsers = filteredUsers.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
@@ -187,6 +199,17 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
   const handleSaveEdit = async () => {
     if (!selectedUser) return;
     setIsProcessing(true);
+    
+    // Check if email changed
+    if (editForm.email && editForm.email !== selectedUser.email) {
+      const emailRes = await profileService.adminChangeEmail(selectedUser.id, editForm.email);
+      if (!emailRes.success) {
+        alert('Gagal mengganti email Auth: ' + emailRes.message);
+        setIsProcessing(false);
+        return;
+      }
+    }
+
     const success = await profileService.updateProfile(selectedUser.id, {
       full_name: editForm.name,
       phone: editForm.phone,
@@ -198,12 +221,13 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
       role: editForm.role,
       status: editForm.status,
     });
+
     if (success) {
       setShowEditModal(false);
       loadUsers();
       alert('Data pengguna berhasil diperbarui!');
     } else {
-      alert('Gagal menyimpan perubahan.');
+      alert('Gagal menyimpan perubahan profil.');
     }
     setIsProcessing(false);
   };
@@ -222,7 +246,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
     setIsProcessing(true);
     const { success, message } = await profileService.adminSetPassword(selectedUser.id, newPassword);
     if (success) {
-      alert('Password siswa berhasil direset.');
+      alert('Password berhasil direset.');
       setShowPasswordModal(false);
       setNewPassword('');
       setConfirmPassword('');
@@ -235,7 +259,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
   const handleDelete = async () => {
     if (!selectedUser) return;
     setIsProcessing(true);
-    const result = await profileService.deleteUser(selectedUser.id);
+    const result = await profileService.adminDeleteUserSecure(selectedUser.id);
     if (result.success) {
       loadUsers();
       setShowDeleteModal(false);
@@ -284,7 +308,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return '-';
-    return new Date(dateString).toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: 'numeric' });
+    return new Date(dateString).toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
   };
 
   return (
@@ -293,7 +317,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black text-slate-800">Manajemen Akun</h1>
-          <p className="text-sm text-slate-500">Kelola akun siswa dan akses pengguna sistem.</p>
+          <p className="text-sm text-slate-500">Pusat pengelolaan seluruh pengguna TEFA DKV.</p>
         </div>
         <button onClick={loadUsers} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 text-slate-600 font-bold text-sm shadow-sm transition-all cursor-pointer">
           <span className="material-symbols-outlined text-sm">refresh</span>
@@ -302,48 +326,36 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-black">
-            <span className="material-symbols-outlined">school</span>
-          </div>
-          <div>
-            <p className="text-xs font-bold text-slate-500">Total Siswa</p>
-            <p className="text-2xl font-black text-slate-800">{totalStudents}</p>
-          </div>
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
+        <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex flex-col justify-center">
+          <p className="text-xs font-bold text-slate-500">Total User</p>
+          <p className="text-2xl font-black text-slate-800">{users.length}</p>
         </div>
-        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-black">
-            <span className="material-symbols-outlined">check_circle</span>
-          </div>
-          <div>
-            <p className="text-xs font-bold text-slate-500">Akun Aktif</p>
-            <p className="text-2xl font-black text-slate-800">{totalActive}</p>
-          </div>
+        <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-100 shadow-sm flex flex-col justify-center">
+          <p className="text-xs font-bold text-emerald-600">Siswa Aktif</p>
+          <p className="text-2xl font-black text-emerald-800">{totalActive}</p>
         </div>
-        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center font-black">
-            <span className="material-symbols-outlined">block</span>
-          </div>
-          <div>
-            <p className="text-xs font-bold text-slate-500">Akun Nonaktif</p>
-            <p className="text-2xl font-black text-slate-800">{totalInactive}</p>
-          </div>
+        <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200 shadow-sm flex flex-col justify-center">
+          <p className="text-xs font-bold text-slate-600">Nonaktif</p>
+          <p className="text-2xl font-black text-slate-800">{totalInactive}</p>
         </div>
-        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-black">
-            <span className="material-symbols-outlined">admin_panel_settings</span>
-          </div>
-          <div>
-            <p className="text-xs font-bold text-slate-500">Admin / Staff</p>
-            <p className="text-2xl font-black text-slate-800">{totalAdmin}</p>
-          </div>
+        <div className="bg-blue-50 rounded-2xl p-4 border border-blue-100 shadow-sm flex flex-col justify-center cursor-pointer hover:bg-blue-100 transition-colors" onClick={() => setFilterIsNew(!filterIsNew)}>
+          <p className="text-xs font-bold text-blue-600">User Baru</p>
+          <p className="text-2xl font-black text-blue-800">{totalNew}</p>
+        </div>
+        <div className="bg-amber-50 rounded-2xl p-4 border border-amber-100 shadow-sm flex flex-col justify-center cursor-pointer hover:bg-amber-100 transition-colors" onClick={() => { setFilterStatus('Unverified'); }}>
+          <p className="text-[10px] font-bold text-amber-600 uppercase">Belum Konfirmasi</p>
+          <p className="text-2xl font-black text-amber-800">{totalUnverified}</p>
+        </div>
+        <div className="bg-purple-50 rounded-2xl p-4 border border-purple-100 shadow-sm flex flex-col justify-center">
+          <p className="text-xs font-bold text-purple-600">Admin / Staff</p>
+          <p className="text-2xl font-black text-purple-800">{totalAdmin}</p>
         </div>
       </div>
 
       {/* Filter & Search Bar */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
-        <div className="relative w-full md:w-96">
+      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
+        <div className="relative w-full md:w-96 flex-shrink-0">
           <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
           <input
             type="text"
@@ -354,17 +366,19 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
           />
         </div>
         
-        <div className="flex flex-wrap gap-2 w-full md:w-auto">
+        <div className="flex flex-wrap gap-2 w-full md:justify-end">
           <select value={filterRole} onChange={(e) => setFilterRole(e.target.value)} className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm text-slate-600 font-medium focus:outline-none focus:ring-2 focus:ring-[#5B4BFF]/30">
             <option value="all">Semua Role</option>
             <option value="Siswa">Siswa</option>
             <option value="Admin TEFA">Admin</option>
+            <option value="Kepala TEFA">Kepala TEFA</option>
             <option value="Guru / Operator">Staff/Guru</option>
           </select>
           <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm text-slate-600 font-medium focus:outline-none focus:ring-2 focus:ring-[#5B4BFF]/30">
             <option value="all">Semua Status</option>
             <option value="Active">Aktif</option>
             <option value="Inactive">Nonaktif</option>
+            <option value="Unverified">Belum Konfirmasi Email</option>
           </select>
           <select value={filterClass} onChange={(e) => setFilterClass(e.target.value)} className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm text-slate-600 font-medium focus:outline-none focus:ring-2 focus:ring-[#5B4BFF]/30">
             <option value="all">Semua Kelas</option>
@@ -375,15 +389,19 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
             <option value="Terlama">Terlama</option>
             <option value="Nama A-Z">Nama A-Z</option>
             <option value="Nama Z-A">Nama Z-A</option>
+            <option value="Last Login">Last Login</option>
           </select>
+          <button onClick={() => setFilterIsNew(!filterIsNew)} className={`px-4 py-2 rounded-xl text-sm font-bold border transition-colors ${filterIsNew ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-white text-slate-600 border-slate-200'}`}>
+            User Baru
+          </button>
         </div>
       </div>
 
       {/* Loading & Error States */}
       {isLoading ? (
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-12 text-center shadow-sm">
+        <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-sm">
           <div className="w-10 h-10 border-4 border-slate-200 border-t-[#5B4BFF] rounded-full animate-spin mx-auto"></div>
-          <p className="mt-4 text-slate-500 font-medium text-sm">Memuat data akun...</p>
+          <p className="mt-4 text-slate-500 font-medium text-sm">Memuat data pengguna & auth...</p>
         </div>
       ) : errorMsg ? (
         <div className="bg-white rounded-2xl border border-red-200 p-12 text-center shadow-sm">
@@ -392,28 +410,25 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
           <button onClick={loadUsers} className="px-4 py-2 bg-red-50 text-red-600 font-bold text-sm rounded-xl hover:bg-red-100 cursor-pointer">Coba Lagi</button>
         </div>
       ) : filteredUsers.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-16 text-center shadow-sm">
+        <div className="bg-white rounded-2xl border border-slate-200 p-16 text-center shadow-sm">
           <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-slate-100">
             <span className="material-symbols-outlined text-3xl text-slate-400">group_off</span>
           </div>
-          <p className="text-slate-800 font-bold text-lg">Belum ada akun siswa.</p>
-          <p className="text-slate-500 text-sm mt-1">Sesuaikan filter atau tunggu pendaftaran baru.</p>
+          <p className="text-slate-800 font-bold text-lg">Belum ada user yang cocok.</p>
+          <p className="text-slate-500 text-sm mt-1">Sesuaikan pencarian atau filter Anda.</p>
         </div>
       ) : (
         /* Data Table */
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                  <th className="p-4">Avatar</th>
-                  <th className="p-4">Nama</th>
-                  <th className="p-4">Email</th>
-                  <th className="p-4">NIS/NISN</th>
-                  <th className="p-4">Kelas</th>
+                <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                  <th className="p-4">User</th>
+                  <th className="p-4">Identitas</th>
                   <th className="p-4">Role</th>
-                  <th className="p-4">Status</th>
-                  <th className="p-4">Terdaftar</th>
+                  <th className="p-4">Status & Email</th>
+                  <th className="p-4">Last Login</th>
                   <th className="p-4 text-right">Aksi</th>
                 </tr>
               </thead>
@@ -421,34 +436,55 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
                 {paginatedUsers.map((user) => (
                   <tr key={user.id} className="hover:bg-slate-50/50 transition-colors group cursor-pointer" onClick={() => openDetail(user)}>
                     <td className="p-4">
-                      <img src={user.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&q=80'} alt={user.name} className="w-10 h-10 rounded-full object-cover border border-slate-200" />
+                      <div className="flex items-center gap-3">
+                        <img src={user.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&q=80'} alt={user.name} className="w-10 h-10 rounded-full object-cover border border-slate-200" />
+                        <div>
+                          <p className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                            {user.name}
+                            {user.isNewUser && <span className="bg-blue-100 text-blue-700 text-[9px] px-1.5 py-0.5 rounded-md uppercase font-black tracking-widest">Baru</span>}
+                          </p>
+                          <p className="text-xs text-slate-500">{user.email}</p>
+                        </div>
+                      </div>
                     </td>
-                    <td className="p-4 font-bold text-slate-800 text-sm">{user.name}</td>
-                    <td className="p-4 text-slate-500 text-sm">{user.email}</td>
-                    <td className="p-4 text-slate-600 text-sm font-mono">{user.nis || '-'}</td>
-                    <td className="p-4 text-slate-600 text-sm">{user.studentClass || '-'}</td>
                     <td className="p-4">
-                      <span className="text-xs px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 font-semibold border border-slate-200">{user.role}</span>
+                      {user.role === 'Siswa' ? (
+                        <>
+                          <p className="text-slate-700 text-sm font-mono">{user.nis || '-'}</p>
+                          <p className="text-slate-500 text-xs">{user.studentClass || '-'} {user.major || ''}</p>
+                        </>
+                      ) : (
+                        <p className="text-slate-500 text-xs">-</p>
+                      )}
                     </td>
                     <td className="p-4">
-                      <span className={`text-[10px] px-2.5 py-1 rounded-full border font-bold uppercase tracking-wider ${getStatusBadge(user.statusAkun)}`}>
-                        {user.statusAkun === 'Active' ? 'Aktif' : 'Nonaktif'}
-                      </span>
+                      <span className="text-xs px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 font-semibold border border-slate-200">{user.role}</span>
                     </td>
-                    <td className="p-4 text-slate-500 text-xs whitespace-nowrap">{formatDate(user.createdAt)}</td>
+                    <td className="p-4">
+                      <div className="flex flex-col gap-1 items-start">
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full border font-bold uppercase tracking-wider ${getStatusBadge(user.statusAkun)}`}>
+                          {user.statusAkun === 'Active' ? 'Aktif' : 'Nonaktif'}
+                        </span>
+                        {user.emailConfirmedAt ? (
+                          <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1"><span className="material-symbols-outlined text-[12px]">verified</span> Verified</span>
+                        ) : (
+                          <span className="text-[10px] text-amber-600 font-semibold flex items-center gap-1"><span className="material-symbols-outlined text-[12px]">warning</span> Unverified</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="p-4 text-slate-500 text-xs whitespace-nowrap">
+                      {user.lastSignInAt ? formatDate(user.lastSignInAt) : 'Belum pernah login'}
+                    </td>
                     <td className="p-4 text-right">
                       <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()}>
-                        <button onClick={() => openDetail(user)} title="Detail" className="w-8 h-8 rounded-lg text-slate-400 hover:text-[#5B4BFF] hover:bg-purple-50 flex items-center justify-center transition-colors cursor-pointer">
-                          <span className="material-symbols-outlined text-sm">visibility</span>
-                        </button>
-                        <button onClick={() => openEdit(user)} title="Edit User" className="w-8 h-8 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 flex items-center justify-center transition-colors cursor-pointer">
+                        <button onClick={() => openEdit(user)} title="Edit Profil & Email" className="w-8 h-8 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 flex items-center justify-center transition-colors cursor-pointer">
                           <span className="material-symbols-outlined text-sm">edit</span>
                         </button>
                         <button onClick={() => { setSelectedUser(user); setShowPasswordModal(true); }} title="Reset Password" className="w-8 h-8 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50 flex items-center justify-center transition-colors cursor-pointer">
                           <span className="material-symbols-outlined text-sm">key</span>
                         </button>
                         {user.statusAkun === 'Active' ? (
-                          <button onClick={() => { setSelectedUser(user); setShowDisableModal(true); }} title="Nonaktifkan" className="w-8 h-8 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition-colors cursor-pointer">
+                          <button onClick={() => { setSelectedUser(user); setShowDisableModal(true); }} title="Nonaktifkan" className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer">
                             <span className="material-symbols-outlined text-sm">block</span>
                           </button>
                         ) : (
@@ -456,6 +492,9 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
                             <span className="material-symbols-outlined text-sm">check_circle</span>
                           </button>
                         )}
+                        <button onClick={() => { setSelectedUser(user); setShowDeleteModal(true); }} title="Hapus Akun Permanen" className="w-8 h-8 rounded-lg text-red-300 hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition-colors cursor-pointer ml-2 border border-transparent hover:border-red-200">
+                          <span className="material-symbols-outlined text-sm">delete_forever</span>
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -475,81 +514,67 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
       {/* Detail Modal */}
       {showDetailModal && selectedUser && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl">
-            <div className="flex items-start justify-between mb-6">
-              <div className="flex items-center gap-4">
-                <img src={selectedUser.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&q=80'} alt={selectedUser.name} className="w-16 h-16 rounded-full object-cover border-4 border-slate-100 shadow-sm" />
-                <div>
-                  <h2 className="text-xl font-black text-slate-800">{selectedUser.name}</h2>
-                  <p className="text-sm text-slate-500">{selectedUser.email}</p>
+          <div className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl flex flex-col md:flex-row overflow-hidden max-h-[90vh]">
+            <div className="bg-slate-50 p-6 md:w-1/3 border-r border-slate-200 flex flex-col items-center text-center">
+              <img src={selectedUser.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&q=80'} alt={selectedUser.name} className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-md mb-4" />
+              <h2 className="text-lg font-black text-slate-800">{selectedUser.name}</h2>
+              <span className="text-xs px-3 py-1 rounded-full bg-slate-200 text-slate-700 font-bold mt-2">{selectedUser.role}</span>
+              {selectedUser.isNewUser && <span className="text-[10px] bg-blue-100 text-blue-700 font-black px-2 py-1 rounded mt-2 uppercase tracking-widest">User Baru</span>}
+            </div>
+
+            <div className="p-6 md:w-2/3 overflow-y-auto">
+              <div className="flex justify-between items-center mb-4 border-b border-slate-100 pb-2">
+                <h3 className="text-sm font-black text-slate-800 flex items-center gap-2"><span className="material-symbols-outlined text-lg">person</span> Profile Information</h3>
+                <button onClick={() => setShowDetailModal(false)} className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center transition-colors cursor-pointer">
+                  <span className="material-symbols-outlined text-sm">close</span>
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
+                <div><p className="text-slate-400 text-xs">Email</p><p className="font-bold text-slate-700">{selectedUser.email}</p></div>
+                <div><p className="text-slate-400 text-xs">No. WhatsApp</p><p className="font-bold text-slate-700">{selectedUser.whatsapp || '-'}</p></div>
+                <div><p className="text-slate-400 text-xs">NIS/NISN</p><p className="font-bold text-slate-700">{selectedUser.nis || '-'}</p></div>
+                <div><p className="text-slate-400 text-xs">Kelas & Jurusan</p><p className="font-bold text-slate-700">{selectedUser.studentClass || '-'} {selectedUser.major || ''}</p></div>
+              </div>
+
+              <h3 className="text-sm font-black text-slate-800 flex items-center gap-2 mb-4 border-b border-slate-100 pb-2 mt-6"><span className="material-symbols-outlined text-lg">shield_person</span> Account Identity & Auth</h3>
+              <div className="grid grid-cols-2 gap-4 mb-6 text-sm bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <div className="col-span-2"><p className="text-slate-400 text-xs">User ID (Auth UID)</p><p className="font-mono text-xs text-slate-600 bg-white px-2 py-1 rounded border border-slate-200 break-all">{selectedUser.id}</p></div>
+                <div><p className="text-slate-400 text-xs">Status Akun</p><p className={`font-bold ${selectedUser.statusAkun === 'Active' ? 'text-emerald-600' : 'text-slate-600'}`}>{selectedUser.statusAkun === 'Active' ? 'Aktif / Bisa Login' : 'Nonaktif / Terblokir'}</p></div>
+                <div><p className="text-slate-400 text-xs">Status Email</p>
+                  <p className={`font-bold flex items-center gap-1 ${selectedUser.emailConfirmedAt ? 'text-emerald-600' : 'text-amber-600'}`}>
+                    <span className="material-symbols-outlined text-[16px]">{selectedUser.emailConfirmedAt ? 'check_circle' : 'warning'}</span>
+                    {selectedUser.emailConfirmedAt ? 'Verified' : 'Unverified'}
+                  </p>
                 </div>
+                <div><p className="text-slate-400 text-xs">Tanggal Terdaftar</p><p className="font-bold text-slate-700">{formatDate(selectedUser.createdAt)}</p></div>
+                <div><p className="text-slate-400 text-xs">Last Login (Auth)</p><p className="font-bold text-slate-700">{selectedUser.lastSignInAt ? formatDate(selectedUser.lastSignInAt) : 'Belum pernah login'}</p></div>
               </div>
-              <button onClick={() => setShowDetailModal(false)} className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center transition-colors cursor-pointer">
-                <span className="material-symbols-outlined text-sm">close</span>
-              </button>
-            </div>
 
-            <div className="bg-slate-50 rounded-2xl p-4 space-y-3 text-sm border border-slate-100">
-              <div className="flex justify-between py-1">
-                <span className="text-slate-500">ID Pengguna</span>
-                <span className="font-mono text-xs text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200">{selectedUser.id.substring(0, 8)}...</span>
-              </div>
-              <div className="flex justify-between py-1 border-t border-slate-200/50 pt-3">
-                <span className="text-slate-500">NIS/NISN</span>
-                <span className="font-bold text-slate-700">{selectedUser.nis || '-'}</span>
-              </div>
-              <div className="flex justify-between py-1">
-                <span className="text-slate-500">Kelas</span>
-                <span className="font-bold text-slate-700">{selectedUser.studentClass || '-'}</span>
-              </div>
-              <div className="flex justify-between py-1">
-                <span className="text-slate-500">Role</span>
-                <span className="font-bold text-slate-700">{selectedUser.role}</span>
-              </div>
-              <div className="flex justify-between py-1">
-                <span className="text-slate-500">Status Akun</span>
-                <span className={`font-bold ${selectedUser.statusAkun === 'Active' ? 'text-emerald-600' : 'text-red-600'}`}>{selectedUser.statusAkun === 'Active' ? 'Aktif' : 'Nonaktif'}</span>
-              </div>
-              <div className="flex justify-between py-1">
-                <span className="text-slate-500">Tanggal Daftar</span>
-                <span className="font-bold text-slate-700">{formatDate(selectedUser.createdAt)}</span>
-              </div>
-            </div>
-
-            <div className="flex gap-2 mt-6">
-              <button onClick={() => openEdit(selectedUser)} className="flex-1 py-2.5 bg-white border border-slate-200 text-slate-700 font-bold text-xs rounded-xl hover:bg-slate-50 transition-all flex justify-center items-center gap-2 cursor-pointer">
-                <span className="material-symbols-outlined text-sm">edit</span> Edit Profil
-              </button>
-              <button onClick={() => setShowPasswordModal(true)} className="flex-1 py-2.5 bg-white border border-slate-200 text-amber-700 font-bold text-xs rounded-xl hover:bg-amber-50 transition-all flex justify-center items-center gap-2 cursor-pointer">
-                <span className="material-symbols-outlined text-sm">key</span> Reset Password
-              </button>
-              {selectedUser.statusAkun === 'Active' ? (
-                <button onClick={() => setShowDisableModal(true)} className="flex-1 py-2.5 bg-white border border-red-200 text-red-700 font-bold text-xs rounded-xl hover:bg-red-50 transition-all flex justify-center items-center gap-2 cursor-pointer">
-                  <span className="material-symbols-outlined text-sm">block</span> Nonaktifkan
+              <div className="flex gap-2 mt-6">
+                <button onClick={() => openEdit(selectedUser)} className="flex-1 py-2.5 bg-white border border-slate-200 text-slate-700 font-bold text-xs rounded-xl hover:bg-slate-50 transition-all flex justify-center items-center gap-2 cursor-pointer">
+                  <span className="material-symbols-outlined text-sm">edit</span> Edit Profil & Email
                 </button>
-              ) : (
-                <button onClick={() => handleActivate(selectedUser.id)} disabled={isProcessing} className="flex-1 py-2.5 bg-emerald-500 text-white font-bold text-xs rounded-xl hover:bg-emerald-600 transition-all flex justify-center items-center gap-2 cursor-pointer disabled:opacity-50">
-                  <span className="material-symbols-outlined text-sm">check_circle</span> Aktifkan
+                <button onClick={() => setShowPasswordModal(true)} className="flex-1 py-2.5 bg-white border border-slate-200 text-amber-700 font-bold text-xs rounded-xl hover:bg-amber-50 transition-all flex justify-center items-center gap-2 cursor-pointer">
+                  <span className="material-symbols-outlined text-sm">key</span> Reset Password
                 </button>
-              )}
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Edit Modal */}
+      {/* Edit Modal (Included Change Email) */}
       {showEditModal && selectedUser && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
-            <h2 className="text-xl font-black text-slate-800 mb-6">Edit Profil Pengguna</h2>
+            <h2 className="text-xl font-black text-slate-800 mb-6 flex items-center gap-2"><span className="material-symbols-outlined text-blue-500">manage_accounts</span> Edit Profil & Identity</h2>
 
             <div className="space-y-4">
               {/* Avatar */}
               <div className="flex items-center gap-4">
                 <img src={tempAvatar || selectedUser.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&q=80'} alt="Avatar" className="w-16 h-16 rounded-2xl object-cover border-2 border-slate-200" />
                 <div>
-                  <button onClick={() => setShowAvatarCrop(true)} className="px-4 py-2 bg-slate-100 text-slate-700 font-bold text-xs rounded-xl hover:bg-slate-200 transition-all cursor-pointer">Ganti Foto</button>
-                  <p className="text-[10px] text-slate-400 mt-1">JPG, PNG, WEBP max 2MB</p>
+                  <button type="button" onClick={() => setShowAvatarCrop(true)} className="px-4 py-2 bg-slate-100 text-slate-700 font-bold text-xs rounded-xl hover:bg-slate-200 transition-all cursor-pointer">Ganti Foto</button>
                 </div>
               </div>
 
@@ -558,10 +583,10 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
                 <input type="text" value={editForm.name || ''} onChange={(e) => setEditForm(p => ({ ...p, name: e.target.value }))} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#5B4BFF]/30" />
               </div>
 
-              {/* Prevent editing email to avoid Auth inconsistency unless we use admin update user API */}
-              <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1">Email (Read Only)</label>
-                <input type="email" value={editForm.email || ''} readOnly className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-sm text-slate-500 cursor-not-allowed" />
+              <div className="bg-amber-50 p-3 rounded-xl border border-amber-200">
+                <label className="block text-xs font-bold text-amber-900 mb-1 flex items-center gap-1"><span className="material-symbols-outlined text-[14px]">warning</span> Email Identity (Auth)</label>
+                <input type="email" value={editForm.email || ''} onChange={(e) => setEditForm(p => ({ ...p, email: e.target.value }))} className="w-full px-4 py-2.5 border border-amber-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50 bg-white" placeholder="Masukkan email baru..." />
+                <p className="text-[10px] text-amber-700 mt-1">Mengubah ini akan mengganti email login siswa pada Supabase Auth.</p>
               </div>
 
               {selectedUser.role === 'Siswa' && (
@@ -576,9 +601,15 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
                       <input type="text" value={editForm.studentClass || ''} onChange={(e) => setEditForm(p => ({ ...p, studentClass: e.target.value }))} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#5B4BFF]/30" />
                     </div>
                   </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">WhatsApp</label>
-                    <input type="text" value={editForm.whatsapp || ''} onChange={(e) => setEditForm(p => ({ ...p, whatsapp: e.target.value }))} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#5B4BFF]/30" />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-600 mb-1">Jurusan</label>
+                      <input type="text" value={editForm.major || ''} onChange={(e) => setEditForm(p => ({ ...p, major: e.target.value }))} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#5B4BFF]/30" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-600 mb-1">WhatsApp</label>
+                      <input type="text" value={editForm.whatsapp || ''} onChange={(e) => setEditForm(p => ({ ...p, whatsapp: e.target.value }))} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#5B4BFF]/30" />
+                    </div>
                   </div>
                 </>
               )}
@@ -619,8 +650,8 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
             <div className="w-12 h-12 bg-amber-50 text-amber-500 rounded-full flex items-center justify-center mb-4 border border-amber-100">
               <span className="material-symbols-outlined">key</span>
             </div>
-            <h2 className="text-xl font-black text-slate-800 mb-1">Reset Password</h2>
-            <p className="text-sm text-slate-500 mb-6">Reset password akun siswa ini ({selectedUser.name})?</p>
+            <h2 className="text-xl font-black text-slate-800 mb-1">Reset Password Server-side</h2>
+            <p className="text-sm text-slate-500 mb-6">Paksa penggantian sandi untuk akun: <strong>{selectedUser.name}</strong></p>
 
             <div className="space-y-4">
               <div>
@@ -632,10 +663,12 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
                 <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Ulangi password" className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/30" />
               </div>
             </div>
+            
+            <p className="text-[10px] text-slate-400 mt-4"><span className="font-bold text-slate-500">Security Note:</span> Aksi ini langsung mengubah identitas Auth melalui layanan API tersinkronisasi. Service key tidak digunakan pada browser.</p>
 
-            <div className="flex gap-3 mt-8">
+            <div className="flex gap-3 mt-6 pt-4 border-t border-slate-100">
               <button onClick={() => { setShowPasswordModal(false); setNewPassword(''); setConfirmPassword(''); }} className="flex-1 py-3 bg-slate-100 text-slate-700 font-bold text-sm rounded-xl hover:bg-slate-200 transition-all cursor-pointer">Batal</button>
-              <button onClick={handleResetPassword} disabled={isProcessing} className="flex-1 py-3 bg-amber-500 text-white font-bold text-sm rounded-xl hover:bg-amber-600 transition-all disabled:opacity-50 cursor-pointer">Reset Password</button>
+              <button onClick={handleResetPassword} disabled={isProcessing} className="flex-1 py-3 bg-amber-500 text-white font-bold text-sm rounded-xl hover:bg-amber-600 transition-all disabled:opacity-50 cursor-pointer">Simpan Password</button>
             </div>
           </div>
         </div>
@@ -645,33 +678,50 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
       {showDisableModal && selectedUser && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl text-center">
-            <div className="w-16 h-16 rounded-full bg-red-50 text-red-500 border border-red-100 flex items-center justify-center mx-auto mb-4">
+            <div className="w-16 h-16 rounded-full bg-slate-100 text-slate-500 border border-slate-200 flex items-center justify-center mx-auto mb-4">
               <span className="material-symbols-outlined text-3xl">person_off</span>
             </div>
             <h2 className="text-xl font-black text-slate-800 mb-2">Nonaktifkan akun siswa ini?</h2>
             <p className="text-sm text-slate-500 mb-6 px-4">
-              Akun <strong>{selectedUser.name}</strong> tidak akan bisa login, namun data dan riwayat pesanan akan tetap tersimpan aman.
+              Akun <strong>{selectedUser.name}</strong> tidak akan bisa login, namun data pesanan/transaksi akan tetap dipertahankan dengan aman.
             </p>
 
             <div className="flex gap-3">
               <button onClick={() => setShowDisableModal(false)} className="flex-1 py-3 bg-slate-100 text-slate-700 font-bold text-sm rounded-xl hover:bg-slate-200 transition-all cursor-pointer">Batal</button>
-              <button onClick={handleDisable} disabled={isProcessing} className="flex-1 py-3 bg-red-500 text-white font-bold text-sm rounded-xl hover:bg-red-600 transition-all disabled:opacity-50 cursor-pointer">Nonaktifkan</button>
+              <button onClick={handleDisable} disabled={isProcessing} className="flex-1 py-3 bg-slate-700 text-white font-bold text-sm rounded-xl hover:bg-slate-800 transition-all disabled:opacity-50 cursor-pointer">Nonaktifkan</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Delete Modal (Optional / Kept for admin power users) */}
+      {/* Delete Secure Modal */}
       {showDeleteModal && selectedUser && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl">
-            <div className="text-center">
-              <h2 className="text-xl font-black text-slate-800 mb-2">Hapus Permanen?</h2>
-              <p className="text-sm text-slate-500 mb-6">Apakah Anda yakin ingin menghapus <strong>{selectedUser.name}</strong> selamanya?</p>
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-white shadow-sm">
+                <span className="material-symbols-outlined text-3xl">warning</span>
+              </div>
+              <h2 className="text-xl font-black text-slate-800 mb-2">Hapus Auth Account Permanen?</h2>
+              <p className="text-sm text-slate-500">Anda akan menghapus akun:</p>
+              <p className="text-md font-bold text-slate-800 mt-1">{selectedUser.name}</p>
+              <p className="text-sm font-medium text-slate-600">{selectedUser.email}</p>
             </div>
+            
+            <div className="bg-red-50 p-4 rounded-xl border border-red-200 mb-6">
+              <p className="text-xs font-bold text-red-800 mb-1">PERINGATAN SANGAT PENTING:</p>
+              <ul className="text-[11px] text-red-700 list-disc list-inside space-y-1">
+                <li>Tindakan ini menghancurkan identitas login di database Auth.</li>
+                <li>Data riwayat order dan invoice yang di-set NULL akan tetap ada (tidak Cascade menghancurkan finance).</li>
+                <li>Tindakan ini tidak dapat dibatalkan.</li>
+              </ul>
+            </div>
+
             <div className="flex gap-3">
               <button onClick={() => setShowDeleteModal(false)} className="flex-1 py-3 bg-slate-100 text-slate-700 font-bold text-sm rounded-xl hover:bg-slate-200 transition-all cursor-pointer">Batal</button>
-              <button onClick={handleDelete} disabled={isProcessing} className="flex-1 py-3 bg-red-600 text-white font-bold text-sm rounded-xl hover:bg-red-700 transition-all disabled:opacity-50 cursor-pointer">Hapus</button>
+              <button onClick={handleDelete} disabled={isProcessing} className="flex-1 py-3 bg-red-600 text-white font-bold text-sm rounded-xl hover:bg-red-700 shadow-lg shadow-red-500/30 transition-all disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer">
+                {isProcessing ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span> : 'Ya, Hapus Permanen'}
+              </button>
             </div>
           </div>
         </div>

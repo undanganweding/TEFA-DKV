@@ -5,19 +5,35 @@ import { mapProfileToUserProfile } from './authService';
 // ===== PROFILE / USER MANAGEMENT =====
 
 export async function getAllUsers(): Promise<UserProfile[]> {
-  const { data: profiles, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .order('created_at', { ascending: false });
+  try {
+    const { data, error } = await supabase.functions.invoke('admin-manage-users', {
+      body: { action: 'list' }
+    });
 
-  if (error) {
-    console.error('Error fetching users:', error);
+    if (error || !data?.success) {
+      console.error('Error fetching users from edge function:', error || data?.error);
+      return [];
+    }
+
+    const usersList = data.data || [];
+    const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
+    const now = new Date().getTime();
+
+    return usersList.map((u: any) => {
+      const profile = mapProfileToUserProfile(u, '');
+      const createdDate = new Date(u.created_at || new Date()).getTime();
+      return {
+        ...profile,
+        email: u.email || '',
+        emailConfirmedAt: u.email_confirmed_at,
+        lastSignInAt: u.last_sign_in_at,
+        isNewUser: (now - createdDate) <= SEVEN_DAYS
+      };
+    });
+  } catch (err) {
+    console.error('Failed to get all users:', err);
     return [];
   }
-
-  // We need emails from auth - fetch via admin or join approach
-  // For now, map profiles without emails (admin can see from Supabase dashboard)
-  return (profiles || []).map(p => mapProfileToUserProfile(p, ''));
 }
 
 export async function getUsersByFilter(filter: 'all' | 'pending' | 'active' | 'admin' | 'inactive'): Promise<UserProfile[]> {
@@ -160,8 +176,8 @@ export async function getPendingCount(): Promise<number> {
 
 export async function adminSetPassword(targetUserId: string, newPassword: string): Promise<{ success: boolean; message: string }> {
   try {
-    const { data, error } = await supabase.functions.invoke('admin-set-password', {
-      body: { targetUserId, newPassword }
+    const { data, error } = await supabase.functions.invoke('admin-manage-users', {
+      body: { action: 'reset_password', targetUserId, newPassword }
     });
 
     if (error) {
@@ -176,6 +192,36 @@ export async function adminSetPassword(targetUserId: string, newPassword: string
     return { success: true, message: 'Password berhasil diubah.' };
   } catch (err: any) {
     console.error('Unexpected error setting password:', err);
+    return { success: false, message: 'Terjadi kesalahan internal.' };
+  }
+}
+
+export async function adminChangeEmail(targetUserId: string, newEmail: string): Promise<{ success: boolean; message: string }> {
+  try {
+    const { data, error } = await supabase.functions.invoke('admin-manage-users', {
+      body: { action: 'update_email', targetUserId, newEmail }
+    });
+
+    if (error) return { success: false, message: error.message || 'Gagal menghubungi server.' };
+    if (data?.error) return { success: false, message: data.error };
+
+    return { success: true, message: 'Email berhasil diperbarui.' };
+  } catch (err: any) {
+    return { success: false, message: 'Terjadi kesalahan internal.' };
+  }
+}
+
+export async function adminDeleteUserSecure(targetUserId: string): Promise<{ success: boolean; message: string }> {
+  try {
+    const { data, error } = await supabase.functions.invoke('admin-manage-users', {
+      body: { action: 'delete_user', targetUserId }
+    });
+
+    if (error) return { success: false, message: error.message || 'Gagal menghubungi server.' };
+    if (data?.error) return { success: false, message: data.error };
+
+    return { success: true, message: 'Akun berhasil dihapus secara permanen.' };
+  } catch (err: any) {
     return { success: false, message: 'Terjadi kesalahan internal.' };
   }
 }

@@ -44,6 +44,9 @@ export interface UserProfile {
   name: string;
   username?: string;
   email: string;
+  emailConfirmedAt?: string | null;
+  lastSignInAt?: string | null;
+  isNewUser?: boolean;
   role: UserRole;
   avatar: string;
   defaultPage: PageId;
