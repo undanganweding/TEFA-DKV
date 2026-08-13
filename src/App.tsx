@@ -236,35 +236,43 @@ export function App() {
     };
   }, [rawSession]);
 
-  // Load all data from Supabase on mount / after login
+  // Load all data from Supabase on mount / after login in safe sequential batches
   useEffect(() => {
     if (!isLoggedIn || dataLoaded) return;
     const loadData = async () => {
       try {
-        const [prods, mats, movs, ords, trxs, tools_, procs, inbox, custFiles] = await Promise.all([
-          productService.fetchProducts(),
-          materialService.fetchMaterials(),
-          materialService.fetchStockMovements(),
-          orderServiceModule.fetchOrders(),
-          financeService.fetchTransactions(),
-          inventoryService.fetchInventory(),
-          procurementService.fetchProcurements(),
-          fileService.fetchInboxFiles(),
-          fileService.fetchCustomerFiles(),
-        ]);
+        // Fetch core essentials first
+        const prods = await productService.fetchProducts().catch(() => []);
         setProducts(prods);
-        setMaterials(mats);
-        setStockMovements(movs);
+
+        const ords = await orderServiceModule.fetchOrders().catch(() => []);
         setOrders(ords);
-        setTransactions(trxs);
-        setTools(tools_);
-        setProcurements(procs);
+
+        const inbox = await fileService.fetchInboxFiles().catch(() => []);
         setInboxFiles(inbox);
+
+        // Fetch remaining tables sequentially to avoid HTTP2 socket overload
+        const mats = await materialService.fetchMaterials().catch(() => []);
+        setMaterials(mats);
+
+        const movs = await materialService.fetchStockMovements().catch(() => []);
+        setStockMovements(movs);
+
+        const trxs = await financeService.fetchTransactions().catch(() => []);
+        setTransactions(trxs);
+
+        const tools_ = await inventoryService.fetchInventory().catch(() => []);
+        setTools(tools_);
+
+        const procs = await procurementService.fetchProcurements().catch(() => []);
+        setProcurements(procs);
+
+        const custFiles = await fileService.fetchCustomerFiles().catch(() => []);
         setCustomerFiles(custFiles);
+
         setDataLoaded(true);
       } catch (err) {
         console.error('Error loading data from Supabase:', err);
-        // Data will remain as empty arrays — UI still renders
         setDataLoaded(true);
       }
     };
