@@ -250,11 +250,10 @@ export function App() {
         const ords = await orderServiceModule.fetchOrders().catch(() => []);
         setOrders(ords);
 
-        const inbox = await fileService.fetchInboxFiles().catch(() => []);
-        setInboxFiles(inbox);
-
-        // 2. Heavy admin tables — ONLY fetch if role is Admin to protect student network bandwidth
+        // 2. Admin-only tables (inbox_files, materials, stock_movements, dll dilindungi RLS Admin)
         if (!isStudent) {
+          const inbox = await fileService.fetchInboxFiles().catch(() => []);
+          setInboxFiles(inbox);
           const mats = await materialService.fetchMaterials().catch(() => []);
           setMaterials(mats);
 
