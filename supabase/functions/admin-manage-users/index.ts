@@ -63,7 +63,7 @@ serve(async (req) => {
 
     if (action === 'list') {
       // Get all auth users
-      const { data: authData, error: authErr } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 })
+      const { data: authData, error: authErr } = await supabaseAdmin.auth.admin.listUsers()
       if (authErr) throw authErr
 
       // Get all profiles
