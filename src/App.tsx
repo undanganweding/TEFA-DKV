@@ -832,7 +832,31 @@ export function App() {
 
         return { success: true, orderId: res.orderId, orderNo: res.orderNo };
       } else {
-        console.error('Failed to create order in Supabase:', res.error);
+        // Order creation failed — try to recover using idempotency key
+        // The order MIGHT have been created server-side, but the network failed before response arrived
+        console.warn('[ORDER] Order creation returned failure, attempting recovery query...', res.error);
+        if ((newOrder as any).idempotencyKey) {
+          try {
+            const recovered = await orderServiceModule.recoverOrderByKey((newOrder as any).idempotencyKey);
+            if (recovered && recovered.success) {
+              console.log('[ORDER] Order successfully recovered from DB despite network error:', recovered);
+              const recoveredOrder: ProductionOrder = {
+                ...newOrder,
+                id: recovered.orderId!,
+                orderNo: recovered.orderNo || newOrder.orderNo,
+              };
+              setOrders((prev) => [recoveredOrder, ...prev]);
+              return { success: true, orderId: recovered.orderId, orderNo: recovered.orderNo };
+            }
+          } catch (recoverErr) {
+            console.error('[ORDER] Recovery query also failed:', recoverErr);
+          }
+        }
+        // Show better error message for students
+        const isNetworkError = res.error?.includes('Failed to fetch') || res.error?.includes('network') || res.error?.includes('fetch');
+        if (isNetworkError) {
+          return { success: false, error: 'Koneksi internet terputus. Pesanan mungkin sudah tersimpan — silakan cek menu "Pesanan Saya" sebelum mengirim ulang.' };
+        }
         return { success: false, error: res.error || 'Gagal menyimpan pesanan ke database.' };
       }
     } catch (err: any) {

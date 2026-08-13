@@ -133,6 +133,35 @@ export interface Database {
           qty_required?: number;
         };
       };
+      product_variants: {
+        Row: {
+          id: string;
+          product_id: string;
+          name: string;
+          code: string | null;
+          unit: string;
+          base_price: number;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          product_id: string;
+          name: string;
+          code?: string | null;
+          unit?: string;
+          base_price?: number;
+          is_active?: boolean;
+        };
+        Update: {
+          name?: string;
+          code?: string | null;
+          unit?: string;
+          base_price?: number;
+          is_active?: boolean;
+        };
+      };
       materials: {
         Row: {
           id: string;
@@ -259,6 +288,7 @@ export interface Database {
         Row: {
           id: string;
           order_no: string;
+          idempotency_key: string | null;
           created_by: string | null;
           guest_access_token: string;
           customer_name: string;
@@ -291,6 +321,7 @@ export interface Database {
         Insert: {
           id?: string;
           order_no: string;
+          idempotency_key?: string | null;
           created_by?: string | null;
           guest_access_token?: string;
           customer_name: string;

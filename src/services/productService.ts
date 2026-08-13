@@ -1,8 +1,11 @@
-import { supabase, directRestFetch } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import type { Product } from '../types';
 import type { Database } from '../lib/database.types';
+import type { PostgrestFilterBuilder } from '@supabase/postgrest-js';
 
 type ProductRow = Database['public']['Tables']['products']['Row'];
+type RecipeRow = Database['public']['Tables']['product_recipes']['Row'];
+type VariantRow = Database['public']['Tables']['product_variants']['Row'];
 
 /**
  * Maps a Supabase product row to the existing Product interface
@@ -27,54 +30,52 @@ export function mapProductRow(row: ProductRow): Product {
   };
 }
 
-export async function fetchProducts(): Promise<Product[]> {
-  let productRows: any[] = [];
-  try {
-    const { data, error } = await supabase
-      .from('products')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error || !data) {
-      console.warn('[NETWORK] Supabase JS query for products failed, executing Direct REST Transport...', error);
-      productRows = await directRestFetch('products?select=*&order=created_at.desc');
-    } else {
-      productRows = data;
-    }
-  } catch (err) {
-    console.warn('[NETWORK] Supabase JS exception for products, executing Direct REST Transport...', err);
-    try {
-      productRows = await directRestFetch('products?select=*&order=created_at.desc');
-    } catch (e) {
-      console.error('[NETWORK] Direct REST Transport for products also failed:', e);
-      return [];
+/**
+ * Execute a Supabase query with retry on network errors.
+ */
+async function execWithRetry<T>(
+  query: PostgrestFilterBuilder<any, any, T[], any, any>,
+  retries = 2
+): Promise<T[] | null> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const { data, error } = await query;
+    if (!error && data !== null) return data;
+    if (attempt < retries) {
+      await new Promise(resolve => setTimeout(resolve, 300));
     }
   }
+  return null;
+}
 
-  // Fetch recipes for all products
-  const { data: recipes } = await supabase
-    .from('product_recipes')
-    .select('*');
+export async function fetchProducts(): Promise<Product[]> {
+  // Fetch all data in PARALLEL (reduces total exposure to connection resets)
+  const [productRows, recipes, variants] = await Promise.all([
+    execWithRetry<ProductRow>(
+      supabase.from('products').select('*').order('created_at', { ascending: false })
+    ),
+    execWithRetry<RecipeRow>(
+      supabase.from('product_recipes').select('*')
+    ),
+    execWithRetry<VariantRow>(
+      supabase.from('product_variants').select('*').eq('is_active', true)
+    ),
+  ]);
 
-  // Fetch all active variants
-  const { data: variants } = await supabase
-    .from('product_variants')
-    .select('*')
-    .eq('is_active', true);
+  if (!productRows || productRows.length === 0) return [];
 
-  return (productRows || []).map(row => {
+  return productRows.map(row => {
     const product = mapProductRow(row);
     const productRecipes = (recipes || [])
-      .filter(r => r.product_id === row.id)
-      .map(r => ({ materialId: r.material_id, qtyRequired: Number(r.qty_required) }));
+      .filter((r: RecipeRow) => r.product_id === row.id)
+      .map((r: RecipeRow) => ({ materialId: r.material_id, qtyRequired: Number(r.qty_required) }));
     if (productRecipes.length > 0) {
       product.recipe = productRecipes;
     }
-    
+
     // Attach variants
     const productVariants = (variants || [])
-      .filter(v => v.product_id === row.id)
-      .map(v => ({
+      .filter((v: VariantRow) => v.product_id === row.id)
+      .map((v: VariantRow) => ({
         id: v.id,
         productId: v.product_id,
         name: v.name,
@@ -83,9 +84,8 @@ export async function fetchProducts(): Promise<Product[]> {
         basePrice: Number(v.base_price),
         isActive: v.is_active,
       }));
-    
-    product.variants = productVariants;
 
+    product.variants = productVariants;
     return product;
   });
 }
