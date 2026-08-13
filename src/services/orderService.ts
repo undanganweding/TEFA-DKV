@@ -144,6 +144,7 @@ export async function createOrder(orderData: {
   notes: string;
   status?: string;
   createdBy?: string;
+  idempotencyKey?: string;
   inboxFile?: {
     uploadDate?: string;
     customerName?: string;
@@ -193,6 +194,7 @@ export async function createOrder(orderData: {
       notes: orderData.notes,
       status: orderData.status || 'Menunggu Admin',
       created_by: orderData.createdBy || null,
+      idempotency_key: orderData.idempotencyKey || null,
       inbox_file: orderData.inboxFile ? {
         upload_date: orderData.inboxFile.uploadDate || null,
         customer_name: orderData.inboxFile.customerName || orderData.customerName,
@@ -227,12 +229,35 @@ export async function createOrder(orderData: {
   };
 }
 
+export async function recoverOrderByKey(idempotencyKey: string): Promise<{ success: boolean; orderId?: string; orderNo?: string; guestAccessToken?: string } | null> {
+  if (!idempotencyKey) return null;
+  try {
+    const { data, error } = await supabase
+      .from('orders')
+      .select('id, order_no, guest_access_token')
+      .eq('idempotency_key', idempotencyKey)
+      .maybeSingle();
+
+    if (error || !data) return null;
+    return {
+      success: true,
+      orderId: data.id,
+      orderNo: data.order_no,
+      guestAccessToken: data.guest_access_token,
+    };
+  } catch (err) {
+    console.error('Error recovering order by key:', err);
+    return null;
+  }
+}
+
 export async function createGuestOrder(orderData: {
   items: CartItem[];
   customerName: string;
   customerPhone: string;
   customerEmail?: string;
   notes?: string;
+  idempotencyKey?: string;
 }): Promise<{ success: boolean; orderId?: string; orderNo?: string; guestAccessToken?: string; error?: string }> {
   const { data, error } = await supabase.rpc('create_guest_order', {
     order_data: {
@@ -259,6 +284,7 @@ export async function createGuestOrder(orderData: {
       customer_phone: orderData.customerPhone,
       customer_email: orderData.customerEmail || null,
       notes: orderData.notes || null,
+      idempotency_key: orderData.idempotencyKey || null,
     },
   });
 

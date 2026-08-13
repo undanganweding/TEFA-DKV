@@ -24,6 +24,26 @@ DECLARE
   v_created_by uuid;
   v_inbox_file jsonb;
 BEGIN
+  -- Handle Idempotency early
+  IF (order_data->>'idempotency_key') IS NOT NULL AND order_data->>'idempotency_key' != '' THEN
+    SELECT id, order_no, paid_amount, total_amount, payment_status
+    INTO v_order_id, v_order_no, v_paid_amount, v_total_amount, v_payment_status
+    FROM orders
+    WHERE idempotency_key = order_data->>'idempotency_key';
+
+    IF FOUND THEN
+      RETURN jsonb_build_object(
+        'success', true,
+        'order_id', v_order_id,
+        'order_no', v_order_no,
+        'total_amount', v_total_amount,
+        'paid_amount', v_paid_amount,
+        'payment_status', v_payment_status,
+        'message', 'Idempotent request returned existing order'
+      );
+    END IF;
+  END IF;
+
   -- Generate order number
   v_order_no := generate_order_no(COALESCE(order_data->>'prefix', 'POS'));
   v_order_id := gen_random_uuid();
@@ -70,7 +90,7 @@ BEGIN
     institution, order_date, due_date, status, payment_status, payment_method,
     subtotal, discount, tax_amount, total_amount, total_hpp,
     paid_amount, balance_due, refunded_amount,
-    operator_name, priority, notes, design_notes, finishing_notes
+    operator_name, priority, notes, design_notes, finishing_notes, idempotency_key
   ) VALUES (
     v_order_id, v_order_no,
     v_created_by,
@@ -89,7 +109,8 @@ BEGIN
     COALESCE(order_data->>'priority', 'Normal'),
     order_data->>'notes',
     order_data->>'design_notes',
-    order_data->>'finishing_notes'
+    order_data->>'finishing_notes',
+    order_data->>'idempotency_key'
   );
 
   -- Insert order items

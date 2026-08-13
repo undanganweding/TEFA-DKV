@@ -225,6 +225,9 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
   const myOrders = orders.filter((o) => !o.isArchived);
   const myFiles = inboxFiles.filter((f) => !f.isArchived);
 
+  const [isSubmittingOrder, setIsSubmittingOrder] = useState<boolean>(false);
+  const [submissionStatusMsg, setSubmissionStatusMsg] = useState<string | null>(null);
+
   // Order Submission Helper
   const handleCreateOrderSubmit = (
     productName: string,
@@ -235,6 +238,11 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
     notes: string,
     fileData?: { name: string; size: string; type: any; previewUrl?: string } | null
   ) => {
+    if (isSubmittingOrder) return; // Prevent double-click & React StrictMode duplicate submissions
+    setIsSubmittingOrder(true);
+    setSubmissionStatusMsg('Memverifikasi pesanan...');
+
+    const clientDedupeId = `IDEMP-${currentUser?.id || 'STUDENT'}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
     const randomNum = Math.floor(10000 + Math.random() * 90000);
     const orderId = `TEFA-2026-${randomNum}`;
     const now = new Date();
@@ -305,6 +313,7 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
         operatorName: 'Sistem Portal Siswa',
         priority: 'Normal',
         notes: notes,
+        idempotencyKey: clientDedupeId,
         statusHistory: [
           {
             status: 'Menunggu Admin',
@@ -333,6 +342,8 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
 
       // WAIT FOR SUPABASE DB RESPONSE BEFORE SHOWING SUCCESS UI
       onAddOrder(newProdOrder).then((res: any) => {
+        setIsSubmittingOrder(false);
+        setSubmissionStatusMsg(null);
         if (res && res.success) {
           const finalOrderNo = res.orderNo || orderId;
           
@@ -350,9 +361,16 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
           setSubmittedOrderSuccess({ orderId: finalOrderNo, productName, totalAmount });
           setSelectedProductForDetail(null);
         } else {
-          alert(`Gagal membuat pesanan: ${res?.error || 'Database error'}. Silakan coba lagi.`);
+          alert('Status pesanan belum dapat diverifikasi. Silakan cek Pesanan Saya sebelum mencoba lagi.');
         }
+      }).catch(() => {
+        setIsSubmittingOrder(false);
+        setSubmissionStatusMsg(null);
+        alert('Status pesanan belum dapat diverifikasi. Silakan cek Pesanan Saya sebelum mencoba lagi.');
       });
+    } else {
+      setIsSubmittingOrder(false);
+      setSubmissionStatusMsg(null);
     }
   };
 
@@ -1151,10 +1169,15 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
 
                   <button
                     type="submit"
-                    className="w-full bg-gradient-to-r from-[#5B4BFF] to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white font-extrabold text-xs py-3.5 rounded-2xl shadow-lg shadow-purple-900/50 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    disabled={isSubmittingOrder}
+                    className={`w-full text-white font-extrabold text-xs py-3.5 rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                      isSubmittingOrder
+                        ? 'bg-slate-700 opacity-70 cursor-not-allowed'
+                        : 'bg-gradient-to-r from-[#5B4BFF] to-indigo-600 hover:from-purple-600 hover:to-indigo-700 shadow-purple-900/50'
+                    }`}
                   >
-                    <span className="material-symbols-outlined text-lg">check_circle</span>
-                    <span>Submit Pesanan Ke Admin TEFA</span>
+                    <span className="material-symbols-outlined text-lg">{isSubmittingOrder ? 'sync' : 'check_circle'}</span>
+                    <span>{submissionStatusMsg || 'Submit Pesanan Ke Admin TEFA'}</span>
                   </button>
                 </form>
               </div>

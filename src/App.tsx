@@ -782,6 +782,7 @@ export function App() {
         notes: newOrder.notes || '',
         status: newOrder.status || 'Menunggu Admin',
         createdBy: currentUser?.id || undefined,
+        idempotencyKey: (newOrder as any).idempotencyKey || undefined,
         inboxFile: (newOrder as any).inboxFilePayload ? (newOrder as any).inboxFilePayload : undefined,
       });
 
@@ -835,7 +836,14 @@ export function App() {
         return { success: false, error: res.error || 'Gagal menyimpan pesanan ke database.' };
       }
     } catch (err: any) {
-      console.error('Error creating order in Supabase:', err);
+      console.error('Error creating order in Supabase. Attempting recovery query...', err);
+      if ((newOrder as any).idempotencyKey) {
+        const recovered = await orderServiceModule.recoverOrderByKey((newOrder as any).idempotencyKey);
+        if (recovered && recovered.success) {
+          console.log('Order successfully recovered from DB despite network exception:', recovered);
+          return { success: true, orderId: recovered.orderId, orderNo: recovered.orderNo };
+        }
+      }
       return { success: false, error: err.message || 'Terjadi kesalahan sistem.' };
     }
   };
