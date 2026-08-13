@@ -108,7 +108,8 @@ export async function signUp(input: {
   studentClass: string;
   major: string;
   whatsapp: string;
-}): Promise<{ success: boolean; message?: string }> {
+  avatar?: string;
+}): Promise<{ success: boolean; message?: string; user?: any }> {
   const cleanEmail = input.email.trim().toLowerCase();
 
   // Create auth user
@@ -133,28 +134,35 @@ export async function signUp(input: {
     return { success: false, message: 'Email sudah terdaftar. Silakan gunakan email lain atau login.' };
   }
 
-  // Create profile with Pending status
-  const { error: profileError } = await supabase.from('profiles').insert({
+  // Create profile with Active status (Auto-Approved)
+  const newProfile = {
     id: data.user.id,
     full_name: input.name.trim(),
     role: 'Student',
-    status: 'Pending',
+    status: 'Active',
     nis: input.nis.trim(),
     school_class: input.studentClass.trim(),
     major: input.major.trim() || 'Desain Komunikasi Visual',
     whatsapp: input.whatsapp.trim(),
     phone: input.whatsapp.trim(),
-  });
+    avatar_path: input.avatar || null,
+  };
+
+  const { error: profileError } = await supabase.from('profiles').insert(newProfile);
 
   if (profileError) {
     console.error('Profile creation error:', profileError);
     return { success: false, message: 'Gagal membuat profil. Silakan coba lagi.' };
   }
 
-  // Sign out after registration (they need admin approval)
+  // Sign out after registration so they can explicitly login with the success screen
   await supabase.auth.signOut();
 
-  return { success: true, message: 'Pendaftaran berhasil dikirim. Silakan menunggu persetujuan admin TEFA.' };
+  return { 
+    success: true, 
+    message: 'Akun siswa berhasil dibuat dan sudah aktif.',
+    user: newProfile
+  };
 }
 
 export async function signOut(): Promise<void> {

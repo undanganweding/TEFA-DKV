@@ -47,27 +47,27 @@ export async function getUsersByFilter(filter: 'all' | 'pending' | 'active' | 'a
   return (data || []).map(p => mapProfileToUserProfile(p, ''));
 }
 
-export async function approveUser(userId: string): Promise<boolean> {
+export async function activateUser(userId: string): Promise<boolean> {
   const { error } = await supabase
     .from('profiles')
     .update({ status: 'Active', reject_reason: null })
     .eq('id', userId);
 
   if (error) {
-    console.error('Error approving user:', error);
+    console.error('Error activating user:', error);
     return false;
   }
   return true;
 }
 
-export async function rejectUser(userId: string, reason: string): Promise<boolean> {
+export async function suspendUser(userId: string, reason: string = 'Melanggar ketentuan'): Promise<boolean> {
   const { error } = await supabase
     .from('profiles')
-    .update({ status: 'Rejected', reject_reason: reason })
+    .update({ status: 'Inactive', reject_reason: reason })
     .eq('id', userId);
 
   if (error) {
-    console.error('Error rejecting user:', error);
+    console.error('Error suspending user:', error);
     return false;
   }
   return true;
@@ -85,6 +85,8 @@ export async function updateProfile(userId: string, updates: {
   position?: string;
   nip?: string;
   employee_id?: string;
+  role?: string;
+  status?: string;
 }): Promise<boolean> {
   const { error } = await supabase
     .from('profiles')
@@ -120,4 +122,26 @@ export async function getPendingCount(): Promise<number> {
 
   if (error) return 0;
   return count || 0;
+}
+
+export async function adminSetPassword(targetUserId: string, newPassword: string): Promise<{ success: boolean; message: string }> {
+  try {
+    const { data, error } = await supabase.functions.invoke('admin-set-password', {
+      body: { targetUserId, newPassword }
+    });
+
+    if (error) {
+      console.error('Edge function error:', error);
+      return { success: false, message: error.message || 'Gagal menghubungi server untuk mengubah password.' };
+    }
+
+    if (data?.error) {
+      return { success: false, message: data.error };
+    }
+
+    return { success: true, message: 'Password berhasil diubah.' };
+  } catch (err: any) {
+    console.error('Unexpected error setting password:', err);
+    return { success: false, message: 'Terjadi kesalahan internal.' };
+  }
 }

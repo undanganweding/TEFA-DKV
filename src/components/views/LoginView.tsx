@@ -37,6 +37,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onBackToHo
   const [rememberMe, setRememberMe] = useState<boolean>(true);
 
   // Student Register Form State
+  const [registrationSuccessData, setRegistrationSuccessData] = useState<any>(null);
   const [regName, setRegName] = useState<string>('');
   const [regEmail, setRegEmail] = useState<string>('');
   const [regPassword, setRegPassword] = useState<string>('');
@@ -152,6 +153,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onBackToHo
       studentClass: regClass,
       major: regMajor,
       whatsapp: regWhatsapp,
+      avatar: regAvatarUrl,
     }).then((result) => {
       setIsLoading(false);
       if (!result.success) {
@@ -159,15 +161,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onBackToHo
         return;
       }
 
-      setSuccessToast('Pendaftaran berhasil! Menunggu persetujuan admin TEFA.');
-
-      // Reset form & redirect to login after short delay
-      setTimeout(() => {
-        setEmailOrUsername(regEmail);
-        setPassword(regPassword);
-        setActiveTab('login');
-        setSuccessToast('Akun Anda telah terdaftar dan menunggu persetujuan admin.');
-      }, 2000);
+      setRegistrationSuccessData(result.user);
     }).catch((err) => {
       setErrorMessage(err.message || 'Terjadi kesalahan sistem.');
     }).finally(() => {
@@ -385,7 +379,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onBackToHo
               <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-2xl">
                 <button
                   type="button"
-                  onClick={() => handleTabChange('login')}
+                  onClick={() => { setRegistrationSuccessData(null); handleTabChange('login'); }}
                   className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
                     activeTab === 'login'
                       ? 'bg-white text-slate-900 shadow-xs'
@@ -479,7 +473,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onBackToHo
                       <input
                         type="text"
                         required
-                        autoComplete="username"
+                        autoComplete="email"
                         value={emailOrUsername}
                         onChange={(e) => setEmailOrUsername(e.target.value)}
                         placeholder="email@smknuungaran.sch.id / username"
@@ -589,7 +583,72 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onBackToHo
             {/* ========================================================================= */}
             {/* TAB 2: REGISTER STUDENT FORM (/register/student)                          */}
             {/* ========================================================================= */}
-            {activeTab === 'register_student' && (
+            {activeTab === 'register_student' && registrationSuccessData && (
+              <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="text-center py-6">
+                <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
+                  <span className="material-symbols-outlined text-5xl text-emerald-500">check_circle</span>
+                </div>
+                <h2 className="text-3xl font-black text-slate-900 tracking-tight leading-none mb-2">Registrasi Berhasil! 🎉</h2>
+                <p className="text-sm text-slate-500 font-bold mb-8">Akun siswa Anda berhasil dibuat dan sudah aktif.</p>
+
+                <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200 mb-8 max-w-sm mx-auto text-left">
+                  <div className="flex flex-col items-center mb-6 pb-6 border-b border-slate-200">
+                    <img 
+                      src={registrationSuccessData.avatar_path || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&q=80'} 
+                      alt="Profil Siswa" 
+                      className="w-24 h-24 rounded-full object-cover border-4 border-emerald-500 shadow-md mb-4"
+                    />
+                    <h3 className="font-black text-lg text-slate-800">{registrationSuccessData.full_name}</h3>
+                    <p className="text-xs text-slate-500 font-bold">{registrationSuccessData.school_class} - {registrationSuccessData.major}</p>
+                    <div className="mt-3 px-3 py-1 bg-emerald-100 text-emerald-700 text-xs font-black rounded-full flex items-center gap-1">
+                      <span className="material-symbols-outlined text-sm">check_circle</span>
+                      Akun Aktif
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-slate-500 font-bold">Email</span>
+                      <span className="text-xs text-slate-800 font-black">{regEmail}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-slate-500 font-bold">WhatsApp</span>
+                      <span className="text-xs text-slate-800 font-black">{registrationSuccessData.whatsapp}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-slate-500 font-bold">NIS</span>
+                      <span className="text-xs text-slate-800 font-black">{registrationSuccessData.nis || '-'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-xs text-slate-500 mb-6">Anda sekarang dapat masuk menggunakan email dan password yang telah didaftarkan.</p>
+
+                <div className="flex flex-col sm:flex-row gap-3 justify-center max-w-sm mx-auto">
+                  <button
+                    onClick={() => {
+                      setEmailOrUsername(regEmail);
+                      setPassword(regPassword);
+                      setRegistrationSuccessData(null);
+                      setActiveTab('login');
+                    }}
+                    className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-black text-sm tracking-wide shadow-xl shadow-emerald-500/25 transition-all cursor-pointer"
+                  >
+                    Masuk ke Akun
+                  </button>
+                  {onBackToHome && (
+                    <button
+                      onClick={onBackToHome}
+                      className="w-full py-3.5 px-6 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-black text-sm tracking-wide transition-all cursor-pointer"
+                    >
+                      Kembali ke Beranda
+                    </button>
+                  )}
+                </div>
+              </motion.div>
+            )}
+
+            {activeTab === 'register_student' && !registrationSuccessData && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                 <div className="mb-5">
                   <h2 className="text-2xl font-black text-slate-900 tracking-tight leading-none mb-1.5">
@@ -653,7 +712,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onBackToHo
                       <input
                         type="email"
                         required
-                        autoComplete="username"
+                        autoComplete="email"
                         value={regEmail}
                         onChange={(e) => setRegEmail(e.target.value)}
                         placeholder="siswa@smknuungaran.sch.id"

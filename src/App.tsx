@@ -1312,12 +1312,16 @@ export function App() {
                   const updated = [confirmedOrder, ...existingOrders].slice(0, 20); // Keep max 20
                   localStorage.setItem('tefa_guest_orders', JSON.stringify(updated));
                 } catch { /* ignore storage errors */ }
+                
+                return { success: true, orderNo: res.orderNo, guestAccessToken: res.guestAccessToken };
               } else {
                 alert(`Gagal membuat pesanan: ${res.error || 'Server error'}`);
+                return { success: false };
               }
             } catch (err) {
               console.error('Failed to submit guest order', err);
               alert('Terjadi kesalahan saat memproses pesanan.');
+              return { success: false };
             }
           }}
           onSwitchToAdmin={() => setCurrentPage('login')}

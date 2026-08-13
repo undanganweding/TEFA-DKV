@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { UserProfile, UserRole } from '../../types';
 import * as profileService from '../../services/profileService';
 
-type UserFilter = 'all' | 'pending' | 'active' | 'admin' | 'inactive';
+type UserFilter = 'all' | 'siswa' | 'admin' | 'staff' | 'active' | 'inactive';
 
 interface UpdateUserInput {
   name?: string;
@@ -13,6 +13,8 @@ interface UpdateUserInput {
   whatsapp?: string;
   phone?: string;
   avatar?: string;
+  role?: string;
+  status?: string;
 }
 import { AvatarCropModal } from '../AvatarCropModal';
 import { Pagination } from '../Pagination';
@@ -38,13 +40,14 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
+  const [showSuspendModal, setShowSuspendModal] = useState(false);
   const [showAvatarCrop, setShowAvatarCrop] = useState(false);
 
   // Form states
   const [editForm, setEditForm] = useState<UpdateUserInput>({});
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [rejectReason, setRejectReason] = useState('');
+  const [suspendReason, setSuspendReason] = useState('');
   const [tempAvatar, setTempAvatar] = useState<string>('');
 
   // Load users
@@ -66,17 +69,20 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
     let result = [...users];
 
     switch (currentFilter) {
-      case 'pending':
-        result = result.filter((u) => u.statusAkun === 'Pending');
+      case 'siswa':
+        result = result.filter((u) => u.role === 'Siswa');
         break;
       case 'active':
         result = result.filter((u) => u.statusAkun === 'Active');
         break;
       case 'admin':
-        result = result.filter((u) => u.role === 'Admin TEFA' || u.role === 'Kepala TEFA');
+        result = result.filter((u) => u.role === 'Admin TEFA' || u.role === 'Kepala TEFA' || u.role === 'Admin');
+        break;
+      case 'staff':
+        result = result.filter((u) => u.role === 'Guru / Operator');
         break;
       case 'inactive':
-        result = result.filter((u) => u.statusAkun === 'Inactive' || u.statusAkun === 'Rejected');
+        result = result.filter((u) => u.statusAkun === 'Inactive' || u.statusAkun === 'Rejected' || u.statusAkun === 'Suspended');
         break;
     }
 
@@ -100,31 +106,28 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
   const paginatedUsers = filteredUsers.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
   // Handlers
-  const handleApprove = async (userId: string) => {
-    const success = await profileService.approveUser(userId);
+  const handleActivate = async (userId: string) => {
+    const success = await profileService.activateUser(userId);
     if (success) {
       loadUsers();
       setShowDetailModal(false);
       setSelectedUser(null);
     } else {
-      alert('Gagal menyetujui user.');
+      alert('Gagal mengaktifkan user.');
     }
   };
 
-  const handleReject = async () => {
-    if (!selectedUser || !rejectReason.trim()) {
-      alert('Alasan penolakan harus diisi!');
-      return;
-    }
-    const success = await profileService.rejectUser(selectedUser.id, rejectReason);
+  const handleSuspend = async () => {
+    if (!selectedUser) return;
+    const success = await profileService.suspendUser(selectedUser.id, suspendReason);
     if (success) {
       loadUsers();
-      setShowRejectModal(false);
+      setShowSuspendModal(false);
       setShowDetailModal(false);
       setSelectedUser(null);
-      setRejectReason('');
+      setSuspendReason('');
     } else {
-      alert('Gagal menolak user.');
+      alert('Gagal me-nonaktifkan user.');
     }
   };
 
@@ -138,6 +141,8 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
       major: editForm.major,
       whatsapp: editForm.whatsapp,
       avatar_path: editForm.avatar,
+      role: editForm.role,
+      status: editForm.status,
     });
     if (success) {
       setShowEditModal(false);
@@ -147,7 +152,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
     }
   };
 
-  const handleResetPassword = () => {
+  const handleResetPassword = async () => {
     if (!selectedUser) return;
     if (newPassword.length < 8) {
       alert('Password minimal 8 karakter!');
@@ -157,12 +162,20 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
       alert('Konfirmasi password tidak cocok!');
       return;
     }
-    // Supabase reset password via admin requires service role or setting a new password via admin interface.
-    // For safety, we direct them to use standard user password reset since frontend cannot hold service role key.
-    alert('Instruksi pemulihan kata sandi dikirim. Admin dapat mengarahkan pengguna untuk reset via formulir lupa password.');
-    setShowPasswordModal(false);
-    setNewPassword('');
-    setConfirmPassword('');
+    
+    if (!confirm('Anda akan mengubah password akun ' + selectedUser.name + '. Lanjutkan?')) {
+      return;
+    }
+
+    const { success, message } = await profileService.adminSetPassword(selectedUser.id, newPassword);
+    if (success) {
+      alert('Password berhasil diperbarui.');
+      setShowPasswordModal(false);
+      setNewPassword('');
+      setConfirmPassword('');
+    } else {
+      alert(message);
+    }
   };
 
   const handleDelete = async () => {
@@ -200,6 +213,8 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
       whatsapp: user.whatsapp,
       phone: user.phone,
       avatar: user.avatar,
+      role: user.role,
+      status: user.statusAkun,
     });
     setTempAvatar(user.avatar);
     setShowEditModal(true);
@@ -208,10 +223,11 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
 
   const filterTabs = [
     { key: 'all' as UserFilter, label: 'Semua User', count: users.length },
-    { key: 'pending' as UserFilter, label: 'Pending Approval', count: pendingCount, highlight: true },
-    { key: 'active' as UserFilter, label: 'Siswa Aktif', count: users.filter((u) => u.statusAkun === 'Active').length },
-    { key: 'admin' as UserFilter, label: 'Admin', count: users.filter((u) => u.role === 'Admin TEFA' || u.role === 'Kepala TEFA').length },
-    { key: 'inactive' as UserFilter, label: 'Inactive', count: users.filter((u) => u.statusAkun === 'Inactive' || u.statusAkun === 'Rejected').length },
+    { key: 'siswa' as UserFilter, label: 'Total Siswa', count: users.filter((u) => u.role === 'Siswa').length },
+    { key: 'admin' as UserFilter, label: 'Total Admin', count: users.filter((u) => u.role === 'Admin TEFA' || u.role === 'Kepala TEFA' || u.role === 'Admin').length },
+    { key: 'staff' as UserFilter, label: 'Guru / Staff', count: users.filter((u) => u.role === 'Guru / Operator').length },
+    { key: 'active' as UserFilter, label: 'User Aktif', count: users.filter((u) => u.statusAkun === 'Active').length },
+    { key: 'inactive' as UserFilter, label: 'User Nonaktif', count: users.filter((u) => u.statusAkun === 'Inactive' || u.statusAkun === 'Rejected' || u.statusAkun === 'Suspended').length },
   ];
 
   const getStatusBadge = (status: string) => {
@@ -250,8 +266,6 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
             className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
               currentFilter === tab.key
                 ? 'bg-[#5B4BFF] text-white shadow-lg shadow-purple-500/30'
-                : tab.highlight && tab.count > 0
-                ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
                 : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
             }`}
           >
@@ -261,8 +275,6 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
                 className={`ml-2 px-2 py-0.5 rounded-full text-xs ${
                   currentFilter === tab.key
                     ? 'bg-white/20'
-                    : tab.highlight
-                    ? 'bg-amber-500 text-white'
                     : 'bg-slate-100'
                 }`}
               >
@@ -331,28 +343,37 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
               >
                 Edit
               </button>
-              {user.statusAkun === 'Pending' && (
-                <>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleApprove(user.id);
-                    }}
-                    className="flex-1 py-2 text-xs font-bold text-emerald-600 hover:text-white hover:bg-emerald-500 rounded-xl transition-all"
-                  >
-                    Approve
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedUser(user);
-                      setShowRejectModal(true);
-                    }}
-                    className="flex-1 py-2 text-xs font-bold text-red-600 hover:text-white hover:bg-red-500 rounded-xl transition-all"
-                  >
-                    Tolak
-                  </button>
-                </>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedUser(user);
+                  setShowPasswordModal(true);
+                }}
+                className="flex-1 py-2 text-xs font-bold text-amber-600 hover:text-white hover:bg-amber-500 rounded-xl transition-all"
+              >
+                Password
+              </button>
+              {user.statusAkun !== 'Active' ? (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleActivate(user.id);
+                  }}
+                  className="flex-1 py-2 text-xs font-bold text-emerald-600 hover:text-white hover:bg-emerald-500 rounded-xl transition-all"
+                >
+                  Aktifkan
+                </button>
+              ) : (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedUser(user);
+                    setShowSuspendModal(true);
+                  }}
+                  className="flex-1 py-2 text-xs font-bold text-red-600 hover:text-white hover:bg-red-500 rounded-xl transition-all"
+                >
+                  Suspend
+                </button>
               )}
             </div>
           </div>
@@ -446,23 +467,26 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
               >
                 Edit
               </button>
-              {selectedUser.statusAkun === 'Pending' && (
-                <>
-                  <button
-                    onClick={() => handleApprove(selectedUser.id)}
-                    className="flex-1 py-3 bg-emerald-500 text-white font-bold text-sm rounded-xl hover:bg-emerald-600 transition-all"
-                  >
-                    Approve
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowRejectModal(true);
-                    }}
-                    className="flex-1 py-3 bg-red-500 text-white font-bold text-sm rounded-xl hover:bg-red-600 transition-all"
-                  >
-                    Tolak
-                  </button>
-                </>
+              <button
+                onClick={() => setShowPasswordModal(true)}
+                className="flex-1 py-3 bg-amber-500 text-white font-bold text-sm rounded-xl hover:bg-amber-600 transition-all"
+              >
+                Set Password
+              </button>
+              {selectedUser.statusAkun !== 'Active' ? (
+                <button
+                  onClick={() => handleActivate(selectedUser.id)}
+                  className="flex-1 py-3 bg-emerald-500 text-white font-bold text-sm rounded-xl hover:bg-emerald-600 transition-all"
+                >
+                  Aktifkan
+                </button>
+              ) : (
+                <button
+                  onClick={() => setShowSuspendModal(true)}
+                  className="flex-1 py-3 bg-red-500 text-white font-bold text-sm rounded-xl hover:bg-red-600 transition-all"
+                >
+                  Suspend
+                </button>
               )}
             </div>
           </div>
@@ -560,6 +584,34 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
                   </div>
                 </>
               )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1">Role</label>
+                  <select
+                    value={editForm.role || ''}
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, role: e.target.value }))}
+                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#5B4BFF]/30"
+                  >
+                    <option value="Siswa">Siswa</option>
+                    <option value="Guru / Operator">Guru / Staff</option>
+                    <option value="Admin">Admin</option>
+                    <option value="Admin TEFA">Admin TEFA</option>
+                    <option value="Kepala TEFA">Kepala TEFA</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1">Status Akun</label>
+                  <select
+                    value={editForm.status || ''}
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, status: e.target.value }))}
+                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#5B4BFF]/30"
+                  >
+                    <option value="Active">Active</option>
+                    <option value="Inactive">Inactive / Suspended</option>
+                  </select>
+                </div>
+              </div>
             </div>
 
             <div className="flex gap-3 mt-6">
@@ -634,21 +686,21 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
         </div>
       )}
 
-      {/* Reject Modal */}
-      {showRejectModal && selectedUser && (
+      {/* Suspend Modal */}
+      {showSuspendModal && selectedUser && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl">
-            <h2 className="text-xl font-black text-red-600 mb-2">Tolak Pendaftaran</h2>
+            <h2 className="text-xl font-black text-red-600 mb-2">Suspend User</h2>
             <p className="text-sm text-slate-500 mb-4">
-              Tolak pendaftaran: <strong>{selectedUser.name}</strong>
+              Anda akan me-nonaktifkan: <strong>{selectedUser.name}</strong>
             </p>
 
             <div>
-              <label className="block text-xs font-bold text-slate-600 mb-1">Alasan Penolakan *</label>
+              <label className="block text-xs font-bold text-slate-600 mb-1">Alasan Suspend *</label>
               <textarea
-                value={rejectReason}
-                onChange={(e) => setRejectReason(e.target.value)}
-                placeholder="Jelaskan alasan penolakan..."
+                value={suspendReason}
+                onChange={(e) => setSuspendReason(e.target.value)}
+                placeholder="Jelaskan alasan suspend..."
                 rows={4}
                 className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-500/30 resize-none"
               />
@@ -657,18 +709,18 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
             <div className="flex gap-3 mt-6">
               <button
                 onClick={() => {
-                  setShowRejectModal(false);
-                  setRejectReason('');
+                  setShowSuspendModal(false);
+                  setSuspendReason('');
                 }}
                 className="flex-1 py-3 bg-slate-100 text-slate-700 font-bold text-sm rounded-xl hover:bg-slate-200 transition-all"
               >
                 Batal
               </button>
               <button
-                onClick={handleReject}
+                onClick={handleSuspend}
                 className="flex-1 py-3 bg-red-500 text-white font-bold text-sm rounded-xl hover:bg-red-600 transition-all"
               >
-                Tolak Pendaftaran
+                Suspend User
               </button>
             </div>
           </div>

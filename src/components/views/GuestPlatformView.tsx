@@ -266,7 +266,7 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
 
       const newOrder: ProductionOrder = {
         id: 'ORD-GUEST-' + Date.now(),
-        orderNo: orderNo,
+        orderNo: '', // Backend assigns this
         customerName: orderForm.name.trim(),
         customerPhone: orderForm.whatsapp.trim(),
         customerEmail: orderForm.email.trim() || undefined,

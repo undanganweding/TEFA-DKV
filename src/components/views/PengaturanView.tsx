@@ -155,7 +155,7 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
 
   // Handlers
   const handleApprove = async (userId: string) => {
-    const success = await profileService.approveUser(userId);
+    const success = await profileService.activateUser(userId);
     if (success) {
       loadUsers();
       setShowDetailModal(false);
@@ -171,14 +171,13 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
       showToast('Alasan penolakan harus diisi!', 'error');
       return;
     }
-    const success = await profileService.rejectUser(selectedUser.id, rejectReason);
+    const success = await profileService.suspendUser(selectedUser.id, rejectReason);
     if (success) {
       loadUsers();
       setShowRejectModal(false);
       setShowDetailModal(false);
       setSelectedUser(null);
       setRejectReason('');
-      showToast('Pendaftaran ditolak', 'info');
     } else {
       showToast('Gagal menolak user.', 'error');
     }
