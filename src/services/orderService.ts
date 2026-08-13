@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase';
+import { supabase, directRestFetch } from '../lib/supabase';
 import type { ProductionOrder, CartItem, PaymentMethod, OrderStatus } from '../types';
 import type { Database } from '../lib/database.types';
 
@@ -59,7 +59,7 @@ export function mapOrderRow(
     paymentMethod: (row.payment_method || 'Cash') as PaymentMethod,
     items: items.map(mapOrderItemRow),
     subtotal: Number(row.subtotal),
-    totalHpp: Number(row.total_hpp),
+    totalHpp: Number(row.total_hpp || 0),
     discount: Number(row.discount),
     taxAmount: Number(row.tax_amount),
     totalAmount: Number(row.total_amount),
@@ -68,7 +68,7 @@ export function mapOrderRow(
     refundedAmount: Number(row.refunded_amount),
     refunds: refunds || [],
     stockDeducted: row.stock_deducted,
-    operatorName: row.operator_name || '',
+    operatorName: row.operator_name || 'Kepala TEFA',
     priority: (row.priority || 'Normal') as ProductionOrder['priority'],
     notes: row.notes || undefined,
     designNotes: row.design_notes || undefined,
@@ -82,14 +82,27 @@ export function mapOrderRow(
 }
 
 export async function fetchOrders(): Promise<ProductionOrder[]> {
-  const { data: orders, error } = await supabase
-    .from('orders')
-    .select('*')
-    .order('created_at', { ascending: false });
+  let orders: any[] = [];
+  try {
+    const { data, error } = await supabase
+      .from('orders')
+      .select('*')
+      .order('created_at', { ascending: false });
 
-  if (error) {
-    console.error('Error fetching orders:', error);
-    return [];
+    if (error || !data) {
+      console.warn('[NETWORK] Supabase JS query for orders failed, executing Direct REST Transport...', error);
+      orders = await directRestFetch('orders?select=*&order=created_at.desc');
+    } else {
+      orders = data;
+    }
+  } catch (err) {
+    console.warn('[NETWORK] Supabase JS exception for orders, executing Direct REST Transport...', err);
+    try {
+      orders = await directRestFetch('orders?select=*&order=created_at.desc');
+    } catch (e) {
+      console.error('[NETWORK] Direct REST Transport for orders also failed:', e);
+      return [];
+    }
   }
 
   if (!orders || orders.length === 0) return [];

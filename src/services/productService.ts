@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase';
+import { supabase, directRestFetch } from '../lib/supabase';
 import type { Product } from '../types';
 import type { Database } from '../lib/database.types';
 
@@ -28,14 +28,27 @@ export function mapProductRow(row: ProductRow): Product {
 }
 
 export async function fetchProducts(): Promise<Product[]> {
-  const { data, error } = await supabase
-    .from('products')
-    .select('*')
-    .order('created_at', { ascending: false });
+  let productRows: any[] = [];
+  try {
+    const { data, error } = await supabase
+      .from('products')
+      .select('*')
+      .order('created_at', { ascending: false });
 
-  if (error) {
-    console.error('Error fetching products:', error);
-    return [];
+    if (error || !data) {
+      console.warn('[NETWORK] Supabase JS query for products failed, executing Direct REST Transport...', error);
+      productRows = await directRestFetch('products?select=*&order=created_at.desc');
+    } else {
+      productRows = data;
+    }
+  } catch (err) {
+    console.warn('[NETWORK] Supabase JS exception for products, executing Direct REST Transport...', err);
+    try {
+      productRows = await directRestFetch('products?select=*&order=created_at.desc');
+    } catch (e) {
+      console.error('[NETWORK] Direct REST Transport for products also failed:', e);
+      return [];
+    }
   }
 
   // Fetch recipes for all products
@@ -49,7 +62,7 @@ export async function fetchProducts(): Promise<Product[]> {
     .select('*')
     .eq('is_active', true);
 
-  return (data || []).map(row => {
+  return (productRows || []).map(row => {
     const product = mapProductRow(row);
     const productRecipes = (recipes || [])
       .filter(r => r.product_id === row.id)
