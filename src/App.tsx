@@ -754,10 +754,8 @@ export function App() {
   };
 
   // Handlers for Orders
-  const handleAddOrder = async (newOrder: ProductionOrder) => {
-    setOrders((prev) => [newOrder, ...prev]);
-
-    // Persist order directly to Supabase DB via RPC
+  const handleAddOrder = async (newOrder: ProductionOrder): Promise<{ success: boolean; orderId?: string; orderNo?: string; error?: string }> => {
+    // Persist order directly to Supabase DB via RPC first
     try {
       const isUuid = (str?: string) => str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
       const res = await orderServiceModule.createOrder({
@@ -784,59 +782,62 @@ export function App() {
         notes: newOrder.notes || '',
         status: newOrder.status || 'Menunggu Admin',
         createdBy: currentUser?.id || undefined,
+        inboxFile: (newOrder as any).inboxFilePayload ? (newOrder as any).inboxFilePayload : undefined,
       });
 
       if (res.success && res.orderId) {
-        // Update local order id with the server generated orderId/orderNo
-        setOrders((prev) =>
-          prev.map((o) => (o.id === newOrder.id ? { ...o, id: res.orderId!, orderNo: res.orderNo || o.orderNo } : o))
-        );
+        const persistedOrder: ProductionOrder = {
+          ...newOrder,
+          id: res.orderId,
+          orderNo: res.orderNo || newOrder.orderNo,
+        };
+        setOrders((prev) => [persistedOrder, ...prev]);
+
+        // Auto add transaction if paid
+        if (newOrder.paidAmount > 0) {
+          const now = new Date();
+          const transNo =
+            'TRX-' +
+            now.getFullYear() +
+            String(now.getMonth() + 1).padStart(2, '0') +
+            String(now.getDate()).padStart(2, '0') +
+            '-' +
+            Math.floor(10 + Math.random() * 90);
+
+          const paymentRatio = newOrder.paidAmount / (newOrder.totalAmount || 1);
+          const transactionCogs = Math.round((newOrder.totalHpp || 0) * paymentRatio);
+          const transactionProfit = newOrder.paidAmount - transactionCogs;
+
+          const newTrx: FinanceTransaction = {
+            id: 'TRX-' + Date.now(),
+            transNo,
+            date:
+              now.toISOString().split('T')[0] +
+              ' ' +
+              now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+            type: 'Pemasukan',
+            category: 'Penjualan Cetak',
+            description: `Pembayaran ${newOrder.paymentStatus} Order No ${persistedOrder.orderNo} (${newOrder.customerName})`,
+            amount: newOrder.paidAmount,
+            cogsAmount: transactionCogs,
+            profitAmount: transactionProfit,
+            refOrderNo: persistedOrder.orderNo,
+            paymentMethod: newOrder.paymentMethod || 'Cash',
+            operator: settings.activeShiftOperator,
+            status: 'Berhasil',
+          };
+          setTransactions((prev) => [newTrx, ...prev]);
+        }
+
+        return { success: true, orderId: res.orderId, orderNo: res.orderNo };
       } else {
         console.error('Failed to create order in Supabase:', res.error);
+        return { success: false, error: res.error || 'Gagal menyimpan pesanan ke database.' };
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error creating order in Supabase:', err);
+      return { success: false, error: err.message || 'Terjadi kesalahan sistem.' };
     }
-
-    // Auto add transaction if paid
-    if (newOrder.paidAmount > 0) {
-      const now = new Date();
-      const transNo =
-        'TRX-' +
-        now.getFullYear() +
-        String(now.getMonth() + 1).padStart(2, '0') +
-        String(now.getDate()).padStart(2, '0') +
-        '-' +
-        Math.floor(10 + Math.random() * 90);
-
-      const paymentRatio = newOrder.paidAmount / (newOrder.totalAmount || 1);
-      const transactionCogs = Math.round((newOrder.totalHpp || 0) * paymentRatio);
-      const transactionProfit = newOrder.paidAmount - transactionCogs;
-
-      const newTrx: FinanceTransaction = {
-        id: 'TRX-' + Date.now(),
-        transNo,
-        date:
-          now.toISOString().split('T')[0] +
-          ' ' +
-          now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
-        type: 'Pemasukan',
-        category: 'Penjualan Cetak',
-        description: `Pembayaran ${newOrder.paymentStatus} Order No ${newOrder.orderNo} (${newOrder.customerName})`,
-        amount: newOrder.paidAmount,
-        cogsAmount: transactionCogs,
-        profitAmount: transactionProfit,
-        refOrderNo: newOrder.orderNo,
-        paymentMethod: newOrder.paymentMethod || 'Cash',
-        operator: settings.activeShiftOperator,
-        status: 'Berhasil',
-      };
-      setTransactions((prev) => [newTrx, ...prev]);
-    }
-
-    setShowNewOrderModal(false);
-    // Trigger thermal receipt modal
-    setActiveReceiptOrder(newOrder);
   };
 
   const handleUpdateOrderStatus = (orderId: string, newStatus: OrderStatus) => {

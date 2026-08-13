@@ -144,6 +144,23 @@ export async function createOrder(orderData: {
   notes: string;
   status?: string;
   createdBy?: string;
+  inboxFile?: {
+    uploadDate?: string;
+    customerName?: string;
+    classGrade?: string;
+    major?: string;
+    phone?: string;
+    serviceType?: string;
+    printSize?: string;
+    qty?: number;
+    notes?: string;
+    fileName: string;
+    fileType: string;
+    fileSize: string;
+    previewUrl?: string;
+    storagePath?: string;
+    folderPath?: string;
+  };
 }): Promise<{ success: boolean; orderId?: string; orderNo?: string; error?: string }> {
   const { data, error } = await supabase.rpc('create_order', {
     order_data: {
@@ -176,6 +193,23 @@ export async function createOrder(orderData: {
       notes: orderData.notes,
       status: orderData.status || 'Menunggu Admin',
       created_by: orderData.createdBy || null,
+      inbox_file: orderData.inboxFile ? {
+        upload_date: orderData.inboxFile.uploadDate || null,
+        customer_name: orderData.inboxFile.customerName || orderData.customerName,
+        class_grade: orderData.inboxFile.classGrade || null,
+        major: orderData.inboxFile.major || null,
+        phone: orderData.inboxFile.phone || orderData.customerPhone,
+        service_type: orderData.inboxFile.serviceType || null,
+        print_size: orderData.inboxFile.printSize || null,
+        qty: orderData.inboxFile.qty || 1,
+        notes: orderData.inboxFile.notes || null,
+        file_name: orderData.inboxFile.fileName,
+        file_type: orderData.inboxFile.fileType,
+        file_size: orderData.inboxFile.fileSize,
+        preview_url: orderData.inboxFile.previewUrl || null,
+        storage_path: orderData.inboxFile.storagePath || null,
+        folder_path: orderData.inboxFile.folderPath || null,
+      } : null,
     },
   });
 

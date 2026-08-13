@@ -269,8 +269,6 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
       linkedOrderNo: orderId,
     };
 
-    onAddInboxFile(newInboxFile);
-
     // 2. Create Production Order for Admin
     if (onAddOrder) {
       const newProdOrder: ProductionOrder = {
@@ -280,14 +278,14 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
         customerPhone: phone,
         customerEmail: email,
         institution: `SMK NU Ungaran (${classGrade})`,
-        orderDate: '2026-08-11',
-        dueDate: '2026-08-13 15:00',
+        orderDate: new Date().toISOString().split('T')[0],
+        dueDate: new Date(Date.now() + 86400000).toISOString().split('T')[0] + ' 15:00',
         status: 'Menunggu Admin',
         paymentStatus: 'Belum Bayar',
         items: [
           {
             id: `item-${Date.now()}`,
-            productId: selectedProductForDetail?.id || 'p-gen',
+            productId: selectedProductForDetail?.id || '',
             productName: productName,
             category: selectedCategory,
             unit: selectedProductForDetail?.unit || 'pcs',
@@ -315,25 +313,47 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
             note: 'Order dan file diunggah oleh siswa via Student TEFA Platform.',
           },
         ],
-      };
-      onAddOrder(newProdOrder);
+        inboxFilePayload: {
+          uploadDate: formattedDate,
+          customerName: customerName,
+          classGrade: `${classGrade} (${major})`,
+          major: major,
+          phone: phone,
+          serviceType: productName,
+          printSize: sizeSpec || 'Standard',
+          qty: qty,
+          notes: notes ? `[Material: ${material}] ${notes}` : `Material: ${material}`,
+          fileName: fileToUpload.name,
+          fileType: fileToUpload.type,
+          fileSize: fileToUpload.size,
+          previewUrl: fileToUpload.previewUrl,
+          folderPath: `/TEFA_FILES/2026/STUDENTS/${orderId}/${fileToUpload.name}`,
+        }
+      } as any;
+
+      // WAIT FOR SUPABASE DB RESPONSE BEFORE SHOWING SUCCESS UI
+      onAddOrder(newProdOrder).then((res: any) => {
+        if (res && res.success) {
+          const finalOrderNo = res.orderNo || orderId;
+          
+          setNotifications((prev) => [
+            {
+              id: `notif-${Date.now()}`,
+              title: `Pesanan ${finalOrderNo} Berhasil Dibuat`,
+              text: `Order ${productName} telah terkirim ke Admin TEFA.`,
+              time: 'Baru saja',
+              unread: true,
+            },
+            ...prev,
+          ]);
+
+          setSubmittedOrderSuccess({ orderId: finalOrderNo, productName, totalAmount });
+          setSelectedProductForDetail(null);
+        } else {
+          alert(`Gagal membuat pesanan: ${res?.error || 'Database error'}. Silakan coba lagi.`);
+        }
+      });
     }
-
-    // Add notification
-    setNotifications((prev) => [
-      {
-        id: `notif-${Date.now()}`,
-        title: `Pesanan ${orderId} Berhasil Dibuat`,
-        text: `Order ${productName} telah terkirim ke Admin TEFA.`,
-        time: 'Baru saja',
-        unread: true,
-      },
-      ...prev,
-    ]);
-
-    // Show success alert & popup
-    setSubmittedOrderSuccess({ orderId, productName, totalAmount });
-    setSelectedProductForDetail(null);
   };
 
   // Avatar Upload Helper
