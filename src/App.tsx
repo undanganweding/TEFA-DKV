@@ -736,6 +736,35 @@ export function App() {
   const handleAddOrder = (newOrder: ProductionOrder) => {
     setOrders((prev) => [newOrder, ...prev]);
 
+    // Persist order directly to Supabase DB
+    orderServiceModule.createOrder({
+      items: newOrder.items.map((it, idx) => ({
+        id: it.id || `item-${Date.now()}-${idx}`,
+        productId: it.productId,
+        productName: it.productName,
+        category: it.category || 'Cetak Outdoor',
+        unitPrice: it.unitPrice,
+        costPrice: it.costPrice || 0,
+        qty: it.qty,
+        unit: it.unit as any,
+        totalPrice: it.totalPrice,
+        notes: it.notes,
+        fileName: it.fileName,
+      })),
+      customerName: newOrder.customerName,
+      customerPhone: newOrder.customerPhone || '',
+      discount: newOrder.discount || 0,
+      paidAmount: newOrder.paidAmount || 0,
+      paymentMethod: newOrder.paymentMethod || 'Cash',
+      operatorName: newOrder.operatorName || 'Sistem Portal Siswa',
+      priority: newOrder.priority || 'Normal',
+      notes: newOrder.notes || '',
+      status: newOrder.status || 'Menunggu Admin',
+      createdBy: currentUser?.id || undefined,
+    }).catch((err) => {
+      console.error('Failed to save order to Supabase:', err);
+    });
+
     // Auto add transaction if paid
     if (newOrder.paidAmount > 0) {
       const now = new Date();
