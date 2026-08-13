@@ -7,7 +7,7 @@ echo  ==============================================
 echo.
 
 :: Set folder project
-set PROJECT_DIR=E:\web\TEFA-DKV-main
+set PROJECT_DIR=%~dp0
 
 :: Pindah ke folder project
 cd /d "%PROJECT_DIR%"
@@ -28,6 +28,9 @@ set /p msg="  Masukkan pesan commit: "
 if "%msg%"=="" set msg=update project
 git commit -m "%msg%"
 
+:: Rename branch to main (just in case it is master)
+git branch -M main
+
 :: Pull dari remote
 echo.
 echo  [3/4] Pulling from GitHub...
@@ -36,7 +39,7 @@ git pull origin main --no-edit
 :: Push ke remote
 echo.
 echo  [4/4] Pushing to GitHub...
-git push origin main
+git push -u origin main
 
 echo.
 echo  ==============================================

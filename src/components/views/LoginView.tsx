@@ -466,7 +466,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onBackToHo
                   )}
                 </div>
 
-                <form onSubmit={handleLoginSubmit} className="space-y-4">
+                <form onSubmit={handleLoginSubmit} className="space-y-4" autoComplete="on">
                   {/* Email / Username Input */}
                   <div>
                     <label className="block text-xs font-extrabold text-slate-700 mb-1.5">
@@ -479,6 +479,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onBackToHo
                       <input
                         type="text"
                         required
+                        autoComplete="username"
                         value={emailOrUsername}
                         onChange={(e) => setEmailOrUsername(e.target.value)}
                         placeholder="email@smknuungaran.sch.id / username"
@@ -508,6 +509,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onBackToHo
                       <input
                         type={showPassword ? 'text' : 'password'}
                         required
+                        autoComplete="current-password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         placeholder="Masukkan kata sandi"
@@ -598,7 +600,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onBackToHo
                   </p>
                 </div>
 
-                <form onSubmit={handleRegisterSubmit} className="space-y-3.5">
+                <form onSubmit={handleRegisterSubmit} className="space-y-3.5" autoComplete="on">
                   {/* Foto Profil Preview & Upload Trigger */}
                   <div className="flex items-center gap-3 p-3 bg-purple-50/70 border border-purple-200/80 rounded-2xl">
                     {regAvatarUrl ? (
@@ -651,6 +653,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onBackToHo
                       <input
                         type="email"
                         required
+                        autoComplete="username"
                         value={regEmail}
                         onChange={(e) => setRegEmail(e.target.value)}
                         placeholder="siswa@smknuungaran.sch.id"
@@ -726,6 +729,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onBackToHo
                       <input
                         type="password"
                         required
+                        autoComplete="new-password"
                         value={regPassword}
                         onChange={(e) => setRegPassword(e.target.value)}
                         placeholder="Minimal 8 karakter"
@@ -739,6 +743,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onBackToHo
                       <input
                         type="password"
                         required
+                        autoComplete="new-password"
                         value={regConfirmPassword}
                         onChange={(e) => setRegConfirmPassword(e.target.value)}
                         placeholder="Ulangi password"
@@ -801,7 +806,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onBackToHo
                 </div>
 
                 {forgotStep === 1 ? (
-                  <form onSubmit={handleForgotVerifyEmail} className="space-y-4">
+                  <form onSubmit={handleForgotVerifyEmail} className="space-y-4" autoComplete="on">
                     <p className="text-xs text-slate-600 font-medium leading-relaxed">
                       Masukkan email terdaftar Anda di sistem TEFA DKV. Kami akan memverifikasi identitas akun Anda.
                     </p>
@@ -813,6 +818,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onBackToHo
                       <input
                         type="email"
                         required
+                        autoComplete="username"
                         value={forgotEmail}
                         onChange={(e) => setForgotEmail(e.target.value)}
                         placeholder="nama@smknuungaran.sch.id"
@@ -828,7 +834,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onBackToHo
                     </button>
                   </form>
                 ) : (
-                  <form onSubmit={handleResetPasswordSubmit} className="space-y-4">
+                  <form onSubmit={handleResetPasswordSubmit} className="space-y-4" autoComplete="on">
                     <div className="p-3 bg-blue-50 border border-blue-200 rounded-2xl text-xs text-blue-900 font-bold">
                       Email terverifikasi: {forgotEmail}
                     </div>
@@ -840,6 +846,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onBackToHo
                       <input
                         type="password"
                         required
+                        autoComplete="new-password"
                         value={newPasswordInput}
                         onChange={(e) => setNewPasswordInput(e.target.value)}
                         placeholder="Masukkan password baru"

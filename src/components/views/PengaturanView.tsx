@@ -357,7 +357,7 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
       </div>
 
       {activeTab === 'settings' && (
-        <form onSubmit={handleSubmit} className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-2xs space-y-6 text-xs">
+        <form onSubmit={handleSubmit} className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-2xs space-y-6 text-xs" autoComplete="off">
           {/* Hak Akses / Role Section */}
           <div className="space-y-4">
             <h3 className="font-extrabold text-slate-900 text-sm uppercase tracking-wider border-b border-slate-100 pb-2 flex items-center justify-between">
@@ -428,6 +428,7 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
                 <label className="block font-bold text-slate-700 mb-1">Email Resmi Unit Produksi</label>
                 <input
                   type="email"
+                  autoComplete="off"
                   value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
                   className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold"
@@ -742,11 +743,11 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-600 mb-1">Nama Lengkap</label>
-                <input type="text" value={editForm.name || ''} onChange={(e) => setEditForm((p) => ({ ...p, name: e.target.value }))} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
+                <input type="text" autoComplete="off" value={editForm.name || ''} onChange={(e) => setEditForm((p) => ({ ...p, name: e.target.value }))} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-600 mb-1">Email</label>
-                <input type="email" value={editForm.email || ''} onChange={(e) => setEditForm((p) => ({ ...p, email: e.target.value }))} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
+                <input type="email" autoComplete="off" value={editForm.email || ''} onChange={(e) => setEditForm((p) => ({ ...p, email: e.target.value }))} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
               </div>
               {selectedUser.role === 'Siswa' && (
                 <>
@@ -792,11 +793,11 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
             <div className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-slate-600 mb-1">Password Baru</label>
-                <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Minimal 8 karakter" className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
+                <input type="password" autoComplete="new-password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Minimal 8 karakter" className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-600 mb-1">Konfirmasi Password</label>
-                <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Ulangi password baru" className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
+                <input type="password" autoComplete="new-password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Ulangi password baru" className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
               </div>
             </div>
             <div className="flex gap-3 mt-6">

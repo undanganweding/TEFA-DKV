@@ -896,7 +896,7 @@ export const KasirView: React.FC<KasirViewProps> = ({
                 </button>
               </div>
 
-              <form onSubmit={handleAddCustomOrderSubmit} className="space-y-3 text-xs font-semibold">
+              <form onSubmit={handleAddCustomOrderSubmit} className="space-y-3 text-xs font-semibold" autoComplete="off">
                 <div>
                   <label className="block text-slate-500 font-bold mb-1">Nama Layanan Custom *</label>
                   <input

@@ -179,7 +179,7 @@ export const StudentRegisterView: React.FC<StudentRegisterViewProps> = ({
         )}
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4" autoComplete="on">
           {/* Avatar */}
           <div className="flex items-center gap-4 pb-4 border-b border-slate-100">
             <img
@@ -216,6 +216,7 @@ export const StudentRegisterView: React.FC<StudentRegisterViewProps> = ({
             <label className="block text-xs font-bold text-slate-600 mb-1">Email *</label>
             <input
               type="email"
+              autoComplete="username"
               value={form.email}
               onChange={(e) => handleChange('email', e.target.value)}
               placeholder="email@smknuungaran.sch.id"
@@ -229,6 +230,7 @@ export const StudentRegisterView: React.FC<StudentRegisterViewProps> = ({
               <label className="block text-xs font-bold text-slate-600 mb-1">Password *</label>
               <input
                 type="password"
+                autoComplete="new-password"
                 value={form.password}
                 onChange={(e) => handleChange('password', e.target.value)}
                 placeholder="Min. 8 karakter"
@@ -239,6 +241,7 @@ export const StudentRegisterView: React.FC<StudentRegisterViewProps> = ({
               <label className="block text-xs font-bold text-slate-600 mb-1">Konfirmasi *</label>
               <input
                 type="password"
+                autoComplete="new-password"
                 value={form.confirmPassword}
                 onChange={(e) => handleChange('confirmPassword', e.target.value)}
                 placeholder="Ulangi password"

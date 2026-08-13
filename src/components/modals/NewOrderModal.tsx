@@ -150,7 +150,7 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
         </div>
 
         {/* Form Content */}
-        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto flex-1 space-y-5 text-xs">
+        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto flex-1 space-y-5 text-xs" autoComplete="off">
           {/* Customer Info Section */}
           <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
             <h4 className="font-extrabold text-slate-800 text-xs uppercase tracking-wider flex items-center gap-2">

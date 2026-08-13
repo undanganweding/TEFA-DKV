@@ -491,6 +491,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           animate={{ opacity: 1, y: 0 }}
           onSubmit={handleSavePersonalData}
           className="space-y-6"
+          autoComplete="off"
         >
           {/* Personal Info Card */}
           <div className="bg-white rounded-[28px] border border-slate-200/80 p-6 sm:p-8 shadow-sm space-y-6">
@@ -845,6 +846,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           animate={{ opacity: 1, y: 0 }}
           onSubmit={handleSavePassword}
           className="bg-white rounded-[28px] border border-slate-200/80 p-6 sm:p-8 shadow-sm space-y-6"
+          autoComplete="off"
         >
           <div className="flex items-center justify-between border-b border-slate-100 pb-4">
             <div className="flex items-center gap-3">
@@ -874,6 +876,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 <input
                   type={showOldPass ? 'text' : 'password'}
                   required
+                  autoComplete="current-password"
                   value={oldPassword}
                   onChange={(e) => setOldPassword(e.target.value)}
                   placeholder="Masukkan kata sandi lama"
@@ -900,6 +903,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 <input
                   type={showNewPass ? 'text' : 'password'}
                   required
+                  autoComplete="new-password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="Minimal 6 - 8+ karakter"
@@ -952,6 +956,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 <input
                   type={showConfirmPass ? 'text' : 'password'}
                   required
+                  autoComplete="new-password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="Ketik ulang kata sandi baru"

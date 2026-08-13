@@ -313,6 +313,7 @@ export const ProdukView: React.FC<ProdukViewProps> = ({
           <form
             onSubmit={handleSubmit}
             className="bg-white rounded-[24px] p-6 max-w-md w-full space-y-4 border border-slate-200 shadow-2xl text-xs font-sans"
+            autoComplete="off"
           >
             <div className="flex justify-between items-center pb-2 border-b border-slate-100">
               <h3 className="font-black text-slate-900 text-sm">

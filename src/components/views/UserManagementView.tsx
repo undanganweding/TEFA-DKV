@@ -498,6 +498,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
                 <label className="block text-xs font-bold text-slate-600 mb-1">Nama Lengkap</label>
                 <input
                   type="text"
+                  autoComplete="off"
                   value={editForm.name || ''}
                   onChange={(e) => setEditForm((prev) => ({ ...prev, name: e.target.value }))}
                   className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#5B4BFF]/30"
@@ -508,6 +509,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
                 <label className="block text-xs font-bold text-slate-600 mb-1">Email</label>
                 <input
                   type="email"
+                  autoComplete="off"
                   value={editForm.email || ''}
                   onChange={(e) => setEditForm((prev) => ({ ...prev, email: e.target.value }))}
                   className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#5B4BFF]/30"
@@ -590,6 +592,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
                 <label className="block text-xs font-bold text-slate-600 mb-1">Password Baru</label>
                 <input
                   type="password"
+                  autoComplete="new-password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="Minimal 8 karakter"
@@ -600,6 +603,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
                 <label className="block text-xs font-bold text-slate-600 mb-1">Konfirmasi Password</label>
                 <input
                   type="password"
+                  autoComplete="new-password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="Ulangi password baru"
