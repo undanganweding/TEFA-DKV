@@ -140,7 +140,7 @@ export async function signUp(input: {
         major: input.major.trim() || 'Desain Komunikasi Visual',
         whatsapp: input.whatsapp.trim(),
         phone: input.whatsapp.trim(),
-        avatar_path: input.avatar || null,
+        avatar_path: null,
       },
     },
   });
