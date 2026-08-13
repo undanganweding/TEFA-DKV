@@ -52,6 +52,7 @@ export const StudentRegisterView: React.FC<StudentRegisterViewProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
     setError('');
 
     // Validation

@@ -421,10 +421,20 @@ export const PesananView: React.FC<PesananViewProps> = ({
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-semibold">
-              <div className="bg-slate-50 p-3.5 rounded-2xl space-y-1">
-                <span className="text-slate-400 font-extrabold uppercase tracking-wider block text-[10px]">Produk Cetak</span>
-                <p className="text-slate-900 font-extrabold text-sm">{activeOrderDetail.items[0]?.productName || 'Custom TEFA'}</p>
-                <p className="text-slate-500">Jumlah: {activeOrderDetail.items[0]?.qty || 1} pcs</p>
+              <div className="bg-slate-50 p-3.5 rounded-2xl space-y-3">
+                <span className="text-slate-400 font-extrabold uppercase tracking-wider block text-[10px] border-b border-slate-200 pb-2">Rincian Produk Cetak</span>
+                <div className="space-y-3 max-h-40 overflow-y-auto pr-2">
+                  {activeOrderDetail.items.map((item, idx) => (
+                    <div key={idx} className="space-y-1">
+                      <p className="text-slate-900 font-extrabold text-sm">{item.productName || 'Custom TEFA'}</p>
+                      {item.variantName && <p className="text-slate-600">Varian: {item.variantName}</p>}
+                      <p className="text-slate-600">
+                        {item.qty} {item.unit || 'pcs'} x {formatRupiah(item.unitPrice || 0)}
+                      </p>
+                      <p className="text-[#5B4BFF] font-black text-sm">Subtotal: {formatRupiah(item.totalPrice || 0)}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               <div className="bg-slate-50 p-3.5 rounded-2xl space-y-1">

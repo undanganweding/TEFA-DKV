@@ -132,7 +132,10 @@ export async function signUp(input: {
   });
 
   if (error) {
-    if (error.message.includes('already registered')) {
+    if (error.status === 429 || error.message?.toLowerCase().includes('rate limit') || error.message?.toLowerCase().includes('too many requests')) {
+      return { success: false, message: 'Terlalu banyak percobaan pendaftaran. Silakan tunggu beberapa saat sebelum mencoba lagi.' };
+    }
+    if (error.message?.includes('already registered')) {
       return { success: false, message: 'Email sudah terdaftar. Silakan gunakan email lain atau login.' };
     }
     return { success: false, message: error.message };

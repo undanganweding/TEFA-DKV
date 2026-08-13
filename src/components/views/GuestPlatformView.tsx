@@ -221,21 +221,29 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
     let qty = 1;
     let subtotal = 0;
 
-    if (currentPage === 'product_order' && selectedOrderProduct) {
+    if (selectedOrderProduct) {
       if (productRequiresFile(selectedOrderProduct) && !selectedFile) {
         setFileError('Produk ini memerlukan file desain! Silakan upload file desain Anda.');
         return;
       }
-      if (selectedOrderProduct.variants && selectedOrderProduct.variants.length > 0 && !selectedVariant) {
+      if (selectedOrderProduct.variants && selectedOrderProduct.variants.length > 0 && !selectedVariant && selectedOrderProduct.id !== 'custom') {
         alert('Mohon pilih varian produk!');
         return;
       }
-      productName = selectedOrderProduct.name;
-      unitPrice = selectedVariant ? Number(selectedVariant.basePrice) : (parseInt(selectedOrderProduct.price.replace(/[^\d]/g, ''), 10) || 0);
-      qty = productQty;
-      subtotal = unitPrice * qty;
+
+      if (selectedOrderProduct.id === 'custom') {
+        productName = 'Layanan Cetak Custom - ' + (services.find((s) => s.id === orderForm.service)?.name || '');
+        unitPrice = 0;
+        qty = productQty || 1;
+        subtotal = 0;
+      } else {
+        productName = selectedOrderProduct.name;
+        unitPrice = selectedVariant ? Number(selectedVariant.basePrice) : (parseInt(selectedOrderProduct.price.replace(/[^\d]/g, ''), 10) || 0);
+        qty = productQty || 1;
+        subtotal = unitPrice * qty;
+      }
     } else {
-      // Custom Order / Quick Order Flow
+      // Legacy fallback
       if (!orderForm.service) {
         alert('Mohon pilih jenis layanan!');
         return;
@@ -354,6 +362,8 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
         date: found.orderDate,
         status: found.status,
         statusHistory: found.statusHistory || [],
+        totalAmount: found.totalAmount,
+        items: found.items
       });
       return;
     }
@@ -362,7 +372,7 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
     try {
       const result = await trackGuestOrder(query, undefined, window.sessionStorage.getItem(`guest_token_${query}`) || undefined);
       if (result && result.success) {
-        const items = (result.items || []) as Array<{ product_name: string; qty: number; unit: string; total_price: number; notes?: string }>;
+        const items = (result.items || []) as Array<{ product_name: string; variant_name?: string; qty: number; unit: string; total_price: number; notes?: string }>;
         const history = (result.statusHistory || []) as Array<{ status: string; timestamp: string; updated_by: string; note?: string }>;
         setTrackResult({
           orderId: result.orderNo || query,
@@ -375,6 +385,8 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
             updatedBy: h.updated_by,
             note: h.note,
           })),
+          totalAmount: result.totalAmount || 0,
+          items: items.map(i => ({ productName: i.product_name, variantName: i.variant_name, qty: i.qty, unit: i.unit, totalPrice: i.total_price }))
         });
       } else {
         alert('Data pesanan tidak ditemukan. Cek kembali Order ID atau WhatsApp Anda.');
@@ -1380,7 +1392,19 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
                     </div>
                     <div className="flex justify-between items-center py-1">
                       <span className="text-slate-500 font-bold">Layanan</span>
-                      <span className="font-extrabold text-slate-800 text-right">{trackResult.product}</span>
+                      <div className="text-right">
+                        {trackResult.items?.map((item: any, idx: number) => (
+                          <div key={idx} className="font-extrabold text-slate-800">
+                            {item.productName} {item.variantName ? `- ${item.variantName}` : ''} ({item.qty} {item.unit || 'pcs'})
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex justify-between items-center py-1">
+                      <span className="text-slate-500 font-bold">Total Tagihan</span>
+                      <span className="font-black text-[#5B4BFF]">
+                        {trackResult.totalAmount > 0 ? `Rp ${trackResult.totalAmount.toLocaleString('id-ID')}` : 'Menunggu Konfirmasi'}
+                      </span>
                     </div>
                     <div className="flex justify-between items-center py-1">
                       <span className="text-slate-500 font-bold">Tanggal Order</span>
