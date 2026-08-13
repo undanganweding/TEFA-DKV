@@ -6,16 +6,40 @@ import { mapProfileToUserProfile } from './authService';
 
 export async function getAllUsers(): Promise<UserProfile[]> {
   try {
-    const { data, error } = await supabase.functions.invoke('admin-manage-users', {
-      body: { action: 'list' }
-    });
+    // 1. Coba panggil RPC get_all_users_admin secara langsung dulu
+    const { data: rpcData, error: rpcError } = await supabase.rpc('get_all_users_admin');
 
-    if (error || !data?.success) {
-      console.error('Error fetching users from edge function:', error || data?.error);
-      return [];
+    let usersList: any[] = [];
+
+    if (!rpcError && Array.isArray(rpcData) && rpcData.length > 0) {
+      usersList = rpcData;
+    } else {
+      // 2. Fallback ke Edge Function jika RPC belum ter-grant atau gagal
+      const { data, error } = await supabase.functions.invoke('admin-manage-users', {
+        body: { action: 'list' }
+      });
+
+      if (!error && data?.success && Array.isArray(data.data)) {
+        usersList = data.data;
+      } else {
+        // 3. Fallback terakhir: Ambil langsung dari tabel profiles jika Edge Function/RPC gagal
+        const { data: profilesData, error: profError } = await supabase
+          .from('profiles')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (profError) {
+          console.error('Error fallback fetching profiles:', profError);
+          return [];
+        }
+
+        usersList = (profilesData || []).map((p: any) => ({
+          ...p,
+          email: '', // Email default kosong jika RLS profiles tidak menyimpannya
+        }));
+      }
     }
 
-    const usersList = data.data || [];
     const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
     const now = new Date().getTime();
 
@@ -24,7 +48,7 @@ export async function getAllUsers(): Promise<UserProfile[]> {
       const createdDate = new Date(u.created_at || new Date()).getTime();
       return {
         ...profile,
-        email: u.email || '',
+        email: u.email || profile.email || '',
         emailConfirmedAt: u.email_confirmed_at,
         lastSignInAt: u.last_sign_in_at,
         isNewUser: (now - createdDate) <= SEVEN_DAYS
