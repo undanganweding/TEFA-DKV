@@ -192,7 +192,7 @@ export function App() {
             setIsLoggedIn(true);
             // If they are on public_upload or login, keep them on public_upload for Student role
             if (currentPage === 'login') {
-              setCurrentPage(profile.role === 'Siswa' ? 'public_upload' : 'dashboard');
+              setCurrentPage(profile.role === 'Admin TEFA' || profile.role === 'Admin' ? 'dashboard' : 'public_upload');
             }
           } else {
             // Valid token but profile missing/inactive -> fallback profile from auth metadata
@@ -787,11 +787,10 @@ export function App() {
       });
 
       if (res.success && res.orderId) {
-        // Refresh full orders list from Supabase DB so both Admin & Student have the persisted order with DB UUID
-        const dbOrders = await orderServiceModule.fetchOrders();
-        if (dbOrders && dbOrders.length > 0) {
-          setOrders(dbOrders);
-        }
+        // Update local order id with the server generated orderId/orderNo
+        setOrders((prev) =>
+          prev.map((o) => (o.id === newOrder.id ? { ...o, id: res.orderId!, orderNo: res.orderNo || o.orderNo } : o))
+        );
       } else {
         console.error('Failed to create order in Supabase:', res.error);
       }

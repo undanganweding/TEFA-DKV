@@ -235,12 +235,26 @@ export async function getSession(): Promise<any> {
 let inFlightProfileRequest: Promise<UserProfile | null> | null = null;
 
 export async function fetchUserProfile(user: any): Promise<UserProfile | null> {
-  // Primary & ultra-fast profile construction directly from JWT user_metadata
+  try {
+    const { data: profileData, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (profileData) {
+      return mapProfileToUserProfile(profileData as ProfileRow, user.email || '');
+    }
+  } catch (e) {
+    console.warn('Error querying profile table:', e);
+  }
+
+  // Fallback ke user_metadata hanya jika tabel profiles belum/gagal terjangkau
   if (user && user.user_metadata) {
     const meta = user.user_metadata;
     const fallbackProfile: ProfileRow = {
       id: user.id,
-      full_name: meta.full_name || user.email || 'Siswa TEFA',
+      full_name: meta.full_name || user.email || 'Pengguna TEFA',
       role: meta.role || 'Student',
       status: meta.status || 'Active',
       school_class: meta.school_class || null,
@@ -257,32 +271,7 @@ export async function fetchUserProfile(user: any): Promise<UserProfile | null> {
       created_at: user.created_at || new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
-    
-    // Asynchronously update/verify from database without blocking session hydration
-    Promise.resolve(
-      supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single()
-    ).catch(() => {});
-
     return mapProfileToUserProfile(fallbackProfile, user.email || '');
-  }
-
-  // Fallback for edge cases where metadata is empty
-  try {
-    const { data: profileData } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single();
-
-    if (profileData) {
-      return mapProfileToUserProfile(profileData as ProfileRow, user.email || '');
-    }
-  } catch {
-    /* silent catch */
   }
 
   return null;
