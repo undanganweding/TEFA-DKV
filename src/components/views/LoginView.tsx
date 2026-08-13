@@ -8,11 +8,12 @@ import { getLoginSlides, SlideItem } from '../../utils/loginContentStore';
 
 interface LoginViewProps {
   onLoginSuccess: (user: UserProfile) => void;
+  onBackToHome?: () => void;
 }
 
 type AuthTab = 'login' | 'register_student' | 'forgot_password';
 
-export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
+export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onBackToHome }) => {
   const [slides, setSlides] = useState<SlideItem[]>(getLoginSlides());
 
   useEffect(() => {
@@ -92,7 +93,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
 
     // Async login with Supabase
     authService.signIn(emailOrUsername, password).then((result) => {
-      setIsLoading(false);
       if (!result.success || !result.user) {
         setErrorMessage(result.message || 'Otentikasi gagal.');
         return;
@@ -105,8 +105,9 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
         onLoginSuccess(user);
       }, 800);
     }).catch((err) => {
-      setIsLoading(false);
       setErrorMessage(err.message || 'Terjadi kesalahan sistem.');
+    }).finally(() => {
+      setIsLoading(false);
     });
   };
 
@@ -168,8 +169,9 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
         setSuccessToast('Akun Anda telah terdaftar dan menunggu persetujuan admin.');
       }, 2000);
     }).catch((err) => {
-      setIsLoading(false);
       setErrorMessage(err.message || 'Terjadi kesalahan sistem.');
+    }).finally(() => {
+      setIsLoading(false);
     });
   };
 
@@ -193,8 +195,9 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
       setSuccessToast(res.message);
       setForgotStep(2);
     }).catch((err) => {
-      setIsLoading(false);
       setErrorMessage(err.message || 'Gagal mengirim email reset.');
+    }).finally(() => {
+      setIsLoading(false);
     });
   };
 
@@ -442,13 +445,25 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
             {/* ========================================================================= */}
             {activeTab === 'login' && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                <div className="mb-6">
-                  <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight leading-none mb-2">
-                    Selamat Datang
-                  </h2>
-                  <p className="text-xs sm:text-sm text-slate-500 font-bold">
-                    Masuk ke Platform TEFA DKV SMK NU Ungaran
-                  </p>
+                <div className="mb-6 flex items-start justify-between">
+                  <div>
+                    <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight leading-none mb-2">
+                      Selamat Datang
+                    </h2>
+                    <p className="text-xs sm:text-sm text-slate-500 font-bold">
+                      Masuk ke Platform TEFA DKV SMK NU Ungaran
+                    </p>
+                  </div>
+                  {onBackToHome && (
+                    <button
+                      type="button"
+                      onClick={onBackToHome}
+                      className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs transition-colors flex items-center gap-1 cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-sm">home</span>
+                      <span>Beranda</span>
+                    </button>
+                  )}
                 </div>
 
                 <form onSubmit={handleLoginSubmit} className="space-y-4">
@@ -762,11 +777,21 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                   <button
                     type="button"
                     onClick={() => handleTabChange('login')}
-                    className="text-xs font-extrabold text-[#5B4BFF] flex items-center gap-1 mb-2 hover:underline cursor-pointer"
+                    className="text-xs font-extrabold text-[#5B4BFF] flex items-center gap-1 hover:underline cursor-pointer"
                   >
                     <span className="material-symbols-outlined text-sm">arrow_back</span>
                     <span>Kembali ke Halaman Login</span>
                   </button>
+                  {onBackToHome && (
+                    <button
+                      onClick={onBackToHome}
+                      className="text-xs font-bold text-slate-400 hover:text-[#5B4BFF] transition-colors"
+                    >
+                      Batal
+                    </button>
+                  )}
+                </div>
+                <div className="mb-5">
                   <h2 className="text-2xl font-black text-slate-900 tracking-tight leading-none mb-1.5">
                     Lupa Kata Sandi?
                   </h2>

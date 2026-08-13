@@ -157,48 +157,62 @@ export async function signOut(): Promise<void> {
 }
 
 export async function getSession(): Promise<UserProfile | null> {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session?.user) return null;
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) return null;
 
-  const { data: profileData } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', session.user.id)
-    .single();
-
-  if (!profileData) return null;
-
-  const profile = profileData as ProfileRow;
-  if (profile.status !== 'Active') return null;
-
-  return mapProfileToUserProfile(profile, session.user.email || '');
-}
-
-export function onAuthStateChange(callback: (user: UserProfile | null) => void) {
-  return supabase.auth.onAuthStateChange(async (event, session) => {
-    if (event === 'SIGNED_OUT' || !session?.user) {
-      callback(null);
-      return;
-    }
-
-    const { data: profileData } = await supabase
+    const { data: profileData, error } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', session.user.id)
       .single();
 
-    if (!profileData) {
-      callback(null);
-      return;
+    if (error || !profileData) {
+      console.warn('Profile not found or error fetching profile:', error);
+      return null;
     }
 
     const profile = profileData as ProfileRow;
-    if (profile.status !== 'Active') {
-      callback(null);
-      return;
-    }
+    if (profile.status !== 'Active') return null;
 
-    callback(mapProfileToUserProfile(profile, session.user.email || ''));
+    return mapProfileToUserProfile(profile, session.user.email || '');
+  } catch (err) {
+    console.error('getSession error:', err);
+    return null;
+  }
+}
+
+export function onAuthStateChange(callback: (user: UserProfile | null) => void) {
+  return supabase.auth.onAuthStateChange(async (event, session) => {
+    try {
+      if (event === 'SIGNED_OUT' || !session?.user) {
+        callback(null);
+        return;
+      }
+
+      const { data: profileData, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', session.user.id)
+        .single();
+
+      if (error || !profileData) {
+        console.warn('Profile not found or error fetching profile in auth change:', error);
+        callback(null);
+        return;
+      }
+
+      const profile = profileData as ProfileRow;
+      if (profile.status !== 'Active') {
+        callback(null);
+        return;
+      }
+
+      callback(mapProfileToUserProfile(profile, session.user.email || ''));
+    } catch (err) {
+      console.error('onAuthStateChange error:', err);
+      callback(null);
+    }
   });
 }
 

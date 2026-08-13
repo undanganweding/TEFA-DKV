@@ -71,7 +71,8 @@ export function App() {
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
 
   // Global View Navigation State
-  const [currentPage, setCurrentPage] = useState<PageId>('dashboard');
+  const [currentPage, setCurrentPage] = useState<PageId | 'login'>('dashboard');
+  const [authInitializing, setAuthInitializing] = useState<boolean>(true);
 
   // Master Data State — initialized empty, loaded from Supabase
   const [settings, setSettings] = useState<SystemSettings>(initialSettings);
@@ -134,32 +135,50 @@ export function App() {
   const activeTools = React.useMemo(() => tools.filter((t) => !t.isArchived), [tools]);
   const pendingInboxCount = React.useMemo(() => inboxFiles.filter((f) => f.status === 'Menunggu Pemeriksaan' && !f.isArchived).length, [inboxFiles]);
 
-  // Restore Active User Auth Session on Mount (Supabase + fallback to localStorage)
+  // Restore Active User Auth Session on Mount (Supabase only)
   useEffect(() => {
     const initAuth = async () => {
-      // Try Supabase session first
+      // 1. Determine target page from URL path
+      const path = window.location.pathname;
+      let targetPage: PageId | 'login' = 'public_upload'; // Default Student Platform Homepage
+      if (path === '/login') targetPage = 'login';
+      else if (path.startsWith('/admin')) {
+        const route = path.replace('/admin', '').substring(1) as PageId;
+        targetPage = route || 'dashboard'; // e.g. /admin/pesanan -> pesanan
+      }
+
+      // 2. Fetch Supabase session
       const supabaseUser = await authService.getSession();
+      
       if (supabaseUser) {
         setCurrentUser(supabaseUser);
         setIsLoggedIn(true);
-        if (supabaseUser.role === 'Siswa' || supabaseUser.role === 'Guest') {
-          setCurrentPage('public_upload');
+        // If they are on a public path or login, redirect to their default
+        if (targetPage === 'public_upload' || targetPage === 'login') {
+          if (supabaseUser.role === 'Siswa' || supabaseUser.role === 'Guest') {
+            setCurrentPage('public_upload');
+          } else {
+            setCurrentPage(supabaseUser.defaultPage || 'dashboard');
+          }
         } else {
-          setCurrentPage(supabaseUser.defaultPage || 'dashboard');
+          // If they are already on /admin/something, keep them there if allowed
+          if (supabaseUser.role === 'Siswa' || supabaseUser.role === 'Guest') {
+            setCurrentPage('public_upload');
+          } else {
+            setCurrentPage(targetPage);
+          }
         }
-        return;
-      }
-      // Fallback to localStorage session (for Guest access)
-      const savedSession = getStoredSession();
-      if (savedSession) {
-        setCurrentUser(savedSession);
-        setIsLoggedIn(true);
-        if (savedSession.role === 'Siswa' || savedSession.role === 'Guest') {
-          setCurrentPage('public_upload');
+      } else {
+        // No session: enforce routing protection
+        if (path.startsWith('/admin')) {
+          setCurrentPage('login');
+          window.history.replaceState({}, '', '/login');
         } else {
-          setCurrentPage(savedSession.defaultPage || 'dashboard');
+          setCurrentPage(targetPage);
         }
       }
+      
+      setAuthInitializing(false);
     };
     initAuth();
 
@@ -168,6 +187,10 @@ export function App() {
       if (user) {
         setCurrentUser(user);
         setIsLoggedIn(true);
+      } else {
+        // Only log out if not initializing to prevent loop
+        setIsLoggedIn(false);
+        setCurrentUser(null);
       }
     });
     return () => subscription.unsubscribe();
@@ -207,6 +230,33 @@ export function App() {
     };
     loadData();
   }, [isLoggedIn, dataLoaded]);
+
+  // Sync browser URL with currentPage State changes
+  useEffect(() => {
+    if (authInitializing) return; // Don't push state during initial load
+    if (currentPage === 'login') {
+      window.history.pushState({}, '', '/login');
+    } else if (currentPage === 'public_upload') {
+      window.history.pushState({}, '', '/');
+    } else {
+      window.history.pushState({}, '', `/admin/${currentPage === 'dashboard' ? '' : currentPage}`);
+    }
+  }, [currentPage, authInitializing]);
+
+  // Handle browser back/forward buttons manually
+  useEffect(() => {
+    const handlePopState = () => {
+      const path = window.location.pathname;
+      if (path === '/login') setCurrentPage('login');
+      else if (path === '/') setCurrentPage('public_upload');
+      else if (path.startsWith('/admin')) {
+        const route = path.replace('/admin', '').substring(1) as PageId;
+        setCurrentPage(route || 'dashboard');
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   // 1. Check for persisted active transaction session on mount
   useEffect(() => {
@@ -1118,15 +1168,29 @@ export function App() {
     }
   };
 
-  if (!isLoggedIn) {
+  if (authInitializing) {
+    return (
+      <div className="min-h-screen bg-[#0F1322] flex flex-col items-center justify-center p-6 text-white font-sans selection:bg-[#5B4BFF]/30">
+        <div className="w-16 h-16 relative flex items-center justify-center mb-6">
+          <div className="absolute inset-0 border-4 border-slate-800 rounded-full" />
+          <div className="absolute inset-0 border-4 border-[#5B4BFF] rounded-full border-t-transparent animate-spin" />
+        </div>
+        <h2 className="text-xl font-black text-white tracking-tight mb-2">Memverifikasi Sesi...</h2>
+        <p className="text-sm font-medium text-slate-500">Mempersiapkan Lingkungan Kerja TEFA DKV</p>
+      </div>
+    );
+  }
+
+  if (currentPage === 'login') {
     return (
       <LoginView
         onLoginSuccess={(user) => {
-          setStoredSession(user);
           setCurrentUser(user);
           setIsLoggedIn(true);
-          setCurrentPage(user.defaultPage || (user.role === 'Siswa' || user.role === 'Guest' ? 'public_upload' : 'dashboard'));
+          const target = user.defaultPage || (user.role === 'Siswa' || user.role === 'Guest' ? 'public_upload' : 'dashboard');
+          setCurrentPage(target);
         }}
+        onBackToHome={() => setCurrentPage('public_upload')}
       />
     );
   }
@@ -1134,15 +1198,14 @@ export function App() {
   const handleLogout = async () => {
     // Sign out from Supabase auth
     await authService.signOut().catch(() => {});
-    setStoredSession(null);
     setIsLoggedIn(false);
     setCurrentUser(null);
     setDataLoaded(false); // Reset so data reloads on next login
+    setCurrentPage('public_upload'); // Default route on logout
   };
 
   const handleUpdateProfile = (updatedUser: UserProfile) => {
     setCurrentUser(updatedUser);
-    setStoredSession(updatedUser);
   };
 
   // 1. If page is Student / Customer Portal (public_upload), render Customer Platform
