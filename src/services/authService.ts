@@ -133,7 +133,7 @@ export async function signUp(input: {
     options: {
       data: {
         full_name: input.name.trim(),
-        role: 'Siswa',
+        role: 'Student',
         status: 'Active',
         nis: input.nis.trim(),
         school_class: input.studentClass.trim(),
