@@ -26,8 +26,12 @@ serve(async (req) => {
       throw new Error('Server configuration error')
     }
 
-    // Initialize regular client to verify caller identity
-    const supabaseClient = createClient(supabaseUrl, supabaseAnonKey)
+    // Initialize regular client to verify caller identity and run RLS
+    const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: { Authorization: authHeader }
+      }
+    })
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token)
 
     if (userError || !user) {
