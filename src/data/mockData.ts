@@ -12,13 +12,13 @@ import {
 } from '../types';
 
 export const initialSettings: SystemSettings = {
-  schoolName: 'SMK NU MA\'ARIF 1',
+  schoolName: 'SMK NU UNGARAN',
   tefaName: 'TEFA DKV (Teaching Factory Design & Creative)',
-  address: 'Jl. Pendidikan No. 45, Kompleks NU Center, Kota Semarang',
-  phone: '(024) 7654-3210 / WA: 0812-3456-7890',
-  email: 'tefa.dkv@smknu-semarang.sch.id',
+  address: 'Jl. Kaligarang No. 9, Sembungan, Ungaran Barat, Kab. Semarang 50511',
+  phone: '(024) 6924034',
+  email: 'smknuungaran.sch.id@gmail.com',
   taxPercent: 0,
-  receiptFooterText: 'Terima Kasih Atas Kepercayaan Anda pada TEFA DKV SMK NU! Hasil karya siswa berbakat untuk kemajuan industri kreatif.',
+  receiptFooterText: 'Terima Kasih Atas Kepercayaan Anda pada TEFA DKV SMK NU UNGARAN! Hasil karya siswa berbakat untuk kemajuan industri kreatif.',
   autoPrintReceipt: true,
   activeAcademicYear: '2025/2026',
   activeShiftOperator: 'M. Rizky (XI DKV 1)',
