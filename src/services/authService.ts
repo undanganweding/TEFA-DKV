@@ -241,41 +241,63 @@ export async function fetchUserProfile(user: any): Promise<UserProfile | null> {
   }
 
   inFlightProfileRequest = (async () => {
-    try {
-      const { data: profileData, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
+    const MAX_RETRIES = 2;
+    let attempt = 0;
 
-      if (error || !profileData) {
-        // Distinguish between network errors and not found
-        if (error?.message?.includes('Failed to fetch') || error?.message?.includes('Network') || error?.message?.includes('ERR_CONNECTION_CLOSED')) {
-          console.error('NETWORK_ERROR: Koneksi terputus saat mengambil data profil:', error);
-          throw new Error('NETWORK_ERROR'); 
-        }
-        if (error?.code === 'PGRST116') {
-          console.warn('PROFILE_NOT_FOUND: Profil tidak ditemukan di database.', error);
+    while (attempt <= MAX_RETRIES) {
+      try {
+        const { data: profileData, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+
+        if (error || !profileData) {
+          const isTransientNetworkError =
+            error?.message?.includes('Failed to fetch') ||
+            error?.message?.includes('Network') ||
+            error?.message?.includes('ERR_CONNECTION_CLOSED') ||
+            error?.message?.includes('ERR_CONNECTION_ABORTED');
+
+          if (isTransientNetworkError) {
+            if (attempt < MAX_RETRIES) {
+              attempt++;
+              await new Promise((res) => setTimeout(res, 800 * attempt));
+              continue;
+            }
+            console.error('NETWORK_ERROR: Koneksi terputus saat mengambil data profil:', error);
+            throw new Error('NETWORK_ERROR');
+          }
+
+          if (error?.code === 'PGRST116') {
+            console.warn('PROFILE_NOT_FOUND: Profil tidak ditemukan di database.', error);
+            return null;
+          }
+
+          console.warn('DB_ERROR: Error fetching profile:', error);
           return null;
         }
-        
-        console.warn('DB_ERROR: Error fetching profile:', error);
+
+        const profile = profileData as ProfileRow;
+        if (profile.status !== 'Active') return null;
+
+        return mapProfileToUserProfile(profile, user.email || '');
+      } catch (err: any) {
+        if (err.message === 'NETWORK_ERROR') throw err;
+        if (attempt < MAX_RETRIES) {
+          attempt++;
+          await new Promise((res) => setTimeout(res, 800 * attempt));
+          continue;
+        }
+        console.error('fetchUserProfile error:', err);
         return null;
       }
-
-      const profile = profileData as ProfileRow;
-      if (profile.status !== 'Active') return null;
-
-      return mapProfileToUserProfile(profile, user.email || '');
-    } catch (err: any) {
-      console.error('fetchUserProfile error:', err);
-      if (err.message === 'NETWORK_ERROR') throw err; // propagate network error
-      return null;
-    } finally {
-      // Clear the in-flight request when done
-      inFlightProfileRequest = null;
     }
-  })();
+    return null;
+  })().finally(() => {
+    // Clear the in-flight request when done
+    inFlightProfileRequest = null;
+  });
 
   return inFlightProfileRequest;
 }
