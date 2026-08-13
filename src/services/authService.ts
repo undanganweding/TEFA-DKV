@@ -283,7 +283,38 @@ export async function fetchUserProfile(user: any): Promise<UserProfile | null> {
 
         return mapProfileToUserProfile(profile, user.email || '');
       } catch (err: any) {
-        if (err.message === 'NETWORK_ERROR') throw err;
+        if (err.message === 'NETWORK_ERROR') {
+          if (attempt < MAX_RETRIES) {
+            attempt++;
+            await new Promise((res) => setTimeout(res, 800 * attempt));
+            continue;
+          }
+          // Fallback instan dari user_metadata jika jaringan terputus
+          if (user && user.user_metadata) {
+            const meta = user.user_metadata;
+            const fallbackProfile: ProfileRow = {
+              id: user.id,
+              full_name: meta.full_name || user.email || 'Siswa TEFA',
+              role: meta.role || 'Student',
+              status: meta.status || 'Active',
+              school_class: meta.school_class || null,
+              phone: meta.phone || null,
+              address: null,
+              avatar_path: meta.avatar_path || null,
+              nis: meta.nis || null,
+              major: meta.major || null,
+              whatsapp: meta.whatsapp || null,
+              position: null,
+              nip: null,
+              employee_id: null,
+              reject_reason: null,
+              created_at: user.created_at || new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            };
+            return mapProfileToUserProfile(fallbackProfile, user.email || '');
+          }
+          throw err;
+        }
         if (attempt < MAX_RETRIES) {
           attempt++;
           await new Promise((res) => setTimeout(res, 800 * attempt));
