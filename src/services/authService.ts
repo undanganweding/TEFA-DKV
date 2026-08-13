@@ -235,21 +235,6 @@ export async function getSession(): Promise<any> {
 let inFlightProfileRequest: Promise<UserProfile | null> | null = null;
 
 export async function fetchUserProfile(user: any): Promise<UserProfile | null> {
-  try {
-    const { data: profileData, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .maybeSingle();
-
-    if (profileData) {
-      return mapProfileToUserProfile(profileData as ProfileRow, user.email || '');
-    }
-  } catch (e) {
-    console.warn('Error querying profile table:', e);
-  }
-
-  // Fallback ke user_metadata hanya jika tabel profiles belum/gagal terjangkau
   if (user && user.user_metadata) {
     const meta = user.user_metadata;
     const fallbackProfile: ProfileRow = {
