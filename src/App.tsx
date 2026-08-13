@@ -247,6 +247,33 @@ export function App() {
     loadData();
   }, [isLoggedIn, dataLoaded]);
 
+  // Load products for Guest users (does not require login)
+  // RLS allows anonymous SELECT on visible, non-archived products
+  const [guestProductsLoaded, setGuestProductsLoaded] = useState<boolean>(false);
+  useEffect(() => {
+    if (isLoggedIn || guestProductsLoaded) return; // Skip if logged in (admin data loading handles it)
+    const loadGuestProducts = async () => {
+      try {
+        const prods = await productService.fetchProducts();
+        setProducts(prods);
+        // Also restore guest orders from localStorage
+        const savedGuestOrders = localStorage.getItem('tefa_guest_orders');
+        if (savedGuestOrders) {
+          try {
+            const parsed = JSON.parse(savedGuestOrders) as ProductionOrder[];
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              setOrders(parsed);
+            }
+          } catch { /* ignore parse errors */ }
+        }
+      } catch (err) {
+        console.error('Error loading guest products:', err);
+      }
+      setGuestProductsLoaded(true);
+    };
+    loadGuestProducts();
+  }, [isLoggedIn, guestProductsLoaded]);
+
   // Sync browser URL with currentPage State changes
   useEffect(() => {
     if (authInitializing) return; // Don't push state during initial load
@@ -1226,10 +1253,22 @@ export function App() {
               });
 
               if (res.success && res.orderId) {
-                // 2. Fetch the newly created order from Supabase so it has all correct DB fields (status, etc.)
-                // Or simply refetch all orders to keep state in sync
-                const updatedOrders = await orderServiceModule.fetchOrders();
-                setOrders(updatedOrders);
+                // 2. Build order from RPC response + original form data
+                // DO NOT call fetchOrders() — RLS blocks anonymous SELECT on orders table
+                const confirmedOrder: ProductionOrder = {
+                  ...newOrder,
+                  id: res.orderId,
+                  orderNo: res.orderNo || newOrder.orderNo,
+                };
+                setOrders((prev) => [confirmedOrder, ...prev]);
+
+                // 3. Persist guest orders to localStorage for tracking after refresh
+                try {
+                  const existing = localStorage.getItem('tefa_guest_orders');
+                  const existingOrders: ProductionOrder[] = existing ? JSON.parse(existing) : [];
+                  const updated = [confirmedOrder, ...existingOrders].slice(0, 20); // Keep max 20
+                  localStorage.setItem('tefa_guest_orders', JSON.stringify(updated));
+                } catch { /* ignore storage errors */ }
               } else {
                 alert(`Gagal membuat pesanan: ${res.error || 'Server error'}`);
               }

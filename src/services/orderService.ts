@@ -330,3 +330,38 @@ export async function getGuestOrder(token: string): Promise<ProductionOrder | nu
 
   return mapOrderRow(order, items, history);
 }
+
+/**
+ * Track a guest order by order_no and optionally phone.
+ * Uses SECURITY DEFINER RPC to bypass RLS.
+ */
+export async function trackGuestOrder(
+  orderNo: string,
+  phone?: string
+): Promise<{
+  success: boolean;
+  orderNo?: string;
+  customerName?: string;
+  status?: string;
+  paymentStatus?: string;
+  totalAmount?: number;
+  paidAmount?: number;
+  balanceDue?: number;
+  orderDate?: string;
+  items?: Array<{ product_name: string; qty: number; unit: string; total_price: number; notes?: string }>;
+  statusHistory?: Array<{ status: string; timestamp: string; updated_by: string; note?: string }>;
+  error?: string;
+} | null> {
+  const { data, error } = await supabase.rpc('track_guest_order', {
+    p_order_no: orderNo,
+    p_phone: phone || null,
+  });
+
+  if (error) {
+    console.error('Error tracking guest order:', error);
+    return { success: false, error: error.message };
+  }
+
+  const result = data as any;
+  return result;
+}

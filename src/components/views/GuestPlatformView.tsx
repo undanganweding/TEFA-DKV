@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ProductionOrder, Product } from '../../types';
+import { trackGuestOrder } from '../../services/orderService';
 
 interface GuestPlatformViewProps {
   products?: Product[];
@@ -16,6 +17,7 @@ interface ProductItem {
   id: string;
   name: string;
   price: string;
+  unit: string;
   img: string;
   desc: string;
   specs: string[];
@@ -28,11 +30,12 @@ const services = [
   { id: 'custom', name: 'Custom Design & Studio', icon: 'design_services', desc: 'Desain Logo, Feed IG, Foto Studio & Video' },
 ];
 
-const products: ProductItem[] = [
+const fallbackProducts: ProductItem[] = [
   {
     id: 'cetak_dokumen',
     name: 'Cetak Banner Flexi 280gr',
     price: 'Rp 18.000 / m²',
+    unit: 'm2',
     img: 'https://images.unsplash.com/photo-1562654501-a0ccc0fc3fb1?w=400&q=80',
     desc: 'Cetak banner luar ruangan berkualitas tinggi menggunakan mesin cetak solvent modern dengan bahan Flexi Tiongkok 280gr. Tahan segala cuaca, warna pekat tahan lama, ideal untuk media promosi outdoor.',
     specs: ['Bahan: Flexi Frontlite Tiongkok 280gr', 'Lebar Maksimal: 3.2 meter (tanpa sambungan)', 'Resolusi Cetak: Standard Outdoor Resolution', 'Finishing: Mata ayam (ring besi) di sudut / Selongsong kayu / Lipat kelim lem'],
@@ -41,6 +44,7 @@ const products: ProductItem[] = [
     id: 'merchandise',
     name: 'Stiker Vinyl Glossy A3+',
     price: 'Rp 12.000 / lembar',
+    unit: 'lembar',
     img: 'https://images.unsplash.com/photo-1589939705384-5185137a7f0f?w=400&q=80',
     desc: 'Stiker lembaran berbahan dasar plastik vinyl putih susu dengan permukaan mengkilap (glossy). Tahan air (waterproof), perekat sangat kuat, tidak mudah sobek, cocok sekali untuk label kemasan produk makanan/minuman.',
     specs: ['Bahan: Vinyl Glossy White Premium', 'Ukuran Lembar: A3+ (area cetak 31 x 47 cm)', 'Tinta: Toner Laser anti-luntur', 'Finishing: Kiss-Cut (setengah putus siap tempel) / Die-Cut (putus)'],
@@ -49,6 +53,7 @@ const products: ProductItem[] = [
     id: 'merchandise',
     name: 'Pin Bros Custom DKV',
     price: 'Rp 4.500 / pcs',
+    unit: 'pcs',
     img: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=400&q=80',
     desc: 'Pin bros berbentuk bulat peniti custom untuk aksesoris identitas, tanda panitia acara sekolah/kampus, souvenir pernikahan, merchandise wisuda, atau branding logo komunitas.',
     specs: ['Ukuran: Diameter Standar 44mm / 58mm', 'Laminasi Atas: Glossy Mengkilap / Doff Halus', 'Bahan Peniti: Plastik Putih/Hitam kokoh anti-karat', 'Desain: Bebas custom foto / tulisan'],
@@ -57,6 +62,7 @@ const products: ProductItem[] = [
     id: 'cetak_dokumen',
     name: 'Kartu Nama Exclusive Box',
     price: 'Rp 35.000 / box',
+    unit: 'pcs',
     img: 'https://images.unsplash.com/photo-1542744094-3a31b272c390?w=400&q=80',
     desc: 'Kartu nama cetak dua sisi dengan bahan kertas tebal berkualitas tinggi. Sudah dikemas menggunakan kotak plastik mika transparan eksklusif agar tetap bersih dan rapi saat dibagikan ke klien penting.',
     specs: ['Bahan: Art Carton 260gr / 310gr tebal', 'Isi per Box: 100 lembar kartu nama presisi', 'Ukuran Potong: Standar 90mm x 55mm', 'Pilihan Cetak: 1 Sisi (Single) / 2 Sisi (Bolak-balik)'],
@@ -84,10 +90,11 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
 
   // Map admin products to Guest ProductItem format if available
   const displayProducts: ProductItem[] = adminProducts.length > 0
-    ? adminProducts.map(p => ({
+    ? adminProducts.filter(p => p.showInCustomerPlatform !== false).map(p => ({
         id: p.id,
         name: p.name,
         price: `Rp ${p.basePrice.toLocaleString('id-ID')} / ${p.unit}`,
+        unit: p.unit,
         img: p.coverImage || p.images?.[0] || p.image || 'https://images.unsplash.com/photo-1562654501-a0ccc0fc3fb1?w=400&q=80',
         desc: p.description,
         specs: [
@@ -97,7 +104,7 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
           p.isCustomDimension ? 'Mendukung Ukuran Kustom' : 'Ukuran Standar'
         ]
       }))
-    : products;
+    : fallbackProducts;
 
   // File Upload State
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -316,20 +323,20 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
     }
   };
 
-  const handleTrack = () => {
+  const handleTrack = async () => {
     if (!trackInput.trim()) {
       alert('Masukkan Order ID atau Nomor WhatsApp Anda!');
       return;
     }
 
     const query = trackInput.trim();
-    // Search orders by orderNo or customerPhone
+
+    // 1. First try in-memory orders (from state / localStorage)
     const matchedOrders = orders.filter(
       (o) => o.orderNo.toLowerCase() === query.toLowerCase() || o.customerPhone === query
     );
 
     if (matchedOrders.length > 0) {
-      // Pick the latest order
       const found = matchedOrders[0];
       setTrackResult({
         orderId: found.orderNo,
@@ -338,7 +345,32 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
         status: found.status,
         statusHistory: found.statusHistory || [],
       });
-    } else {
+      return;
+    }
+
+    // 2. Fallback: query database via RPC (works for any guest order)
+    try {
+      const result = await trackGuestOrder(query);
+      if (result && result.success) {
+        const items = (result.items || []) as Array<{ product_name: string; qty: number; unit: string; total_price: number; notes?: string }>;
+        const history = (result.statusHistory || []) as Array<{ status: string; timestamp: string; updated_by: string; note?: string }>;
+        setTrackResult({
+          orderId: result.orderNo || query,
+          product: items.map((i: any) => i.product_name).join(', '),
+          date: result.orderDate || '',
+          status: result.status || 'Menunggu Admin',
+          statusHistory: history.map((h: any) => ({
+            status: h.status,
+            timestamp: h.timestamp,
+            updatedBy: h.updated_by,
+            note: h.note,
+          })),
+        });
+      } else {
+        alert('Data pesanan tidak ditemukan. Cek kembali Order ID atau WhatsApp Anda.');
+        setTrackResult(null);
+      }
+    } catch {
       alert('Data pesanan tidak ditemukan. Cek kembali Order ID atau WhatsApp Anda.');
       setTrackResult(null);
     }
