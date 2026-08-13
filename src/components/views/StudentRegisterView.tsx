@@ -132,27 +132,47 @@ export const StudentRegisterView: React.FC<StudentRegisterViewProps> = ({
           </div>
           <h2 className="text-2xl font-black text-slate-800 mb-2">Pendaftaran Berhasil!</h2>
           <p className="text-slate-500 mb-6">
-            Pendaftaran berhasil dikirim.
+            Pendaftaran berhasil. Akun Anda telah dibuat.
             <br />
-            <strong>Silakan menunggu persetujuan admin TEFA.</strong>
+            <strong>Silakan login untuk mulai memesan atau cek email Anda (jika diperlukan verifikasi).</strong>
           </p>
-          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-6">
-            <div className="flex items-center gap-3 text-left">
-              <span className="material-symbols-outlined text-2xl text-amber-500">info</span>
-              <div>
-                <p className="text-sm font-bold text-amber-800">Informasi Penting</p>
-                <p className="text-xs text-amber-600 mt-1">
-                  Admin akan memverifikasi data kamu. Setelah disetujui, kamu akan bisa login dan menggunakan platform.
-                </p>
+          <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 mb-6">
+            <div className="flex flex-col text-left gap-2">
+              <div className="flex justify-between border-b border-emerald-100 pb-2">
+                <span className="text-xs text-emerald-600 font-medium">Status</span>
+                <span className="text-xs text-emerald-700 font-bold">AKUN AKTIF</span>
+              </div>
+              <div className="flex justify-between border-b border-emerald-100 pb-2">
+                <span className="text-xs text-emerald-600 font-medium">Role</span>
+                <span className="text-xs text-emerald-700 font-bold">SISWA</span>
+              </div>
+              <div className="flex justify-between border-b border-emerald-100 pb-2">
+                <span className="text-xs text-emerald-600 font-medium">Nama</span>
+                <span className="text-xs text-emerald-700 font-bold">{form.name}</span>
+              </div>
+              <div className="flex justify-between pb-1">
+                <span className="text-xs text-emerald-600 font-medium">NIS</span>
+                <span className="text-xs text-emerald-700 font-bold">{form.nis}</span>
               </div>
             </div>
           </div>
-          <button
-            onClick={onSwitchToLogin}
-            className="w-full py-3 bg-[#5B4BFF] text-white font-bold rounded-xl hover:bg-[#4a3ce0] transition-all"
-          >
-            Kembali ke Login
-          </button>
+          <div className="flex flex-col gap-3 pt-2">
+            <button
+              onClick={() => {
+                setShowSuccess(false);
+                onRegisterSuccess();
+              }}
+              className="w-full py-3.5 bg-[#5B4BFF] hover:bg-[#4a3ce0] text-white font-extrabold text-sm rounded-xl shadow-lg shadow-purple-500/20 transition-all"
+            >
+              LOGIN SEKARANG
+            </button>
+            <button
+              onClick={onSwitchToLogin}
+              className="w-full py-3 bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-bold text-sm rounded-xl transition-all"
+            >
+              KEMBALI KE BERANDA
+            </button>
+          </div>
         </div>
       </div>
     );

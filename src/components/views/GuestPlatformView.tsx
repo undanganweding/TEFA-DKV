@@ -6,7 +6,7 @@ import { trackGuestOrder } from '../../services/orderService';
 interface GuestPlatformViewProps {
   products?: Product[];
   orders: ProductionOrder[];
-  onAddOrder: (order: ProductionOrder) => void;
+  onAddOrder: (order: ProductionOrder) => Promise<{ success: boolean; orderNo?: string; guestAccessToken?: string }>;
   onSwitchToAdmin?: () => void;
   onLogout?: () => void;
 }
@@ -214,11 +214,7 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
 
     try {
       const todayStr = new Date().toISOString().split('T')[0];
-      const now = new Date();
-      const dateStr = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
-      const randomSuffix = String(Math.floor(Math.random() * 900) + 100);
-      const orderNo = `TEFA-${dateStr}-${randomSuffix}`;
-      const idempotencyKey = `GUEST-${orderNo}-${Date.now()}`;
+      const idempotencyKey = `GUEST-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
       let productName = '';
       let unitPrice = 0;
@@ -315,14 +311,18 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
         ],
       };
 
-      await onAddOrder(newOrder);
-      setOrderSuccess(orderNo);
-      setOrderSuccessData({
-        orderNo: orderNo,
-        productName: productName,
-        qty: qty,
-        totalPrice: subtotal > 0 ? `Rp ${subtotal.toLocaleString('id-ID')}` : 'Akan dihitung oleh Admin',
-      });
+      const res = await onAddOrder(newOrder);
+      if (res && res.success && res.orderNo) {
+        setOrderSuccess(res.orderNo);
+        setOrderSuccessData({
+          orderNo: res.orderNo,
+          productName: productName,
+          qty: qty,
+          totalPrice: subtotal > 0 ? `Rp ${subtotal.toLocaleString('id-ID')}` : 'Akan dihitung oleh Admin',
+        });
+      } else {
+        throw new Error('Gagal mendapatkan nomor pesanan dari server.');
+      }
 
       // Reset forms
       setOrderForm({ name: '', whatsapp: '', email: '', service: '', notes: '' });

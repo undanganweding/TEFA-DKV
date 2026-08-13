@@ -112,10 +112,23 @@ export async function signUp(input: {
 }): Promise<{ success: boolean; message?: string; user?: any }> {
   const cleanEmail = input.email.trim().toLowerCase();
 
-  // Create auth user
+  // Create auth user and pass profile metadata to the database trigger
   const { data, error } = await supabase.auth.signUp({
     email: cleanEmail,
     password: input.password,
+    options: {
+      data: {
+        full_name: input.name.trim(),
+        role: 'Student',
+        status: 'Active',
+        nis: input.nis.trim(),
+        school_class: input.studentClass.trim(),
+        major: input.major.trim() || 'Desain Komunikasi Visual',
+        whatsapp: input.whatsapp.trim(),
+        phone: input.whatsapp.trim(),
+        avatar_path: input.avatar || null,
+      },
+    },
   });
 
   if (error) {
@@ -134,35 +147,15 @@ export async function signUp(input: {
     return { success: false, message: 'Email sudah terdaftar. Silakan gunakan email lain atau login.' };
   }
 
-  // Create profile with Active status (Auto-Approved)
-  const newProfile = {
-    id: data.user.id,
-    full_name: input.name.trim(),
-    role: 'Student',
-    status: 'Active',
-    nis: input.nis.trim(),
-    school_class: input.studentClass.trim(),
-    major: input.major.trim() || 'Desain Komunikasi Visual',
-    whatsapp: input.whatsapp.trim(),
-    phone: input.whatsapp.trim(),
-    avatar_path: input.avatar || null,
-  };
-
-  const { error: profileError } = await supabase.from('profiles').insert(newProfile);
-
-  if (profileError) {
-    console.error('Profile creation error:', profileError);
-    return { success: false, message: 'Gagal membuat profil. Silakan coba lagi.' };
+  // The Postgres trigger `on_auth_user_created` automatically creates the profile securely.
+  
+  // Sign out after registration so they can explicitly login with the success screen,
+  // or gracefully handle if the session is null due to email confirmation rules.
+  if (data.session) {
+    await supabase.auth.signOut();
   }
 
-  // Sign out after registration so they can explicitly login with the success screen
-  await supabase.auth.signOut();
-
-  return { 
-    success: true, 
-    message: 'Akun siswa berhasil dibuat dan sudah aktif.',
-    user: newProfile
-  };
+  return { success: true, message: 'Registrasi berhasil!', user: data.user };
 }
 
 export async function signOut(): Promise<void> {
