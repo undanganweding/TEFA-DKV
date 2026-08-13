@@ -1284,7 +1284,7 @@ export function App() {
         <GuestPlatformView
           products={products.filter((p) => !p.isArchived)}
           orders={orders}
-          onAddOrder={async (newOrder) => {
+          onAddOrder={async (newOrder, attachedFile) => {
             try {
               // 1. Call API to create Guest Order in Supabase
               const res = await orderServiceModule.createGuestOrder({
@@ -1305,7 +1305,28 @@ export function App() {
                 };
                 setOrders((prev) => [confirmedOrder, ...prev]);
 
-                // 3. Persist guest orders to localStorage for tracking after refresh
+                // 3. Upload attached file to Storage + create inbox_files record
+                if (attachedFile && res.guestAccessToken) {
+                  const productName = newOrder.items?.[0]?.productName || 'Pesanan Cepat';
+                  const uploadRes = await fileService.uploadGuestOrderFile({
+                    orderId: res.orderId,
+                    guestAccessToken: res.guestAccessToken,
+                    orderNo: res.orderNo || '',
+                    customerName: newOrder.customerName,
+                    customerPhone: newOrder.customerPhone || '',
+                    productName,
+                    file: attachedFile,
+                  });
+
+                  if (!uploadRes.success) {
+                    console.error('Guest file upload failed:', uploadRes.error);
+                    // Order was created successfully, but file upload failed.
+                    // We still return success for the order but alert about the file.
+                    alert(`Pesanan berhasil dibuat, tetapi upload file gagal: ${uploadRes.error || 'Unknown error'}. Silakan hubungi admin.`);
+                  }
+                }
+
+                // 4. Persist guest orders to localStorage for tracking after refresh
                 try {
                   const existing = localStorage.getItem('tefa_guest_orders');
                   const existingOrders: ProductionOrder[] = existing ? JSON.parse(existing) : [];

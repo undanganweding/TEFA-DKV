@@ -6,10 +6,11 @@ import { trackGuestOrder } from '../../services/orderService';
 interface GuestPlatformViewProps {
   products?: Product[];
   orders: ProductionOrder[];
-  onAddOrder: (order: ProductionOrder) => Promise<{ success: boolean; orderNo?: string; guestAccessToken?: string }>;
+  onAddOrder: (order: ProductionOrder, attachedFile?: File) => Promise<{ success: boolean; orderNo?: string; guestAccessToken?: string }>;
   onSwitchToAdmin?: () => void;
   onLogout?: () => void;
 }
+
 
 type GuestPage = 'landing' | 'order' | 'tracking' | 'product_order';
 
@@ -319,7 +320,7 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
         ],
       };
 
-      const res = await onAddOrder(newOrder);
+      const res = await onAddOrder(newOrder, selectedFile || undefined);
       if (res && res.success && res.orderNo) {
         setOrderSuccess(res.orderNo);
         setOrderSuccessData({

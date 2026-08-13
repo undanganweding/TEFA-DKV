@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { InboxFile, InboxFileStatus } from '../../types';
 import { Pagination } from '../Pagination';
+import { getSignedUrl } from '../../services/fileService';
 
 interface FileInboxViewProps {
   inboxFiles: InboxFile[];
@@ -25,12 +26,14 @@ export const FileInboxView: React.FC<FileInboxViewProps> = ({
 
   // Filter tags logic
   const filteredFiles = inboxFiles.filter((f) => {
+    const q = searchQuery.toLowerCase();
     const matchesSearch =
-      f.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      f.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      f.fileName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      f.serviceType.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      f.classGrade.toLowerCase().includes(searchQuery.toLowerCase());
+      f.id.toLowerCase().includes(q) ||
+      f.customerName.toLowerCase().includes(q) ||
+      f.fileName.toLowerCase().includes(q) ||
+      f.serviceType.toLowerCase().includes(q) ||
+      f.classGrade.toLowerCase().includes(q) ||
+      (f.linkedOrderNo || '').toLowerCase().includes(q);
 
     let matchesTab = true;
     if (activeTab === 'Pending') matchesTab = f.status === 'Menunggu Pemeriksaan' || f.status === 'File Dicek';
@@ -88,8 +91,32 @@ export const FileInboxView: React.FC<FileInboxViewProps> = ({
     }
   };
 
-  const handleDownload = (file: InboxFile) => {
-    alert(`[Download Simulation]\nMengunduh file: ${file.fileName}\nFolder: ${file.folderPath}`);
+  const handleDownload = async (file: InboxFile) => {
+    // Try to get a signed URL from Supabase Storage
+    // storage_path is stored in folderPath as "design-files/guest-orders/..."
+    // or the raw storage_path field.
+    const storagePath = file.storagePath || file.folderPath;
+    if (storagePath && storagePath.startsWith('design-files/')) {
+      const relativePath = storagePath.replace('design-files/', '');
+      const url = await getSignedUrl('design-files', relativePath);
+      if (url) {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = file.fileName;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        return;
+      }
+    }
+    // Fallback: if previewUrl is available use it directly
+    if (file.previewUrl) {
+      window.open(file.previewUrl, '_blank');
+      return;
+    }
+    alert(`File tidak tersedia untuk diunduh. Path: ${storagePath || file.folderPath}`);
   };
 
   return (
@@ -201,6 +228,12 @@ export const FileInboxView: React.FC<FileInboxViewProps> = ({
                     <p className="text-[10px] font-bold text-[#5B4BFF]">
                       {file.serviceType} • {file.classGrade} ({file.major || 'DKV'})
                     </p>
+                    {file.linkedOrderNo && (
+                      <p className="text-[10px] font-mono font-bold text-emerald-600">
+                        <span className="material-symbols-outlined text-[10px] align-middle mr-0.5">receipt_long</span>
+                        {file.linkedOrderNo}
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -290,6 +323,9 @@ export const FileInboxView: React.FC<FileInboxViewProps> = ({
                 <p>Layanan: <strong className="text-[#5B4BFF]">{selectedFile.serviceType}</strong></p>
                 <p>Ukuran: <strong className="text-slate-900">{selectedFile.dimensions || 'Custom'}</strong></p>
                 <p>Jumlah: <strong className="text-slate-900">{selectedFile.qty} Pcs</strong></p>
+                {selectedFile.linkedOrderNo && (
+                  <p className="col-span-2">Order: <strong className="text-emerald-600 font-mono">{selectedFile.linkedOrderNo}</strong></p>
+                )}
               </div>
               {selectedFile.notes && (
                 <p className="text-[11px] text-slate-500 pt-1 border-t border-slate-200">

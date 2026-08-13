@@ -99,6 +99,7 @@ export interface InboxFile {
   fileType: 'JPG' | 'PNG' | 'PDF' | 'PSD' | 'AI' | 'CDR' | 'ZIP';
   fileSize: string;
   previewUrl?: string;
+  storagePath?: string;
   folderPath: string;
   status: InboxFileStatus;
   linkedOrderNo?: string;

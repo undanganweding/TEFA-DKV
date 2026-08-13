@@ -66,7 +66,19 @@ export async function signIn(email: string, password: string): Promise<{ success
   });
 
   if (error) {
-    return { success: false, message: error.message === 'Invalid login credentials' ? 'Email atau password yang Anda masukkan salah.' : error.message };
+    if (error.status === 429) {
+      return { success: false, message: 'Terlalu banyak percobaan login. Silakan tunggu beberapa saat.' };
+    }
+    if (error.message.includes('Invalid login credentials')) {
+      return { success: false, message: 'Email atau password yang Anda masukkan salah.' };
+    }
+    if (error.message.includes('Email not confirmed')) {
+      return { success: false, message: 'Email belum dikonfirmasi. Silakan konfirmasi email Anda.' };
+    }
+    if (error.message.includes('Failed to fetch') || error.message.includes('Network')) {
+      return { success: false, message: 'Koneksi jaringan terputus. Pastikan internet Anda stabil.' };
+    }
+    return { success: false, message: error.message };
   }
 
   if (!data.user) {
@@ -81,7 +93,13 @@ export async function signIn(email: string, password: string): Promise<{ success
     .single();
 
   if (profileError || !profileData) {
-    return { success: false, message: 'Profil tidak ditemukan. Hubungi admin.' };
+    if (profileError?.code === 'PGRST116') {
+      return { success: false, message: 'Profil tidak ditemukan. Registrasi mungkin tidak selesai sempurna. Hubungi admin.' };
+    }
+    if (profileError?.message?.includes('Failed to fetch') || profileError?.message?.includes('Network')) {
+      return { success: false, message: 'Koneksi terputus saat mengambil data profil.' };
+    }
+    return { success: false, message: 'Gagal memuat profil: ' + (profileError?.message || 'Data kosong') };
   }
 
   const profile = profileData as ProfileRow;
@@ -150,10 +168,39 @@ export async function signUp(input: {
     return { success: false, message: 'Email sudah terdaftar. Silakan gunakan email lain atau login.' };
   }
 
-  // The Postgres trigger `on_auth_user_created` automatically creates the profile securely.
-  
-  // Sign out after registration so they can explicitly login with the success screen,
-  // or gracefully handle if the session is null due to email confirmation rules.
+  // Upload avatar if provided
+  if (input.avatar && input.avatar.startsWith('data:image')) {
+    try {
+      const arr = input.avatar.split(',');
+      const mimeMatch = arr[0].match(/:(.*?);/);
+      if (mimeMatch) {
+        const mime = mimeMatch[1];
+        const bstr = atob(arr[1]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+        while (n--) {
+          u8arr[n] = bstr.charCodeAt(n);
+        }
+        const file = new File([u8arr], `avatar-${Date.now()}.${mime.split('/')[1] || 'png'}`, { type: mime });
+        const path = `${data.user.id}/${file.name}`;
+        
+        const { error: uploadError } = await supabase.storage.from('profile-images').upload(path, file, { upsert: true });
+        
+        if (!uploadError) {
+          const { data: publicData } = supabase.storage.from('profile-images').getPublicUrl(path);
+          if (publicData) {
+            await supabase.from('profiles').update({ avatar_path: publicData.publicUrl }).eq('id', data.user.id);
+          }
+        } else {
+          console.error("Avatar upload error:", uploadError);
+        }
+      }
+    } catch (e) {
+      console.error("Error uploading avatar during signup", e);
+    }
+  }
+
+  // Sign out after registration so they can explicitly login with the success screen
   if (data.session) {
     await supabase.auth.signOut();
   }

@@ -70,6 +70,7 @@ function mapInboxFileRow(row: InboxFileRow): InboxFile {
     fileType: row.file_type as InboxFile['fileType'],
     fileSize: row.file_size,
     previewUrl: row.preview_url || undefined,
+    storagePath: row.storage_path || undefined,
     folderPath: row.folder_path,
     status: row.status as InboxFile['status'],
     linkedOrderNo: row.linked_order_no || undefined,
@@ -233,4 +234,78 @@ export async function getSignedUrl(bucket: string, path: string): Promise<string
   const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, 3600);
   if (error || !data) return null;
   return data.signedUrl;
+}
+
+// ===== GUEST ORDER FILE UPLOAD =====
+
+/**
+ * Uploads a file for a guest order to Supabase Storage.
+ * Path pattern: guest-orders/{orderId}/{guestAccessToken}/{filename}
+ * The RLS policy on design-files bucket validates the order_id + token.
+ *
+ * After successful storage upload, creates an inbox_files record so the
+ * file appears in Admin → File Inbox.
+ */
+export async function uploadGuestOrderFile(params: {
+  orderId: string;
+  guestAccessToken: string;
+  orderNo: string;
+  customerName: string;
+  customerPhone: string;
+  productName: string;
+  file: File;
+}): Promise<{ success: boolean; storagePath?: string; error?: string }> {
+  const { orderId, guestAccessToken, orderNo, customerName, customerPhone, productName, file } = params;
+
+  // 1. Build storage path: guest-orders/{orderId}/{token}/{sanitized-filename}
+  const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const uniqueName = `${Date.now()}-${sanitizedName}`;
+  const storagePath = `guest-orders/${orderId}/${guestAccessToken}/${uniqueName}`;
+
+  // 2. Upload to Supabase Storage (design-files bucket)
+  const { error: uploadError } = await supabase.storage
+    .from('design-files')
+    .upload(storagePath, file, { upsert: false });
+
+  if (uploadError) {
+    console.error('Guest file upload error:', uploadError);
+    return { success: false, error: 'Gagal mengupload file: ' + uploadError.message };
+  }
+
+  // 3. Determine file type label for display
+  const ext = file.name.split('.').pop()?.toUpperCase() || 'FILE';
+  const fileTypeLabel = ['JPG', 'JPEG', 'PNG', 'PDF', 'PSD', 'AI', 'CDR', 'ZIP'].includes(ext)
+    ? (ext === 'JPEG' ? 'JPG' : ext)
+    : 'PDF'; // fallback
+
+  // 4. Format file size for display
+  const fileSizeStr = file.size < 1024 * 1024
+    ? `${(file.size / 1024).toFixed(1)} KB`
+    : `${(file.size / (1024 * 1024)).toFixed(2)} MB`;
+
+  // 5. Create inbox_files record so it appears in Admin → File Inbox
+  const { error: inboxError } = await supabase
+    .from('inbox_files')
+    .insert({
+      customer_name: customerName,
+      class_grade: 'Guest Customer',
+      phone: customerPhone,
+      service_type: productName,
+      file_name: file.name,
+      file_type: file.type || 'application/octet-stream',
+      file_size: fileSizeStr,
+      storage_path: storagePath,
+      folder_path: `design-files/${storagePath}`,
+      status: 'Menunggu Pemeriksaan',
+      linked_order_no: orderNo,
+    });
+
+  if (inboxError) {
+    console.error('Guest file inbox record error:', inboxError);
+    // Cleanup: remove the uploaded file since we failed to create the record
+    await supabase.storage.from('design-files').remove([storagePath]).catch(() => {});
+    return { success: false, error: 'File terupload tetapi gagal membuat record: ' + inboxError.message };
+  }
+
+  return { success: true, storagePath };
 }

@@ -96,6 +96,7 @@ export const StudentRegisterView: React.FC<StudentRegisterViewProps> = ({
         studentClass: form.studentClass,
         major: form.major,
         whatsapp: form.whatsapp,
+        avatar: form.avatar,
       });
 
       if (result.success) {
