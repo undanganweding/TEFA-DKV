@@ -15,7 +15,7 @@ interface ProfileViewProps {
 export const defaultInstitution: InstitutionProfile = {
   schoolName: 'SMK NU Ungaran',
   tefaName: 'TEFA DKV Creative Studio',
-  logoUrl: 'https://images.unsplash.com/photo-1542744094-3a31b272c390?w=200&q=80',
+  logoUrl: 'https://images.unsplash.com/photo-1581291518857-4e27b48ff24e?w=200&q=80',
   address: 'Jl. Kaligarang No. 9, Ungaran, Kab. Semarang, Jawa Tengah 50511',
   contactPhone: '(024) 692-1234 / 0813-9000-8800',
   schoolEmail: 'info@smknuungaran.sch.id',

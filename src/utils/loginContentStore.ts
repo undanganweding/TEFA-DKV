@@ -16,7 +16,7 @@ export const INITIAL_SLIDES: SlideItem[] = [
       'Platform digital enterprise terpadu untuk mengelola produksi cetak, kasir POS, manajemen file, dan workflow industri DKV.',
     features: ['Production Control', 'Point of Sales', 'File Inbox System'],
     imageUrl:
-      'https://images.unsplash.com/photo-1542744094-3a31b272c390?w=1200&q=85',
+      'https://images.unsplash.com/photo-1581291518857-4e27b48ff24e?w=1200&q=85',
     badge: 'TEFA DKV',
     visualTag: 'Studio & Workstation DKV',
   },

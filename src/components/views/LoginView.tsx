@@ -225,7 +225,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onBackToHo
     title: 'TEFA DKV SMK NU Ungaran',
     description: 'Teaching Factory Desain Komunikasi Visual',
     features: [],
-    imageUrl: 'https://images.unsplash.com/photo-1542744094-3a31b272c390?w=1200&q=85',
+    imageUrl: 'https://images.unsplash.com/photo-1581291518857-4e27b48ff24e?w=1200&q=85',
     badge: 'TEFA DKV',
     visualTag: 'Creative Studio',
   };

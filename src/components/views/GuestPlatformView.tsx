@@ -74,7 +74,7 @@ const fallbackProducts: ProductItem[] = [
 
 const galleryItems = [
   { title: 'Project Branding Coffee Shop', category: 'Creative Design', img: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=600&q=80' },
-  { title: 'Poster Event Kebudayaan', category: 'Cetak Poster', img: 'https://images.unsplash.com/photo-1542744094-3a31b272c390?w=600&q=80' },
+  { title: 'Poster Event Kebudayaan', category: 'Cetak Poster', img: 'https://images.unsplash.com/photo-1581291518857-4e27b48ff24e?w=600&q=80' },
   { title: 'Merchandise Event Sekolah', category: 'Pin & Mug', img: 'https://images.unsplash.com/photo-1562654501-a0ccc0fc3fb1?w=600&q=80' },
   { title: 'Foto Studio Kelulusan (Wisuda)', category: 'Studio Portrait', img: 'https://images.unsplash.com/photo-1589939705384-5185137a7f0f?w=600&q=80' },
   { title: 'Stiker Branding Botol Kemasan', category: 'Vinyl Print', img: 'https://images.unsplash.com/photo-1511556532299-8f662fc26c06?w=600&q=80' },
