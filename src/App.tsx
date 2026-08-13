@@ -1196,12 +1196,16 @@ export function App() {
   }
 
   const handleLogout = async () => {
-    // Sign out from Supabase auth
-    await authService.signOut().catch(() => {});
+    // 1. Immediately switch view so guard doesn't trip and trap user in LoginView
+    setCurrentPage('public_upload');
+    
+    // 2. Clear local state
     setIsLoggedIn(false);
     setCurrentUser(null);
     setDataLoaded(false); // Reset so data reloads on next login
-    setCurrentPage('public_upload'); // Default route on logout
+    
+    // 3. Fire supabase sign out
+    await authService.signOut().catch(() => {});
   };
 
   const handleUpdateProfile = (updatedUser: UserProfile) => {
@@ -1213,13 +1217,13 @@ export function App() {
   // - Guest users see simple landing page style GuestPlatformView
   if (currentPage === 'public_upload') {
     // If Guest user, show simple Guest Platform
-    if (currentUser?.role === 'Guest') {
+    if (!currentUser || currentUser?.role === 'Guest') {
       return (
         <GuestPlatformView
           products={products.filter((p) => !p.isArchived)}
           orders={orders}
           onAddOrder={(newOrder) => setOrders((prev) => [newOrder, ...prev])}
-          onSwitchToAdmin={handleLogout}
+          onSwitchToAdmin={() => setCurrentPage('login')}
           onLogout={handleLogout}
         />
       );
@@ -1242,7 +1246,16 @@ export function App() {
     );
   }
 
-  // 2. Role-Based Access Control Protection for Admin Pages
+  // 2. Unauthorized Admin Access Guard
+  // Hard check before rendering Admin dashboard components
+  if (!isLoggedIn || !currentUser) {
+    if (currentPage !== 'public_upload' && currentPage !== 'login') {
+      setCurrentPage('login');
+      return null;
+    }
+  }
+
+  // 3. Role-Based Access Control Protection for Admin Pages
   if (currentUser?.role === 'Siswa' || currentUser?.role === 'Guest') {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6 text-white font-sans">
