@@ -244,6 +244,7 @@ export interface ProductionOrder {
   archivedAt?: string;
   archivedBy?: string;
   idempotency_key?: string;
+  guest_access_token?: string;
 }
 
 export interface CustomerFile {

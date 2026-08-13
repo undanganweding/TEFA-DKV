@@ -346,7 +346,8 @@ export async function getGuestOrder(token: string): Promise<ProductionOrder | nu
  */
 export async function trackGuestOrder(
   orderNo: string,
-  phone?: string
+  phone?: string,
+  guestAccessToken?: string
 ): Promise<{
   success: boolean;
   orderNo?: string;
@@ -364,6 +365,7 @@ export async function trackGuestOrder(
   const { data, error } = await supabase.rpc('track_guest_order', {
     p_order_no: orderNo,
     p_phone: phone || null,
+    p_guest_access_token: guestAccessToken || null,
   });
 
   if (error) {
