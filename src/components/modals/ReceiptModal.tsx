@@ -87,8 +87,8 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
               <p className="font-bold text-[10px] uppercase mb-1">Rincian Pesanan:</p>
               <div className="space-y-2">
                 {order.items.map((item, idx) => (
-                  <div key={idx} className="text-[10px]">
-                    <p className="font-bold">{item.productName}</p>
+                  <div key={idx} className="text-[10px] mb-2 last:mb-0">
+                    <p className="font-bold">{item.productName}{item.variantName ? ` - ${item.variantName}` : ''}</p>
                     {item.calculatedArea ? (
                       <p className="text-[9px] text-slate-500">
                         Dimensi: {item.lengthMeters}m x {item.widthMeters}m = {item.calculatedArea} m²

@@ -21,6 +21,7 @@ interface ProductItem {
   img: string;
   desc: string;
   specs: string[];
+  variants?: any[];
 }
 
 const services = [
@@ -102,7 +103,8 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
           `Satuan: ${p.unit}`,
           `Status: ${p.status}`,
           p.isCustomDimension ? 'Mendukung Ukuran Kustom' : 'Ukuran Standar'
-        ]
+        ],
+        variants: p.variants || []
       }))
     : fallbackProducts;
 
@@ -110,6 +112,7 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
+  const [selectedVariant, setSelectedVariant] = useState<any | null>(null);
 
   // Order Form State
   const [orderForm, setOrderForm] = useState({
@@ -227,8 +230,12 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
         setFileError('Produk ini memerlukan file desain! Silakan upload file desain Anda.');
         return;
       }
+      if (selectedOrderProduct.variants && selectedOrderProduct.variants.length > 0 && !selectedVariant) {
+        alert('Mohon pilih varian produk!');
+        return;
+      }
       productName = selectedOrderProduct.name;
-      unitPrice = parseInt(selectedOrderProduct.price.replace(/[^\d]/g, ''), 10) || 0;
+      unitPrice = selectedVariant ? Number(selectedVariant.basePrice) : (parseInt(selectedOrderProduct.price.replace(/[^\d]/g, ''), 10) || 0);
       qty = productQty;
       subtotal = unitPrice * qty;
     } else {
@@ -276,6 +283,8 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
               return uuidRegex.test(pId) ? pId : undefined;
             })(),
             productName: productName,
+            variantId: selectedVariant ? selectedVariant.id : undefined,
+            variantName: selectedVariant ? selectedVariant.name : undefined,
             category: 'Cetak',
             unit: selectedOrderProduct ? selectedOrderProduct.unit : 'pcs',
             unitPrice: unitPrice,
@@ -340,7 +349,7 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
       const found = matchedOrders[0];
       setTrackResult({
         orderId: found.orderNo,
-        product: found.items.map((i) => i.productName).join(', '),
+        product: found.items.map((i: any) => `${i.productName}${i.variantName ? ` - ${i.variantName}` : ''}`).join(', '),
         date: found.orderDate,
         status: found.status,
         statusHistory: found.statusHistory || [],
@@ -356,7 +365,7 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
         const history = (result.statusHistory || []) as Array<{ status: string; timestamp: string; updated_by: string; note?: string }>;
         setTrackResult({
           orderId: result.orderNo || query,
-          product: items.map((i: any) => i.product_name).join(', '),
+          product: items.map((i: any) => `${i.product_name}${i.variant_name ? ` - ${i.variant_name}` : ''}`).join(', '),
           date: result.orderDate || '',
           status: result.status || 'Menunggu Admin',
           statusHistory: history.map((h: any) => ({
@@ -541,7 +550,10 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
                   {displayProducts.map((product, idx) => (
                     <div
                       key={idx}
-                      onClick={() => setSelectedProduct(product)}
+                      onClick={() => {
+                        setSelectedProduct(product);
+                        setSelectedVariant(null);
+                      }}
                       className="bg-white p-4 rounded-3xl border border-slate-200/80 hover:shadow-xl transition-all group flex flex-col justify-between cursor-pointer hover:border-[#5B4BFF]/35"
                     >
                       <div>
@@ -1039,6 +1051,29 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
                     />
                   </div>
 
+                  {/* Varian Produk (if available) */}
+                  {selectedOrderProduct.variants && selectedOrderProduct.variants.length > 0 && (
+                    <div>
+                      <label className="block text-xs font-extrabold text-slate-700 mb-1.5">
+                        Pilih Varian Produk <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        className="w-full px-4 py-3 border border-slate-200 rounded-2xl text-xs sm:text-sm font-semibold focus:outline-none focus:border-[#5B4BFF] focus:ring-3 focus:ring-purple-500/5 bg-slate-50/50"
+                        value={selectedVariant ? selectedVariant.id : ''}
+                        onChange={(e) => {
+                          const variant = selectedOrderProduct.variants?.find(v => v.id === e.target.value) || null;
+                          setSelectedVariant(variant);
+                        }}
+                        required
+                      >
+                        <option value="" disabled>-- Pilih Varian --</option>
+                        {selectedOrderProduct.variants.map((v: any) => (
+                          <option key={v.id} value={v.id}>{v.name} - Rp {Number(v.basePrice).toLocaleString('id-ID')}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
                   {/* Quantity selector with realtime calculation */}
                   <div>
                     <label className="block text-xs font-extrabold text-slate-700 mb-2">
@@ -1067,7 +1102,7 @@ export const GuestPlatformView: React.FC<GuestPlatformViewProps> = ({
                   <div className="bg-[#5B4BFF]/5 border border-[#5B4BFF]/15 rounded-2xl p-4 flex justify-between items-center text-xs">
                     <span className="text-slate-655 font-bold">Total Pembayaran:</span>
                     <span className="text-[#5B4BFF] font-black text-sm">
-                      Rp {((parseInt(selectedOrderProduct.price.replace(/[^\d]/g, ''), 10) || 0) * productQty).toLocaleString('id-ID')}
+                      Rp {((selectedVariant ? Number(selectedVariant.basePrice) : (parseInt(selectedOrderProduct.price.replace(/[^\d]/g, ''), 10) || 0)) * productQty).toLocaleString('id-ID')}
                     </span>
                   </div>
 

@@ -43,6 +43,12 @@ export async function fetchProducts(): Promise<Product[]> {
     .from('product_recipes')
     .select('*');
 
+  // Fetch all active variants
+  const { data: variants } = await supabase
+    .from('product_variants')
+    .select('*')
+    .eq('is_active', true);
+
   return (data || []).map(row => {
     const product = mapProductRow(row);
     const productRecipes = (recipes || [])
@@ -51,6 +57,22 @@ export async function fetchProducts(): Promise<Product[]> {
     if (productRecipes.length > 0) {
       product.recipe = productRecipes;
     }
+    
+    // Attach variants
+    const productVariants = (variants || [])
+      .filter(v => v.product_id === row.id)
+      .map(v => ({
+        id: v.id,
+        productId: v.product_id,
+        name: v.name,
+        code: v.code || undefined,
+        unit: v.unit,
+        basePrice: Number(v.base_price),
+        isActive: v.is_active,
+      }));
+    
+    product.variants = productVariants;
+
     return product;
   });
 }

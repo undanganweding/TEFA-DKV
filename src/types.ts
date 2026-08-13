@@ -109,8 +109,13 @@ export interface InboxFile {
 
 export type OrderStatus =
   | 'Draft'
+  | 'Menunggu Konfirmasi'
   | 'Menunggu Admin'
+  | 'Dikonfirmasi'
+  | 'Menunggu Pembayaran / DP'
   | 'Diproses'
+  | 'Produksi'
+  | 'Siap Diambil / Dikirim'
   | 'Selesai'
   | 'Diterima'
   | 'Ditolak'
@@ -120,19 +125,32 @@ export type PaymentStatus = 'Belum Bayar' | 'DP' | 'Lunas' | 'PARTIALLY_REFUNDED
 
 export type PaymentMethod = 'Cash' | 'QRIS' | 'Transfer Bank' | 'DP / Piutang';
 
+export interface ProductVariant {
+  id: string;
+  productId: string;
+  name: string;
+  code?: string;
+  unit: string;
+  basePrice: number;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface Product {
   id: string;
   code: string;
   name: string;
   category: 'Cetak Outdoor' | 'Cetak Indoor / A3+' | 'Merchandise' | 'Desain & Creative' | 'Finishing & Jilid';
   subcategory?: string;
-  unit: 'm2' | 'lembar' | 'pcs' | 'paket' | 'meter' | 'set' | 'box';
+  unit: 'm2' | 'lembar' | 'pcs' | 'paket' | 'meter' | 'set' | 'box' | string;
   basePrice: number; // Harga per unit
   costPrice?: number; // HPP Modal per unit
   recipe?: Array<{
     materialId: string;
     qtyRequired: number;
   }>;
+  variants?: ProductVariant[];
   minQty: number;
   description: string;
   isCustomDimension?: boolean; // e.g. Flexi banner (Panjang x Lebar)
@@ -151,6 +169,8 @@ export interface CartItem {
   id: string;
   productId: string;
   productName: string;
+  variantId?: string;
+  variantName?: string;
   category: string;
   unit: string;
   unitPrice: number;
@@ -203,6 +223,9 @@ export interface ProductionOrder {
   notes?: string;
   designNotes?: string;
   finishingNotes?: string;
+  rejectedAt?: string;
+  rejectedBy?: string;
+  rejectionReason?: string;
   artworkFiles?: Array<{
     id: string;
     name: string;

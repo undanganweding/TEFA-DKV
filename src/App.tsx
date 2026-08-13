@@ -924,6 +924,49 @@ export function App() {
     );
   };
 
+  const handleConfirmOrderPrice = async (orderId: string, updatedItems: CartItem[], newSubtotal: number, newDiscount: number, newTax: number, newTotal: number) => {
+    try {
+      const res = await orderServiceModule.confirmOrderPrice(
+        orderId,
+        updatedItems,
+        newSubtotal,
+        newDiscount,
+        newTax,
+        newTotal,
+        currentUser?.name || 'Admin'
+      );
+      if (res.success) {
+        const updatedOrders = await orderServiceModule.fetchOrders();
+        setOrders(updatedOrders);
+      } else {
+        alert(`Gagal konfirmasi harga: ${res.error}`);
+      }
+    } catch (err) {
+      console.error('Confirm price error', err);
+      alert('Terjadi kesalahan saat mengonfirmasi harga.');
+    }
+  };
+
+  const handleRejectOrder = async (orderId: string, reason: string) => {
+    try {
+      const res = await orderServiceModule.rejectOrder(
+        orderId,
+        reason,
+        currentUser?.id || '',
+        currentUser?.name || 'Admin'
+      );
+      if (res.success) {
+        const updatedOrders = await orderServiceModule.fetchOrders();
+        setOrders(updatedOrders);
+      } else {
+        alert(`Gagal menolak pesanan: ${res.error}`);
+      }
+    } catch (err) {
+      console.error('Reject order error', err);
+      alert('Terjadi kesalahan saat menolak pesanan.');
+    }
+  };
+
   // Handlers for File Inbox
   const handleUpdateInboxFileStatus = (fileId: string, status: InboxFileStatus) => {
     setInboxFiles((prev) => prev.map((f) => (f.id === fileId ? { ...f, status } : f)));
@@ -1425,6 +1468,8 @@ export function App() {
               onUpdateOrderStatus={handleUpdateOrderStatus}
               onRecordPayment={handleRecordPayment}
               onRefundOrder={handleRefundOrder}
+              onConfirmOrderPrice={handleConfirmOrderPrice}
+              onRejectOrder={handleRejectOrder}
               onOpenOrderReceipt={(ord) => setActiveReceiptOrder(ord)}
               onOpenNewOrderModal={() => setShowNewOrderModal(true)}
               onOpenPublicUpload={() => setCurrentPage('public_upload')}

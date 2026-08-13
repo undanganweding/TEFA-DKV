@@ -6,11 +6,13 @@ type OrderRow = Database['public']['Tables']['orders']['Row'];
 type OrderItemRow = Database['public']['Tables']['order_items']['Row'];
 type StatusHistoryRow = Database['public']['Tables']['order_status_history']['Row'];
 
-function mapOrderItemRow(row: OrderItemRow): CartItem {
+function mapOrderItemRow(row: OrderItemRow & { variant_name?: string }): CartItem {
   return {
     id: row.id,
     productId: row.product_id || '',
     productName: row.product_name,
+    variantId: (row as any).variant_id || undefined,
+    variantName: (row as any).variant_name || undefined,
     category: '',
     unit: row.unit,
     unitPrice: Number(row.unit_price),
@@ -71,6 +73,9 @@ export function mapOrderRow(
     notes: row.notes || undefined,
     designNotes: row.design_notes || undefined,
     finishingNotes: row.finishing_notes || undefined,
+    rejectedAt: (row as any).rejected_at || undefined,
+    rejectedBy: (row as any).rejected_by || undefined,
+    rejectionReason: (row as any).rejection_reason || undefined,
     statusHistory: history.map(mapStatusHistoryRow),
     isArchived: row.is_archived,
   };
@@ -145,6 +150,8 @@ export async function createOrder(orderData: {
       items: orderData.items.map(item => ({
         product_id: item.productId || null,
         product_name: item.productName,
+        variant_id: item.variantId || null,
+        variant_name: item.variantName || null,
         unit_price: item.unitPrice,
         cost_price: item.costPrice || 0,
         qty: item.qty,
@@ -198,6 +205,8 @@ export async function createGuestOrder(orderData: {
       items: orderData.items.map(item => ({
         product_id: item.productId || null,
         product_name: item.productName,
+        variant_id: item.variantId || null,
+        variant_name: item.variantName || null,
         unit_price: item.unitPrice,
         cost_price: item.costPrice || 0,
         qty: item.qty,
@@ -364,4 +373,86 @@ export async function trackGuestOrder(
 
   const result = data as any;
   return result;
+}
+
+export async function rejectOrder(
+  orderId: string,
+  reason: string,
+  operatorId: string,
+  operatorName: string
+): Promise<{ success: boolean; error?: string }> {
+  // Update order status and rejection reason
+  const { error: orderError } = await supabase
+    .from('orders')
+    .update({
+      status: 'Ditolak',
+      rejected_at: new Date().toISOString(),
+      rejected_by: operatorId,
+      rejection_reason: reason,
+    })
+    .eq('id', orderId);
+
+  if (orderError) {
+    console.error('Error rejecting order:', orderError);
+    return { success: false, error: orderError.message };
+  }
+
+  // Insert status history
+  await supabase.from('order_status_history').insert({
+    order_id: orderId,
+    status: 'Ditolak',
+    updated_by: operatorName,
+    note: `Alasan penolakan: ${reason}`,
+  });
+
+  return { success: true };
+}
+
+export async function confirmOrderPrice(
+  orderId: string,
+  items: CartItem[],
+  subtotal: number,
+  discount: number,
+  taxAmount: number,
+  totalAmount: number,
+  operatorName: string
+): Promise<{ success: boolean; error?: string }> {
+  // 1. Update order totals and status
+  const { error: orderError } = await supabase
+    .from('orders')
+    .update({
+      subtotal,
+      discount,
+      tax_amount: taxAmount,
+      total_amount: totalAmount,
+      balance_due: totalAmount, // Assuming it's unpaid when confirming
+      status: 'Dikonfirmasi',
+    })
+    .eq('id', orderId);
+
+  if (orderError) {
+    console.error('Error confirming order price:', orderError);
+    return { success: false, error: orderError.message };
+  }
+
+  // 2. Update order items (prices might have changed)
+  for (const item of items) {
+    await supabase
+      .from('order_items')
+      .update({
+        unit_price: item.unitPrice,
+        total_price: item.totalPrice,
+      })
+      .eq('id', item.id);
+  }
+
+  // 3. Add status history
+  await supabase.from('order_status_history').insert({
+    order_id: orderId,
+    status: 'Dikonfirmasi',
+    updated_by: operatorName,
+    note: 'Harga pesanan telah dikonfirmasi oleh Admin',
+  });
+
+  return { success: true };
 }
