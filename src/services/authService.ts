@@ -1,5 +1,7 @@
 import { supabase } from '../lib/supabase';
+import { setCurrentToken, getCurrentToken } from '../lib/authToken';
 import type { UserProfile } from '../types';
+
 
 /**
  * Profile row shape returned from Supabase profiles table
@@ -257,12 +259,8 @@ export async function fetchUserProfile(user: any): Promise<UserProfile | null> {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-  // Get JWT from current session (localStorage read, no network request)
-  let token = supabaseAnonKey;
-  try {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session?.access_token) token = session.access_token;
-  } catch {}
+  // Use token from store (set by onAuthStateChange, NO network request needed)
+  const token = getCurrentToken();
 
   // Use native fetch to bypass Supabase JS HTTP/2 transport issues
   try {
@@ -321,6 +319,8 @@ export async function fetchUserProfile(user: any): Promise<UserProfile | null> {
 
 export function onAuthStateChange(callback: (event: string, session: any) => void) {
   return supabase.auth.onAuthStateChange((event, session) => {
+    // Store token synchronously from auth event — NO network call needed
+    setCurrentToken(session?.access_token || null);
     callback(event, session);
   });
 }

@@ -2,9 +2,10 @@
  * Order Service - Native fetch (restCall) for all Supabase REST operations.
  * Using native fetch bypasses Supabase JS HTTP/2 transport which causes
  * ERR_CONNECTION_RESET in Chromium production browsers.
- * JWT is obtained from supabase.auth.getSession() (localStorage read, no network).
+ * JWT is obtained from authToken store (set by onAuthStateChange, no network).
  */
 import { supabase } from '../lib/supabase';
+import { getCurrentToken } from '../lib/authToken';
 import type { ProductionOrder, CartItem, PaymentMethod, OrderStatus } from '../types';
 import type { Database } from '../lib/database.types';
 
@@ -20,16 +21,11 @@ async function sleep(ms: number): Promise<void> {
 }
 
 /**
- * Gets the current user's JWT token from the Supabase session stored in localStorage.
- * This is a LOCAL read — no network request made.
+ * Gets the current user's JWT token from the module-level auth store.
+ * Set synchronously by onAuthStateChange — NO network request made.
  */
-async function getAuthToken(): Promise<string> {
-  try {
-    const { data: { session } } = await supabase.auth.getSession();
-    return session?.access_token || SUPABASE_ANON_KEY;
-  } catch {
-    return SUPABASE_ANON_KEY;
-  }
+function getAuthToken(): string {
+  return getCurrentToken();
 }
 
 interface RestResult<T> {
