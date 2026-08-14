@@ -1386,9 +1386,7 @@ export function App() {
   // - Registered students see StudentPortalView with full dashboard
   // - Guest users see simple landing page style GuestPlatformView
   if (currentPage === 'public_upload') {
-    // If Guest user, Admin, or if auth is STILL initializing, show simple Guest Platform!
-    // This allows the homepage to load in < 2 seconds regardless of auth status.
-    if (authInitializing || !currentUser || currentUser?.role === 'Guest' || currentUser?.role === 'Admin' || currentUser?.role === 'Kepala TEFA') {
+    if (authInitializing || !currentUser || currentUser?.role === 'Guest') {
       return (
         <GuestPlatformView
           products={products.filter((p) => !p.isArchived)}

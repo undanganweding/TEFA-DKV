@@ -255,31 +255,31 @@ export async function getSession(): Promise<any> {
 let inFlightProfileRequest: Promise<UserProfile | null> | null = null;
 
 export async function fetchUserProfile(user: any): Promise<UserProfile | null> {
-  if (user && user.user_metadata) {
-    const meta = user.user_metadata;
-    const fallbackProfile: ProfileRow = {
-      id: user.id,
-      full_name: meta.full_name || user.email || 'Pengguna TEFA',
-      role: meta.role || 'Student',
-      status: meta.status || 'Active',
-      school_class: meta.school_class || null,
-      phone: meta.phone || null,
-      address: null,
-      avatar_path: meta.avatar_path || null,
-      nis: meta.nis || null,
-      major: meta.major || null,
-      whatsapp: meta.whatsapp || null,
-      position: null,
-      nip: null,
-      employee_id: null,
-      reject_reason: null,
-      created_at: user.created_at || new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    return mapProfileToUserProfile(fallbackProfile, user.email || '');
-  }
+  // Always return a profile if user object exists, even if user_metadata is null/undefined
+  if (!user) return null;
 
-  return null;
+  const meta = user.user_metadata || {};
+
+  const fallbackProfile: ProfileRow = {
+    id: user.id,
+    full_name: meta.full_name || user.email || 'Pengguna TEFA',
+    role: meta.role || 'Student',
+    status: meta.status || 'Active',
+    school_class: meta.school_class || null,
+    phone: meta.phone || null,
+    address: null,
+    avatar_path: meta.avatar_path || null,
+    nis: meta.nis || null,
+    major: meta.major || null,
+    whatsapp: meta.whatsapp || null,
+    position: null,
+    nip: null,
+    employee_id: null,
+    reject_reason: null,
+    created_at: user.created_at || new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+  return mapProfileToUserProfile(fallbackProfile, user.email || '');
 }
 
 
