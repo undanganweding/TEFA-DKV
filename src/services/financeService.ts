@@ -1,4 +1,8 @@
-import { supabase } from '../lib/supabase';
+/**
+ * Finance Service — Direct REST API client.
+ */
+
+import { restCall } from '../lib/restClient';
 import type { FinanceTransaction } from '../types';
 import type { Database } from '../lib/database.types';
 
@@ -24,49 +28,31 @@ export function mapFinanceRow(row: FinanceRow): FinanceTransaction {
 }
 
 export async function fetchTransactions(): Promise<FinanceTransaction[]> {
-  const { data, error } = await supabase
-    .from('finance_transactions')
-    .select('*')
-    .order('date', { ascending: false });
-
-  if (error) {
-    console.error('Error fetching transactions:', error);
-    return [];
-  }
-  return (data || []).map(mapFinanceRow);
+  const result = await restCall<FinanceRow[]>('GET', 'finance_transactions?select=*&order=date.desc');
+  if (!result.data) return [];
+  return result.data.map(mapFinanceRow);
 }
 
 export async function createTransaction(transaction: Omit<FinanceTransaction, 'id'>): Promise<FinanceTransaction | null> {
-  const { data, error } = await supabase
-    .from('finance_transactions')
-    .insert({
-      trans_no: transaction.transNo,
-      date: transaction.date,
-      type: transaction.type,
-      amount: transaction.amount,
-      cogs_amount: transaction.cogsAmount || 0,
-      profit_amount: transaction.profitAmount || 0,
-      ref_order_no: transaction.refOrderNo || null,
-      category: transaction.category,
-      description: transaction.description,
-      payment_method: transaction.paymentMethod,
-      operator: transaction.operator,
-      status: transaction.status || 'Berhasil',
-    })
-    .select()
-    .single();
-
-  if (error) {
-    console.error('Error creating transaction:', error);
-    return null;
-  }
-  return mapFinanceRow(data);
+  const result = await restCall<FinanceRow[]>('POST', 'finance_transactions', {
+    trans_no: transaction.transNo,
+    date: transaction.date,
+    type: transaction.type,
+    amount: transaction.amount,
+    cogs_amount: transaction.cogsAmount || 0,
+    profit_amount: transaction.profitAmount || 0,
+    ref_order_no: transaction.refOrderNo || null,
+    category: transaction.category,
+    description: transaction.description,
+    payment_method: transaction.paymentMethod,
+    operator: transaction.operator,
+    status: transaction.status || 'Berhasil',
+  });
+  if (!result.data || result.data.length === 0) return null;
+  return mapFinanceRow(result.data[0]);
 }
 
 export async function archiveTransaction(transactionId: string): Promise<boolean> {
-  const { error } = await supabase
-    .from('finance_transactions')
-    .update({ is_archived: true })
-    .eq('id', transactionId);
-  return !error;
+  const result = await restCall('PATCH', `finance_transactions?id=eq.${transactionId}`, { is_archived: true });
+  return !result.error;
 }

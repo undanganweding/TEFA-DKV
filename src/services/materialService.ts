@@ -1,4 +1,8 @@
-import { supabase } from '../lib/supabase';
+/**
+ * Material Service — Direct REST API client.
+ */
+
+import { restCall } from '../lib/restClient';
 import type { MaterialStock, StockMovement } from '../types';
 import type { Database } from '../lib/database.types';
 
@@ -47,86 +51,56 @@ export function mapStockMovementRow(row: StockMovementRow): StockMovement {
 }
 
 export async function fetchMaterials(): Promise<MaterialStock[]> {
-  const { data, error } = await supabase
-    .from('materials')
-    .select('*')
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    console.error('Error fetching materials:', error);
-    return [];
-  }
-  return (data || []).map(mapMaterialRow);
+  const result = await restCall<MaterialRow[]>('GET', 'materials?select=*&order=created_at.desc');
+  if (!result.data) return [];
+  return result.data.map(mapMaterialRow);
 }
 
 export async function fetchStockMovements(): Promise<StockMovement[]> {
-  const { data, error } = await supabase
-    .from('stock_movements')
-    .select('*')
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    console.error('Error fetching stock movements:', error);
-    return [];
-  }
-  return (data || []).map(mapStockMovementRow);
+  const result = await restCall<StockMovementRow[]>('GET', 'stock_movements?select=*&order=created_at.desc');
+  if (!result.data) return [];
+  return result.data.map(mapStockMovementRow);
 }
 
 export async function createMaterial(material: Omit<MaterialStock, 'id'>): Promise<MaterialStock | null> {
-  const { data, error } = await supabase
-    .from('materials')
-    .insert({
-      code: material.code,
-      name: material.name,
-      category: material.category,
-      current_stock: material.currentStock,
-      min_stock: material.minStock,
-      unit: material.unit,
-      unit_price: material.unitPrice,
-      cost_price: material.costPrice || material.unitPrice,
-      selling_ref_price: material.sellingRefPrice ?? null,
-      supplier: material.supplier || null,
-      location: material.location || null,
-      status: material.status,
-      last_restocked: material.lastRestocked || null,
-      image: material.image || null,
-    })
-    .select()
-    .single();
-
-  if (error) {
-    console.error('Error creating material:', error);
-    return null;
-  }
-  return mapMaterialRow(data);
+  const result = await restCall<MaterialRow[]>('POST', 'materials', {
+    code: material.code,
+    name: material.name,
+    category: material.category,
+    current_stock: material.currentStock,
+    min_stock: material.minStock,
+    unit: material.unit,
+    unit_price: material.unitPrice,
+    cost_price: material.costPrice || material.unitPrice,
+    selling_ref_price: material.sellingRefPrice ?? null,
+    supplier: material.supplier || null,
+    location: material.location || null,
+    status: material.status,
+    last_restocked: material.lastRestocked || null,
+    image: material.image || null,
+  });
+  if (!result.data || result.data.length === 0) return null;
+  return mapMaterialRow(result.data[0]);
 }
 
 export async function updateMaterial(material: MaterialStock): Promise<boolean> {
-  const { error } = await supabase
-    .from('materials')
-    .update({
-      code: material.code,
-      name: material.name,
-      category: material.category,
-      current_stock: material.currentStock,
-      min_stock: material.minStock,
-      unit: material.unit,
-      unit_price: material.unitPrice,
-      cost_price: material.costPrice || material.unitPrice,
-      selling_ref_price: material.sellingRefPrice ?? null,
-      supplier: material.supplier || null,
-      location: material.location || null,
-      status: material.status,
-      last_restocked: material.lastRestocked || null,
-      image: material.image || null,
-    })
-    .eq('id', material.id);
-
-  if (error) {
-    console.error('Error updating material:', error);
-    return false;
-  }
-  return true;
+  const result = await restCall('PATCH', `materials?id=eq.${material.id}`, {
+    code: material.code,
+    name: material.name,
+    category: material.category,
+    current_stock: material.currentStock,
+    min_stock: material.minStock,
+    unit: material.unit,
+    unit_price: material.unitPrice,
+    cost_price: material.costPrice || material.unitPrice,
+    selling_ref_price: material.sellingRefPrice ?? null,
+    supplier: material.supplier || null,
+    location: material.location || null,
+    status: material.status,
+    last_restocked: material.lastRestocked || null,
+    image: material.image || null,
+  });
+  return !result.error;
 }
 
 export async function restockMaterial(
@@ -136,13 +110,9 @@ export async function restockMaterial(
   operator: string
 ): Promise<boolean> {
   // Fetch current material
-  const { data: material, error: fetchError } = await supabase
-    .from('materials')
-    .select('*')
-    .eq('id', materialId)
-    .single();
-
-  if (fetchError || !material) return false;
+  const matResult = await restCall<MaterialRow[]>('GET', `materials?id=eq.${materialId}&select=*`);
+  if (!matResult.data || matResult.data.length === 0) return false;
+  const material = matResult.data[0];
 
   const beforeStock = Number(material.current_stock);
   const newStock = beforeStock + addedQty;
@@ -151,19 +121,15 @@ export async function restockMaterial(
   else if (newStock <= Number(material.min_stock)) newStatus = 'Menipis';
 
   // Update material stock
-  const { error: updateError } = await supabase
-    .from('materials')
-    .update({
-      current_stock: newStock,
-      status: newStatus,
-      last_restocked: new Date().toISOString().split('T')[0],
-    })
-    .eq('id', materialId);
-
-  if (updateError) return false;
+  const updateResult = await restCall('PATCH', `materials?id=eq.${materialId}`, {
+    current_stock: newStock,
+    status: newStatus,
+    last_restocked: new Date().toISOString().split('T')[0],
+  });
+  if (updateResult.error) return false;
 
   // Log stock movement
-  await supabase.from('stock_movements').insert({
+  await restCall('POST', 'stock_movements', {
     material_id: materialId,
     material_name: material.name,
     type: 'Masuk',
@@ -181,37 +147,26 @@ export async function restockMaterial(
 }
 
 export async function archiveMaterial(materialId: string): Promise<boolean> {
-  const { error } = await supabase
-    .from('materials')
-    .update({ is_archived: true })
-    .eq('id', materialId);
-  return !error;
+  const result = await restCall('PATCH', `materials?id=eq.${materialId}`, { is_archived: true });
+  return !result.error;
 }
 
 export async function addStockMovement(movement: Omit<StockMovement, 'id'>): Promise<StockMovement | null> {
-  const { data, error } = await supabase
-    .from('stock_movements')
-    .insert({
-      material_id: movement.materialId,
-      material_name: movement.materialName,
-      type: movement.type,
-      quantity: movement.quantity,
-      before_stock: movement.beforeStock || 0,
-      after_stock: movement.afterStock || 0,
-      reference_id: movement.referenceId || null,
-      unit: movement.unit,
-      unit_cost: movement.unitCost,
-      total_value: movement.totalValue,
-      supplier: movement.supplier || null,
-      notes: movement.notes || null,
-      operator: movement.operator || null,
-    })
-    .select()
-    .single();
-
-  if (error) {
-    console.error('Error adding stock movement:', error);
-    return null;
-  }
-  return mapStockMovementRow(data);
+  const result = await restCall<StockMovementRow[]>('POST', 'stock_movements', {
+    material_id: movement.materialId,
+    material_name: movement.materialName,
+    type: movement.type,
+    quantity: movement.quantity,
+    before_stock: movement.beforeStock || 0,
+    after_stock: movement.afterStock || 0,
+    reference_id: movement.referenceId || null,
+    unit: movement.unit,
+    unit_cost: movement.unitCost,
+    total_value: movement.totalValue,
+    supplier: movement.supplier || null,
+    notes: movement.notes || null,
+    operator: movement.operator || null,
+  });
+  if (!result.data || result.data.length === 0) return null;
+  return mapStockMovementRow(result.data[0]);
 }

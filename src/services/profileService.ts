@@ -1,12 +1,40 @@
+/**
+ * Profile Service — Mixed: REST for database, Supabase JS for Edge Functions.
+ */
+
 import { supabase } from '../lib/supabase';
+import { restCall } from '../lib/restClient';
 import type { UserProfile } from '../types';
 import { mapProfileToUserProfile } from './authService';
+
+interface ProfileRow {
+  id: string;
+  full_name: string;
+  role: string;
+  status: string;
+  school_class: string | null;
+  phone: string | null;
+  address: string | null;
+  avatar_path: string | null;
+  nis: string | null;
+  major: string | null;
+  whatsapp: string | null;
+  position: string | null;
+  nip: string | null;
+  employee_id: string | null;
+  reject_reason: string | null;
+  created_at: string;
+  updated_at: string;
+  email?: string;
+  email_confirmed_at?: string;
+  last_sign_in_at?: string;
+}
 
 // ===== PROFILE / USER MANAGEMENT =====
 
 export async function getAllUsers(): Promise<UserProfile[]> {
   try {
-    // 1. Coba panggil RPC get_all_users_admin secara langsung dulu
+    // Try RPC first
     const { data: rpcData, error: rpcError } = await supabase.rpc('get_all_users_admin');
 
     let usersList: any[] = [];
@@ -14,29 +42,19 @@ export async function getAllUsers(): Promise<UserProfile[]> {
     if (!rpcError && Array.isArray(rpcData) && rpcData.length > 0) {
       usersList = rpcData;
     } else {
-      // 2. Fallback ke Edge Function jika RPC belum ter-grant atau gagal
-      const { data, error } = await supabase.functions.invoke('admin-manage-users', {
+      // Fallback to Edge Function
+      const { data } = await supabase.functions.invoke('admin-manage-users', {
         body: { action: 'list' }
       });
 
-      if (!error && data?.success && Array.isArray(data.data)) {
+      if (!data?.error && data?.success && Array.isArray(data.data)) {
         usersList = data.data;
       } else {
-        // 3. Fallback terakhir: Ambil langsung dari tabel profiles jika Edge Function/RPC gagal
-        const { data: profilesData, error: profError } = await supabase
-          .from('profiles')
-          .select('*')
-          .order('created_at', { ascending: false });
-
-        if (profError) {
-          console.error('Error fallback fetching profiles:', profError);
-          return [];
+        // Last resort: REST direct
+        const result = await restCall<ProfileRow[]>('GET', 'profiles?select=*&order=created_at.desc');
+        if (result.data) {
+          usersList = result.data.map(p => ({ ...p, email: '' }));
         }
-
-        usersList = (profilesData || []).map((p: any) => ({
-          ...p,
-          email: '', // Email default kosong jika RLS profiles tidak menyimpannya
-        }));
       }
     }
 
@@ -61,56 +79,29 @@ export async function getAllUsers(): Promise<UserProfile[]> {
 }
 
 export async function getUsersByFilter(filter: 'all' | 'pending' | 'active' | 'admin' | 'inactive'): Promise<UserProfile[]> {
-  let query = supabase.from('profiles').select('*').order('created_at', { ascending: false });
-
+  let filterQuery = '';
   switch (filter) {
-    case 'pending':
-      query = query.eq('status', 'Pending');
-      break;
-    case 'active':
-      query = query.eq('status', 'Active');
-      break;
-    case 'admin':
-      query = query.eq('role', 'Admin');
-      break;
-    case 'inactive':
-      query = query.eq('status', 'Rejected');
-      break;
+    case 'pending': filterQuery = '&status=eq.Pending'; break;
+    case 'active': filterQuery = '&status=eq.Active'; break;
+    case 'admin': filterQuery = '&role=eq.Admin'; break;
+    case 'inactive': filterQuery = '&status=eq.Rejected'; break;
   }
-
-  const { data, error } = await query;
-  if (error) {
-    console.error('Error fetching filtered users:', error);
-    return [];
-  }
-
-  return (data || []).map(p => mapProfileToUserProfile(p, ''));
+  const result = await restCall<ProfileRow[]>(
+    'GET',
+    `profiles?select=*&order=created_at.desc${filterQuery}`
+  );
+  if (!result.data) return [];
+  return result.data.map(p => mapProfileToUserProfile(p, ''));
 }
 
 export async function activateUser(userId: string): Promise<boolean> {
-  const { error } = await supabase
-    .from('profiles')
-    .update({ status: 'Active', reject_reason: null })
-    .eq('id', userId);
-
-  if (error) {
-    console.error('Error activating user:', error);
-    return false;
-  }
-  return true;
+  const result = await restCall('PATCH', `profiles?id=eq.${userId}`, { status: 'Active', reject_reason: null });
+  return !result.error;
 }
 
 export async function suspendUser(userId: string, reason: string = 'Melanggar ketentuan'): Promise<boolean> {
-  const { error } = await supabase
-    .from('profiles')
-    .update({ status: 'Inactive', reject_reason: reason })
-    .eq('id', userId);
-
-  if (error) {
-    console.error('Error suspending user:', error);
-    return false;
-  }
-  return true;
+  const result = await restCall('PATCH', `profiles?id=eq.${userId}`, { status: 'Inactive', reject_reason: reason });
+  return !result.error;
 }
 
 export async function uploadAvatar(userId: string, file: File): Promise<{ success: boolean; url?: string; message?: string }> {
@@ -123,26 +114,19 @@ export async function uploadAvatar(userId: string, file: File): Promise<{ succes
       .upload(path, file, { upsert: true });
 
     if (uploadError) {
-      console.error('Error uploading avatar:', uploadError);
       return { success: false, message: 'Gagal mengunggah gambar ke storage: ' + uploadError.message };
     }
 
     const { data: publicData } = supabase.storage.from('profile-images').getPublicUrl(path);
     const publicUrl = publicData.publicUrl;
 
-    const { error: updateError } = await supabase
-      .from('profiles')
-      .update({ avatar_path: publicUrl })
-      .eq('id', userId);
-
-    if (updateError) {
-      console.error('Error updating avatar_path in profile:', updateError);
-      return { success: false, message: 'Gagal memperbarui profil di database: ' + updateError.message };
+    const result = await restCall('PATCH', `profiles?id=eq.${userId}`, { avatar_path: publicUrl });
+    if (result.error) {
+      return { success: false, message: 'Gagal memperbarui profil di database: ' + result.error.message };
     }
 
     return { success: true, url: publicUrl };
   } catch (err: any) {
-    console.error('Unexpected avatar upload error:', err);
     return { success: false, message: 'Terjadi kesalahan saat mengunggah foto profil.' };
   }
 }
@@ -162,40 +146,21 @@ export async function updateProfile(userId: string, updates: {
   role?: string;
   status?: string;
 }): Promise<boolean> {
-  const { error } = await supabase
-    .from('profiles')
-    .update(updates)
-    .eq('id', userId);
-
-  if (error) {
-    console.error('Error updating profile:', error);
-    return false;
-  }
-  return true;
+  const result = await restCall('PATCH', `profiles?id=eq.${userId}`, updates);
+  return !result.error;
 }
 
 export async function deleteUser(userId: string): Promise<{ success: boolean; message: string }> {
-  // Delete profile (cascades from auth.users via ON DELETE CASCADE)
-  const { error } = await supabase
-    .from('profiles')
-    .delete()
-    .eq('id', userId);
-
-  if (error) {
-    console.error('Error deleting user:', error);
-    return { success: false, message: 'Gagal menghapus user: ' + error.message };
+  const result = await restCall('DELETE', `profiles?id=eq.${userId}`);
+  if (result.error) {
+    return { success: false, message: 'Gagal menghapus user: ' + result.error.message };
   }
   return { success: true, message: 'Akun berhasil dihapus.' };
 }
 
 export async function getPendingCount(): Promise<number> {
-  const { count, error } = await supabase
-    .from('profiles')
-    .select('*', { count: 'exact', head: true })
-    .eq('status', 'Pending');
-
-  if (error) return 0;
-  return count || 0;
+  const result = await restCall<ProfileRow[]>('GET', 'profiles?status=eq.Pending&select=id');
+  return result.data?.length || 0;
 }
 
 export async function adminSetPassword(targetUserId: string, newPassword: string): Promise<{ success: boolean; message: string }> {
@@ -203,19 +168,10 @@ export async function adminSetPassword(targetUserId: string, newPassword: string
     const { data, error } = await supabase.functions.invoke('admin-manage-users', {
       body: { action: 'reset_password', targetUserId, newPassword }
     });
-
-    if (error) {
-      console.error('Edge function error:', error);
-      return { success: false, message: error.message || 'Gagal menghubungi server untuk mengubah password.' };
-    }
-
-    if (data?.error) {
-      return { success: false, message: data.error };
-    }
-
+    if (error) return { success: false, message: error.message || 'Gagal menghubungi server.' };
+    if (data?.error) return { success: false, message: data.error };
     return { success: true, message: 'Password berhasil diubah.' };
   } catch (err: any) {
-    console.error('Unexpected error setting password:', err);
     return { success: false, message: 'Terjadi kesalahan internal.' };
   }
 }
@@ -225,10 +181,8 @@ export async function adminChangeEmail(targetUserId: string, newEmail: string): 
     const { data, error } = await supabase.functions.invoke('admin-manage-users', {
       body: { action: 'update_email', targetUserId, newEmail }
     });
-
-    if (error) return { success: false, message: error.message || 'Gagal menghubungi server.' };
+    if (error) return { success: false, message: error.message || 'Gagal联系的服务器.' };
     if (data?.error) return { success: false, message: data.error };
-
     return { success: true, message: 'Email berhasil diperbarui.' };
   } catch (err: any) {
     return { success: false, message: 'Terjadi kesalahan internal.' };
@@ -240,10 +194,8 @@ export async function adminDeleteUserSecure(targetUserId: string): Promise<{ suc
     const { data, error } = await supabase.functions.invoke('admin-manage-users', {
       body: { action: 'delete_user', targetUserId }
     });
-
-    if (error) return { success: false, message: error.message || 'Gagal menghubungi server.' };
+    if (error) return { success: false, message: error.message || 'Gagal联系的服务器.' };
     if (data?.error) return { success: false, message: data.error };
-
     return { success: true, message: 'Akun berhasil dihapus secara permanen.' };
   } catch (err: any) {
     return { success: false, message: 'Terjadi kesalahan internal.' };

@@ -1,7 +1,11 @@
+/**
+ * File Service — Direct REST for database, Supabase JS for Storage.
+ */
+
 import { supabase } from '../lib/supabase';
+import { restCall } from '../lib/restClient';
 import type { InboxFile, CustomerFile } from '../types';
 
-// ===== Types from Supabase =====
 interface InboxFileRow {
   id: string;
   upload_date: string;
@@ -83,91 +87,60 @@ function mapInboxFileRow(row: InboxFileRow): InboxFile {
 // ===== INBOX FILES =====
 
 export async function fetchInboxFiles(): Promise<InboxFile[]> {
-  const { data, error } = await supabase
-    .from('inbox_files')
-    .select('*')
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    console.error('Error fetching inbox files:', error);
-    return [];
-  }
-
-  return ((data as InboxFileRow[]) || []).map(mapInboxFileRow);
+  const result = await restCall<InboxFileRow[]>('GET', 'inbox_files?select=*&order=created_at.desc');
+  if (!result.data) return [];
+  return result.data.map(mapInboxFileRow);
 }
 
 export async function addInboxFile(file: Omit<InboxFile, 'id'>): Promise<InboxFile | null> {
-  const { data, error } = await supabase
-    .from('inbox_files')
-    .insert({
-      upload_date: file.uploadDate,
-      customer_name: file.customerName,
-      class_grade: file.classGrade,
-      major: file.major || null,
-      phone: file.phone,
-      service_type: file.serviceType,
-      print_size: file.printSize || null,
-      qty: file.qty,
-      notes: file.notes || null,
-      file_name: file.fileName,
-      file_type: file.fileType,
-      file_size: file.fileSize,
-      preview_url: file.previewUrl || null,
-      folder_path: file.folderPath,
-      status: file.status || 'Menunggu Pemeriksaan',
-      linked_order_no: file.linkedOrderNo || null,
-    })
-    .select()
-    .single();
-
-  if (error || !data) {
-    console.error('Error adding inbox file:', error);
-    return null;
-  }
-
-  return mapInboxFileRow(data as InboxFileRow);
+  const result = await restCall<InboxFileRow[]>('POST', 'inbox_files', {
+    upload_date: file.uploadDate,
+    customer_name: file.customerName,
+    class_grade: file.classGrade,
+    major: file.major || null,
+    phone: file.phone,
+    service_type: file.serviceType,
+    print_size: file.printSize || null,
+    qty: file.qty,
+    notes: file.notes || null,
+    file_name: file.fileName,
+    file_type: file.fileType,
+    file_size: file.fileSize,
+    preview_url: file.previewUrl || null,
+    folder_path: file.folderPath,
+    status: file.status || 'Menunggu Pemeriksaan',
+    linked_order_no: file.linkedOrderNo || null,
+  });
+  if (!result.data || result.data.length === 0) return null;
+  return mapInboxFileRow(result.data[0]);
 }
 
 export async function updateInboxFileStatus(fileId: string, status: string): Promise<boolean> {
-  const { error } = await supabase
-    .from('inbox_files')
-    .update({ status })
-    .eq('id', fileId);
-  return !error;
+  const result = await restCall('PATCH', `inbox_files?id=eq.${fileId}`, { status });
+  return !result.error;
 }
 
 export async function archiveInboxFile(fileId: string): Promise<boolean> {
-  const { error } = await supabase
-    .from('inbox_files')
-    .update({ is_archived: true, archived_at: new Date().toISOString() })
-    .eq('id', fileId);
-  return !error;
+  const result = await restCall('PATCH', `inbox_files?id=eq.${fileId}`, {
+    is_archived: true,
+    archived_at: new Date().toISOString(),
+  });
+  return !result.error;
 }
 
 // ===== CUSTOMER FILES =====
 
 export async function fetchCustomerFiles(): Promise<CustomerFile[]> {
-  const { data: foldersData, error } = await supabase
-    .from('customer_files')
-    .select('*')
-    .order('last_updated', { ascending: false });
-
-  if (error) {
-    console.error('Error fetching customer files:', error);
-    return [];
-  }
-
-  const folders = (foldersData as CustomerFileRow[]) || [];
+  const foldersResult = await restCall<CustomerFileRow[]>('GET', 'customer_files?select=*&order=last_updated.desc');
+  const folders = foldersResult.data || [];
   if (folders.length === 0) return [];
 
-  // Fetch file items for all customer folders
-  const folderIds = folders.map(f => f.id);
-  const { data: itemsData } = await supabase
-    .from('customer_file_items')
-    .select('*')
-    .in('customer_file_id', folderIds);
-
-  const allItems = (itemsData as CustomerFileItemRow[]) || [];
+  const idsParam = folders.map(f => encodeURIComponent(f.id)).join(',');
+  const itemsResult = await restCall<CustomerFileItemRow[]>(
+    'GET',
+    `customer_file_items?customer_file_id=in.(${idsParam})`
+  );
+  const allItems = itemsResult.data || [];
 
   return folders.map(folder => ({
     id: folder.id,
@@ -197,11 +170,11 @@ export async function fetchCustomerFiles(): Promise<CustomerFile[]> {
 }
 
 export async function archiveCustomerFile(fileId: string): Promise<boolean> {
-  const { error } = await supabase
-    .from('customer_files')
-    .update({ is_archived: true, archived_at: new Date().toISOString() })
-    .eq('id', fileId);
-  return !error;
+  const result = await restCall('PATCH', `customer_files?id=eq.${fileId}`, {
+    is_archived: true,
+    archived_at: new Date().toISOString(),
+  });
+  return !result.error;
 }
 
 // ===== SUPABASE STORAGE FILE UPLOAD =====
@@ -220,7 +193,6 @@ export async function uploadFile(
     return null;
   }
 
-  // Get public URL for public buckets, signed URL for private
   if (bucket === 'product-images') {
     const { data } = supabase.storage.from(bucket).getPublicUrl(path);
     return { url: data.publicUrl, path };
@@ -238,14 +210,6 @@ export async function getSignedUrl(bucket: string, path: string): Promise<string
 
 // ===== GUEST ORDER FILE UPLOAD =====
 
-/**
- * Uploads a file for a guest order to Supabase Storage.
- * Path pattern: guest-orders/{orderId}/{guestAccessToken}/{filename}
- * The RLS policy on design-files bucket validates the order_id + token.
- *
- * After successful storage upload, creates an inbox_files record so the
- * file appears in Admin → File Inbox.
- */
 export async function uploadGuestOrderFile(params: {
   orderId: string;
   guestAccessToken: string;
@@ -257,12 +221,11 @@ export async function uploadGuestOrderFile(params: {
 }): Promise<{ success: boolean; storagePath?: string; error?: string }> {
   const { orderId, guestAccessToken, orderNo, customerName, customerPhone, productName, file } = params;
 
-  // 1. Build storage path: guest-orders/{orderId}/{token}/{sanitized-filename}
   const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
   const uniqueName = `${Date.now()}-${sanitizedName}`;
   const storagePath = `guest-orders/${orderId}/${guestAccessToken}/${uniqueName}`;
 
-  // 2. Upload to Supabase Storage (design-files bucket)
+  // Upload to Supabase Storage
   const { error: uploadError } = await supabase.storage
     .from('design-files')
     .upload(storagePath, file, { upsert: false });
@@ -272,39 +235,34 @@ export async function uploadGuestOrderFile(params: {
     return { success: false, error: 'Gagal mengupload file: ' + uploadError.message };
   }
 
-  // 3. Determine file type label for display
   const ext = file.name.split('.').pop()?.toUpperCase() || 'FILE';
   const fileTypeLabel = ['JPG', 'JPEG', 'PNG', 'PDF', 'PSD', 'AI', 'CDR', 'ZIP'].includes(ext)
     ? (ext === 'JPEG' ? 'JPG' : ext)
-    : 'PDF'; // fallback
+    : 'PDF';
 
-  // 4. Format file size for display
   const fileSizeStr = file.size < 1024 * 1024
     ? `${(file.size / 1024).toFixed(1)} KB`
     : `${(file.size / (1024 * 1024)).toFixed(2)} MB`;
 
-  // 5. Create inbox_files record so it appears in Admin → File Inbox
-  const { error: inboxError } = await supabase
-    .from('inbox_files')
-    .insert({
-      customer_name: customerName,
-      class_grade: 'Guest Customer',
-      phone: customerPhone,
-      service_type: productName,
-      file_name: file.name,
-      file_type: file.type || 'application/octet-stream',
-      file_size: fileSizeStr,
-      storage_path: storagePath,
-      folder_path: `design-files/${storagePath}`,
-      status: 'Menunggu Pemeriksaan',
-      linked_order_no: orderNo,
-    });
+  // Create inbox_files record via REST
+  const inboxResult = await restCall('POST', 'inbox_files', {
+    customer_name: customerName,
+    class_grade: 'Guest Customer',
+    phone: customerPhone,
+    service_type: productName,
+    file_name: file.name,
+    file_type: file.type || 'application/octet-stream',
+    file_size: fileSizeStr,
+    storage_path: storagePath,
+    folder_path: `design-files/${storagePath}`,
+    status: 'Menunggu Pemeriksaan',
+    linked_order_no: orderNo,
+  });
 
-  if (inboxError) {
-    console.error('Guest file inbox record error:', inboxError);
-    // Cleanup: remove the uploaded file since we failed to create the record
+  if (inboxResult.error) {
+    console.error('Guest file inbox record error:', inboxResult.error);
     await supabase.storage.from('design-files').remove([storagePath]).catch(() => {});
-    return { success: false, error: 'File terupload tetapi gagal membuat record: ' + inboxError.message };
+    return { success: false, error: 'File terupload tetapi gagal membuat record: ' + inboxResult.error.message };
   }
 
   return { success: true, storagePath };

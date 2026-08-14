@@ -1,4 +1,8 @@
-import { supabase } from '../lib/supabase';
+/**
+ * Inventory Service — Direct REST API client.
+ */
+
+import { restCall } from '../lib/restClient';
 import type { ToolInventory } from '../types';
 import type { Database } from '../lib/database.types';
 
@@ -28,81 +32,55 @@ export function mapInventoryRow(row: InventoryRow): ToolInventory {
 }
 
 export async function fetchInventory(): Promise<ToolInventory[]> {
-  const { data, error } = await supabase
-    .from('inventory_assets')
-    .select('*')
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    console.error('Error fetching inventory:', error);
-    return [];
-  }
-  return (data || []).map(mapInventoryRow);
+  const result = await restCall<InventoryRow[]>('GET', 'inventory_assets?select=*&order=created_at.desc');
+  if (!result.data) return [];
+  return result.data.map(mapInventoryRow);
 }
 
 export async function createInventoryAsset(tool: Omit<ToolInventory, 'id'>): Promise<ToolInventory | null> {
-  const { data, error } = await supabase
-    .from('inventory_assets')
-    .insert({
-      asset_code: tool.code,
-      name: tool.name,
-      category: tool.category,
-      location: tool.location,
-      condition: tool.condition,
-      status: tool.status,
-      serial_number: tool.serialNumber,
-      purchase_date: tool.purchaseDate || null,
-      last_maintenance: tool.lastMaintenance || null,
-      pic_name: tool.picName,
-      specifications: tool.specification || null,
-      brand: tool.brand || null,
-      model: tool.model || null,
-      purchase_price: tool.acquisitionCost || null,
-      image_path: tool.coverImage || tool.images?.[0] || null,
-    })
-    .select()
-    .single();
-
-  if (error) {
-    console.error('Error creating inventory:', error);
-    return null;
-  }
-  return mapInventoryRow(data);
+  const result = await restCall<InventoryRow[]>('POST', 'inventory_assets', {
+    asset_code: tool.code,
+    name: tool.name,
+    category: tool.category,
+    location: tool.location,
+    condition: tool.condition,
+    status: tool.status,
+    serial_number: tool.serialNumber,
+    purchase_date: tool.purchaseDate || null,
+    last_maintenance: tool.lastMaintenance || null,
+    pic_name: tool.picName,
+    specifications: tool.specification || null,
+    brand: tool.brand || null,
+    model: tool.model || null,
+    purchase_price: tool.acquisitionCost || null,
+    image_path: tool.coverImage || tool.images?.[0] || null,
+  });
+  if (!result.data || result.data.length === 0) return null;
+  return mapInventoryRow(result.data[0]);
 }
 
 export async function updateInventoryAsset(tool: ToolInventory): Promise<boolean> {
-  const { error } = await supabase
-    .from('inventory_assets')
-    .update({
-      asset_code: tool.code,
-      name: tool.name,
-      category: tool.category,
-      location: tool.location,
-      condition: tool.condition,
-      status: tool.status,
-      serial_number: tool.serialNumber,
-      purchase_date: tool.purchaseDate || null,
-      last_maintenance: tool.lastMaintenance || null,
-      pic_name: tool.picName,
-      specifications: tool.specification || null,
-      brand: tool.brand || null,
-      model: tool.model || null,
-      purchase_price: tool.acquisitionCost || null,
-      image_path: tool.coverImage || tool.images?.[0] || null,
-    })
-    .eq('id', tool.id);
-
-  if (error) {
-    console.error('Error updating inventory:', error);
-    return false;
-  }
-  return true;
+  const result = await restCall('PATCH', `inventory_assets?id=eq.${tool.id}`, {
+    asset_code: tool.code,
+    name: tool.name,
+    category: tool.category,
+    location: tool.location,
+    condition: tool.condition,
+    status: tool.status,
+    serial_number: tool.serialNumber,
+    purchase_date: tool.purchaseDate || null,
+    last_maintenance: tool.lastMaintenance || null,
+    pic_name: tool.picName,
+    specifications: tool.specification || null,
+    brand: tool.brand || null,
+    model: tool.model || null,
+    purchase_price: tool.acquisitionCost || null,
+    image_path: tool.coverImage || tool.images?.[0] || null,
+  });
+  return !result.error;
 }
 
 export async function archiveInventoryAsset(assetId: string): Promise<boolean> {
-  const { error } = await supabase
-    .from('inventory_assets')
-    .update({ is_archived: true })
-    .eq('id', assetId);
-  return !error;
+  const result = await restCall('PATCH', `inventory_assets?id=eq.${assetId}`, { is_archived: true });
+  return !result.error;
 }

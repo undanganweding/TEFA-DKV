@@ -1,39 +1,93 @@
-import { supabase } from '../lib/supabase';
+/**
+ * Order Service - Direct REST API client.
+ * Bypasses Supabase JS to avoid HTTP/2 connection issues.
+ */
 import type { ProductionOrder, CartItem, PaymentMethod, OrderStatus } from '../types';
 import type { Database } from '../lib/database.types';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-/**
- * Fallback direct REST fetch for when Supabase JS fails.
- * Uses native fetch to bypass potential Supabase JS internal issues.
- */
-async function directRestFetch<T = any>(endpoint: string): Promise<T> {
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    throw new Error('Missing Supabase environment variables');
-  }
-
-  const url = `${SUPABASE_URL}/rest/v1/${endpoint}`;
-  const response = await fetch(url, {
-    headers: {
-      'apikey': SUPABASE_ANON_KEY,
-      'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-      'Content-Type': 'application/json',
-    },
-  });
-
-  if (!response.ok) {
-    const errorBody = await response.text();
-    throw new Error(`REST fetch failed: ${response.status} ${errorBody}`);
-  }
-
-  return response.json();
-}
-
 type OrderRow = Database['public']['Tables']['orders']['Row'];
 type OrderItemRow = Database['public']['Tables']['order_items']['Row'];
 type StatusHistoryRow = Database['public']['Tables']['order_status_history']['Row'];
+
+async function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+interface RestResult<T> {
+  data: T | null;
+  error: { message: string; status?: number } | null;
+}
+
+async function restCall<T = any>(
+  method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
+  endpoint: string,
+  body?: any,
+  retries = 3,
+  baseDelay = 500
+): Promise<RestResult<T>> {
+  const url = `${SUPABASE_URL}/rest/v1/${endpoint}`;
+  const headers = {
+    'apikey': SUPABASE_ANON_KEY,
+    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+    'Content-Type': 'application/json',
+    'Prefer': 'return=representation',
+  };
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const options: RequestInit = { method, headers, credentials: 'omit' };
+      if (body && (method === 'POST' || method === 'PATCH')) {
+        options.body = JSON.stringify(body);
+      }
+
+      const response = await fetch(url, options);
+
+      if (response.status >= 400 && response.status < 500 && response.status !== 429) {
+        const text = await response.text().catch(() => '');
+        return { data: null, error: { message: text || `HTTP ${response.status}`, status: response.status } };
+      }
+
+      if (response.status >= 500 || response.status === 429) {
+        if (attempt < retries) {
+          const delay = response.status === 429
+            ? parseInt(response.headers.get('retry-after') || '5', 10) * 1000
+            : baseDelay * Math.pow(2, attempt);
+          await sleep(delay);
+          continue;
+        }
+      }
+
+      if (response.status === 204) return { data: {} as T, error: null };
+
+      const text = await response.text();
+      if (!response.ok) {
+        return { data: null, error: { message: text || `HTTP ${response.status}`, status: response.status } };
+      }
+
+      return { data: text ? JSON.parse(text) : ({} as T), error: null };
+
+    } catch (err: any) {
+      const isNetworkError =
+        !err.status &&
+        (err.message?.includes('Failed to fetch') ||
+          err.message?.includes('NetworkError') ||
+          err.message?.includes('net::ERR_') ||
+          err.name === 'TypeError');
+
+      if (isNetworkError && attempt < retries) {
+        await sleep(baseDelay * Math.pow(2, attempt));
+        continue;
+      }
+
+      return { data: null, error: { message: err.message || 'Network error' } };
+    }
+  }
+
+  return { data: null, error: { message: 'All retries exhausted' } };
+}
 
 function mapOrderItemRow(row: OrderItemRow & { variant_name?: string }): CartItem {
   return {
@@ -111,57 +165,27 @@ export function mapOrderRow(
 }
 
 export async function fetchOrders(): Promise<ProductionOrder[]> {
-  let orders: any[] = [];
-  try {
-    const { data, error } = await supabase
-      .from('orders')
-      .select('*')
-      .order('created_at', { ascending: false });
+  const ordersResult = await restCall<OrderRow[]>('GET', 'orders?select=*&order=created_at.desc');
+  if (!ordersResult.data || ordersResult.data.length === 0) return [];
 
-    if (error || !data) {
-      console.warn('[NETWORK] Supabase JS query for orders failed, executing Direct REST Transport...', error);
-      orders = await directRestFetch('orders?select=*&order=created_at.desc');
-    } else {
-      orders = data;
-    }
-  } catch (err) {
-    console.warn('[NETWORK] Supabase JS exception for orders, executing Direct REST Transport...', err);
-    try {
-      orders = await directRestFetch('orders?select=*&order=created_at.desc');
-    } catch (e) {
-      console.error('[NETWORK] Direct REST Transport for orders also failed:', e);
-      return [];
-    }
-  }
-
-  if (!orders || orders.length === 0) return [];
-
+  const orders = ordersResult.data;
   const orderIds = orders.map(o => o.id);
+  const idsParam = orderIds.map(id => encodeURIComponent(id)).join(',');
 
-  // Fetch items for all orders
-  const { data: allItems } = await supabase
-    .from('order_items')
-    .select('*')
-    .in('order_id', orderIds);
+  const [itemsResult, historyResult, refundsResult] = await Promise.all([
+    restCall<OrderItemRow[]>('GET', `order_items?order_id=in.(${idsParam})`),
+    restCall<StatusHistoryRow[]>('GET', `order_status_history?order_id=in.(${idsParam})&order=timestamp.asc`),
+    restCall<any[]>('GET', `refunds?order_id=in.(${idsParam})&status=eq.Completed`),
+  ]);
 
-  // Fetch status history for all orders
-  const { data: allHistory } = await supabase
-    .from('order_status_history')
-    .select('*')
-    .in('order_id', orderIds)
-    .order('timestamp', { ascending: true });
-
-  // Fetch refunds for all orders
-  const { data: allRefunds } = await supabase
-    .from('refunds')
-    .select('*')
-    .in('order_id', orderIds)
-    .eq('status', 'Completed');
+  const allItems = itemsResult.data || [];
+  const allHistory = historyResult.data || [];
+  const allRefunds = refundsResult.data || [];
 
   return orders.map(order => {
-    const items = (allItems || []).filter(i => i.order_id === order.id);
-    const history = (allHistory || []).filter(h => h.order_id === order.id);
-    const refunds = (allRefunds || [])
+    const items = allItems.filter(i => i.order_id === order.id);
+    const history = allHistory.filter(h => h.order_id === order.id);
+    const refunds = allRefunds
       .filter(r => r.order_id === order.id)
       .map(r => ({
         id: r.id,
@@ -188,21 +212,10 @@ export async function createOrder(orderData: {
   createdBy?: string;
   idempotencyKey?: string;
   inboxFile?: {
-    uploadDate?: string;
-    customerName?: string;
-    classGrade?: string;
-    major?: string;
-    phone?: string;
-    serviceType?: string;
-    printSize?: string;
-    qty?: number;
-    notes?: string;
-    fileName: string;
-    fileType: string;
-    fileSize: string;
-    previewUrl?: string;
-    storagePath?: string;
-    folderPath?: string;
+    uploadDate?: string; customerName?: string; classGrade?: string; major?: string;
+    phone?: string; serviceType?: string; printSize?: string; qty?: number;
+    notes?: string; fileName: string; fileType: string; fileSize: string;
+    previewUrl?: string; storagePath?: string; folderPath?: string;
   };
 }): Promise<{ success: boolean; orderId?: string; orderNo?: string; error?: string }> {
   const keyToUse = orderData.idempotencyKey || `IDEMP-${orderData.createdBy || 'STUDENT'}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
@@ -257,30 +270,22 @@ export async function createOrder(orderData: {
     } : null,
   };
 
-  // Try up to 2 times with 1s delay between attempts
-  for (let attempt = 0; attempt <= 1; attempt++) {
-    const { data, error } = await supabase.rpc('create_order', { order_data: orderPayload });
+  for (let attempt = 0; attempt <= 2; attempt++) {
+    const result = await restCall<any>('POST', 'rpc/create_order', { order_data: orderPayload }, 2);
 
-    if (!error && data) {
-      const result = data as any;
-      if (result?.success) {
-        return {
-          success: true,
-          orderId: result.order_id,
-          orderNo: result.order_no,
-        };
+    if (!result.error && result.data) {
+      const rpcResult = result.data;
+      if (rpcResult?.success) {
+        return { success: true, orderId: rpcResult.order_id, orderNo: rpcResult.order_no };
       } else {
-        return { success: false, error: result?.error || 'RPC returned failure.' };
+        return { success: false, error: rpcResult?.error || 'RPC returned failure.' };
       }
     }
 
-    // If this was not the last attempt, wait and retry
-    if (attempt < 1) {
-      console.warn(`[ORDER] create_order attempt ${attempt + 1} failed, retrying in 1s...`, error);
-      await new Promise(resolve => setTimeout(resolve, 1000));
+    if (attempt < 2) {
+      await sleep(500 * Math.pow(2, attempt));
     } else {
-      console.error('Error creating order:', error);
-      return { success: false, error: error?.message || 'Gagal mengirim pesanan.' };
+      return { success: false, error: result.error?.message || 'Gagal mengirim pesanan.' };
     }
   }
 
@@ -289,24 +294,16 @@ export async function createOrder(orderData: {
 
 export async function recoverOrderByKey(idempotencyKey: string): Promise<{ success: boolean; orderId?: string; orderNo?: string; guestAccessToken?: string } | null> {
   if (!idempotencyKey) return null;
-  try {
-    const { data, error } = await supabase
-      .from('orders')
-      .select('id, order_no, guest_access_token')
-      .eq('idempotency_key', idempotencyKey)
-      .maybeSingle();
-
-    if (error || !data) return null;
-    return {
-      success: true,
-      orderId: data.id,
-      orderNo: data.order_no,
-      guestAccessToken: data.guest_access_token,
-    };
-  } catch (err) {
-    console.error('Error recovering order by key:', err);
-    return null;
+  const result = await restCall<any[]>(
+    'GET',
+    `orders?select=id,order_no,guest_access_token&idempotency_key=eq.${encodeURIComponent(idempotencyKey)}`,
+    undefined, 2
+  );
+  if (!result.error && result.data && result.data.length > 0) {
+    const order = result.data[0];
+    return { success: true, orderId: order.id, orderNo: order.order_no, guestAccessToken: order.guest_access_token };
   }
+  return null;
 }
 
 export async function createGuestOrder(orderData: {
@@ -344,134 +341,73 @@ export async function createGuestOrder(orderData: {
     idempotency_key: orderData.idempotencyKey || null,
   };
 
-  // Try up to 2 times with 1s delay between attempts
-  for (let attempt = 0; attempt <= 1; attempt++) {
-    const { data, error } = await supabase.rpc('create_guest_order', { order_data: orderPayload });
-
-    if (!error && data) {
-      const result = data as any;
+  for (let attempt = 0; attempt <= 2; attempt++) {
+    const result = await restCall<any>('POST', 'rpc/create_guest_order', { order_data: orderPayload }, 2);
+    if (!result.error && result.data) {
+      const rpcResult = result.data;
       return {
-        success: result?.success || false,
-        orderId: result?.order_id,
-        orderNo: result?.order_no,
-        guestAccessToken: result?.guest_access_token,
-        error: result?.error,
+        success: rpcResult?.success || false,
+        orderId: rpcResult?.order_id,
+        orderNo: rpcResult?.order_no,
+        guestAccessToken: rpcResult?.guest_access_token,
+        error: rpcResult?.error,
       };
     }
-
-    if (attempt < 1) {
-      console.warn(`[ORDER] create_guest_order attempt ${attempt + 1} failed, retrying in 1s...`, error);
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    } else {
-      console.error('Error creating guest order:', error);
-      return { success: false, error: error?.message || 'Gagal mengirim pesanan.' };
-    }
+    if (attempt < 2) await sleep(500 * Math.pow(2, attempt));
+    else return { success: false, error: result.error?.message || 'Gagal mengirim pesanan.' };
   }
-
   return { success: false, error: 'Gagal mengirim pesanan.' };
 }
 
-export async function updateOrderStatus(
-  orderId: string,
-  newStatus: OrderStatus,
-  operator: string,
-  note?: string
-): Promise<{ success: boolean; error?: string }> {
-  const { data, error } = await supabase.rpc('update_order_status', {
+export async function updateOrderStatus(orderId: string, newStatus: OrderStatus, operator: string, note?: string): Promise<{ success: boolean; error?: string }> {
+  const result = await restCall<any>('POST', 'rpc/update_order_status', {
     p_order_id: orderId,
     p_new_status: newStatus,
     p_operator: operator,
     p_note: note || null,
-  });
-
-  if (error) {
-    console.error('Error updating order status:', error);
-    return { success: false, error: error.message };
-  }
-
-  const result = data as any;
-  return { success: result?.success || false, error: result?.error };
+  }, 2);
+  if (!result.error && result.data) return { success: result.data?.success || false, error: result.data?.error };
+  return { success: false, error: result.error?.message };
 }
 
-export async function recordPayment(
-  orderId: string,
-  amount: number,
-  method: string,
-  operator: string,
-  reference?: string,
-  notes?: string
-): Promise<{ success: boolean; error?: string }> {
-  const { data, error } = await supabase.rpc('record_payment', {
+export async function recordPayment(orderId: string, amount: number, method: string, operator: string, reference?: string, notes?: string): Promise<{ success: boolean; error?: string }> {
+  const result = await restCall<any>('POST', 'rpc/record_payment', {
     p_order_id: orderId,
     p_amount: amount,
     p_method: method,
     p_reference: reference || null,
     p_notes: notes || null,
     p_operator: operator,
-  });
-
-  if (error) {
-    console.error('Error recording payment:', error);
-    return { success: false, error: error.message };
-  }
-
-  const result = data as any;
-  return { success: result?.success || false, error: result?.error };
+  }, 2);
+  if (!result.error && result.data) return { success: result.data?.success || false, error: result.data?.error };
+  return { success: false, error: result.error?.message };
 }
 
-export async function processRefund(
-  orderId: string,
-  amount: number,
-  reason: string,
-  operator: string,
-  paymentId?: string
-): Promise<{ success: boolean; error?: string }> {
-  const { data, error } = await supabase.rpc('process_refund', {
+export async function processRefund(orderId: string, amount: number, reason: string, operator: string, paymentId?: string): Promise<{ success: boolean; error?: string }> {
+  const result = await restCall<any>('POST', 'rpc/process_refund', {
     p_order_id: orderId,
     p_amount: amount,
     p_reason: reason,
     p_payment_id: paymentId || null,
     p_operator: operator,
-  });
-
-  if (error) {
-    console.error('Error processing refund:', error);
-    return { success: false, error: error.message };
-  }
-
-  const result = data as any;
-  return { success: result?.success || false, error: result?.error };
+  }, 2);
+  if (!result.error && result.data) return { success: result.data?.success || false, error: result.data?.error };
+  return { success: false, error: result.error?.message };
 }
 
 export async function archiveOrder(orderId: string): Promise<boolean> {
-  const { error } = await supabase
-    .from('orders')
-    .update({ is_archived: true })
-    .eq('id', orderId);
-  return !error;
+  const result = await restCall('PATCH', `orders?id=eq.${orderId}`, { is_archived: true }, 2);
+  return !result.error;
 }
 
 export async function getGuestOrder(token: string): Promise<ProductionOrder | null> {
-  const { data, error } = await supabase.rpc('get_guest_order', {
-    p_token: token,
-  });
-
-  if (error || !data) return null;
-
-  const result = data as any;
-  if (!result.success) return null;
-
-  const order = result.order;
-  const items = result.items || [];
-  const history = result.status_history || [];
-
-  return mapOrderRow(order, items, history);
+  const result = await restCall<any>('POST', 'rpc/get_guest_order', { p_token: token }, 2);
+  if (!result.error && result.data?.success) {
+    return mapOrderRow(result.data.order, result.data.items || [], result.data.status_history || []);
+  }
+  return null;
 }
 
-/**
- * Track a guest order by order_no and optionally phone.
- * Uses SECURITY DEFINER RPC to bypass RLS.
- */
 export async function trackGuestOrder(
   orderNo: string,
   phone?: string,
@@ -486,55 +422,34 @@ export async function trackGuestOrder(
   paidAmount?: number;
   balanceDue?: number;
   orderDate?: string;
-  items?: Array<{ product_name: string; qty: number; unit: string; total_price: number; notes?: string }>;
-  statusHistory?: Array<{ status: string; timestamp: string; updated_by: string; note?: string }>;
+  items?: any[];
+  statusHistory?: any[];
   error?: string;
 } | null> {
-  const { data, error } = await supabase.rpc('track_guest_order', {
+  const result = await restCall<any>('POST', 'rpc/track_guest_order', {
     p_order_no: orderNo,
     p_phone: phone || null,
     p_guest_access_token: guestAccessToken || null,
-  });
-
-  if (error) {
-    console.error('Error tracking guest order:', error);
-    return { success: false, error: error.message };
-  }
-
-  const result = data as any;
-  return result;
+  }, 2);
+  if (!result.error && result.data) return result.data;
+  return { success: false, error: result.error?.message };
 }
 
-export async function rejectOrder(
-  orderId: string,
-  reason: string,
-  operatorId: string,
-  operatorName: string
-): Promise<{ success: boolean; error?: string }> {
-  // Update order status and rejection reason
-  const { error: orderError } = await supabase
-    .from('orders')
-    .update({
-      status: 'Ditolak',
-      rejected_at: new Date().toISOString(),
-      rejected_by: operatorId,
-      rejection_reason: reason,
-    })
-    .eq('id', orderId);
-
-  if (orderError) {
-    console.error('Error rejecting order:', orderError);
-    return { success: false, error: orderError.message };
-  }
-
-  // Insert status history
-  await supabase.from('order_status_history').insert({
+export async function rejectOrder(orderId: string, reason: string, operatorId: string, operatorName: string): Promise<{ success: boolean; error?: string }> {
+  const now = new Date().toISOString();
+  const updateResult = await restCall('PATCH', `orders?id=eq.${orderId}`, {
+    status: 'Ditolak',
+    rejected_at: now,
+    rejected_by: operatorId,
+    rejection_reason: reason,
+  }, 2);
+  if (updateResult.error) return { success: false, error: updateResult.error.message };
+  await restCall('POST', 'order_status_history', {
     order_id: orderId,
     status: 'Ditolak',
     updated_by: operatorName,
     note: `Alasan penolakan: ${reason}`,
-  });
-
+  }, 1);
   return { success: true };
 }
 
@@ -547,42 +462,20 @@ export async function confirmOrderPrice(
   totalAmount: number,
   operatorName: string
 ): Promise<{ success: boolean; error?: string }> {
-  // 1. Update order totals and status
-  const { error: orderError } = await supabase
-    .from('orders')
-    .update({
-      subtotal,
-      discount,
-      tax_amount: taxAmount,
-      total_amount: totalAmount,
-      balance_due: totalAmount, // Assuming it's unpaid when confirming
-      status: 'Dikonfirmasi',
-    })
-    .eq('id', orderId);
-
-  if (orderError) {
-    console.error('Error confirming order price:', orderError);
-    return { success: false, error: orderError.message };
-  }
-
-  // 2. Update order items (prices might have changed)
-  for (const item of items) {
-    await supabase
-      .from('order_items')
-      .update({
-        unit_price: item.unitPrice,
-        total_price: item.totalPrice,
-      })
-      .eq('id', item.id);
-  }
-
-  // 3. Add status history
-  await supabase.from('order_status_history').insert({
+  const updateResult = await restCall('PATCH', `orders?id=eq.${orderId}`, {
+    subtotal,
+    discount,
+    tax_amount: taxAmount,
+    total_amount: totalAmount,
+    balance_due: totalAmount,
+    status: 'Dikonfirmasi',
+  }, 2);
+  if (updateResult.error) return { success: false, error: updateResult.error.message };
+  await restCall('POST', 'order_status_history', {
     order_id: orderId,
     status: 'Dikonfirmasi',
     updated_by: operatorName,
     note: 'Harga pesanan telah dikonfirmasi oleh Admin',
-  });
-
+  }, 1);
   return { success: true };
 }

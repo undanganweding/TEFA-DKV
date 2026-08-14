@@ -1,4 +1,20 @@
-import { supabase } from '../lib/supabase';
+/**
+ * Notification Service — Direct REST API client.
+ */
+
+import { restCall } from '../lib/restClient';
+
+interface NotificationRow {
+  id: string;
+  user_id: string;
+  title: string;
+  message: string;
+  type: string;
+  reference_type: string | null;
+  reference_id: string | null;
+  is_read: boolean;
+  created_at: string;
+}
 
 export interface Notification {
   id: string;
@@ -13,19 +29,12 @@ export interface Notification {
 }
 
 export async function fetchNotifications(userId: string): Promise<Notification[]> {
-  const { data, error } = await supabase
-    .from('notifications')
-    .select('*')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false })
-    .limit(50);
-
-  if (error) {
-    console.error('Error fetching notifications:', error);
-    return [];
-  }
-
-  return (data || []).map(row => ({
+  const result = await restCall<NotificationRow[]>(
+    'GET',
+    `notifications?user_id=eq.${encodeURIComponent(userId)}&select=*&order=created_at.desc&limit=50`
+  );
+  if (!result.data) return [];
+  return result.data.map(row => ({
     id: row.id,
     userId: row.user_id,
     title: row.title,
@@ -46,7 +55,7 @@ export async function createNotification(notif: {
   referenceType?: string;
   referenceId?: string;
 }): Promise<boolean> {
-  const { error } = await supabase.from('notifications').insert({
+  const result = await restCall('POST', 'notifications', {
     user_id: notif.userId,
     title: notif.title,
     message: notif.message,
@@ -54,38 +63,31 @@ export async function createNotification(notif: {
     reference_type: notif.referenceType || null,
     reference_id: notif.referenceId || null,
   });
-  return !error;
+  return !result.error;
 }
 
 export async function markAsRead(notificationId: string): Promise<boolean> {
-  const { error } = await supabase
-    .from('notifications')
-    .update({ is_read: true })
-    .eq('id', notificationId);
-  return !error;
+  const result = await restCall('PATCH', `notifications?id=eq.${notificationId}`, { is_read: true });
+  return !result.error;
 }
 
 export async function markAllAsRead(userId: string): Promise<boolean> {
-  const { error } = await supabase
-    .from('notifications')
-    .update({ is_read: true })
-    .eq('user_id', userId)
-    .eq('is_read', false);
-  return !error;
-}
-
-export async function getUnreadCount(userId: string): Promise<number> {
-  const { count, error } = await supabase
-    .from('notifications')
-    .select('*', { count: 'exact', head: true })
-    .eq('user_id', userId)
-    .eq('is_read', false);
-
-  if (error) return 0;
-  return count || 0;
+  const result = await restCall('PATCH', `notifications?user_id=eq.${encodeURIComponent(userId)}&is_read=eq.false`, { is_read: true });
+  return !result.error;
 }
 
 // ===== ACTIVITY LOGS =====
+
+interface ActivityLogRow {
+  id: string;
+  actor_id: string | null;
+  action: string;
+  entity_type: string;
+  entity_id: string;
+  description: string | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+}
 
 export async function logActivity(log: {
   actorId?: string;
@@ -95,7 +97,7 @@ export async function logActivity(log: {
   description?: string;
   metadata?: Record<string, unknown>;
 }): Promise<boolean> {
-  const { error } = await supabase.from('activity_logs').insert({
+  const result = await restCall('POST', 'activity_logs', {
     actor_id: log.actorId || null,
     action: log.action,
     entity_type: log.entityType,
@@ -103,10 +105,7 @@ export async function logActivity(log: {
     description: log.description || null,
     metadata: log.metadata || null,
   });
-  if (error) {
-    console.error('Error logging activity:', error);
-  }
-  return !error;
+  return !result.error;
 }
 
 export async function fetchActivityLogs(limit: number = 50): Promise<Array<{
@@ -119,18 +118,12 @@ export async function fetchActivityLogs(limit: number = 50): Promise<Array<{
   metadata: Record<string, unknown> | null;
   createdAt: string;
 }>> {
-  const { data, error } = await supabase
-    .from('activity_logs')
-    .select('*')
-    .order('created_at', { ascending: false })
-    .limit(limit);
-
-  if (error) {
-    console.error('Error fetching activity logs:', error);
-    return [];
-  }
-
-  return (data || []).map(row => ({
+  const result = await restCall<ActivityLogRow[]>(
+    'GET',
+    `activity_logs?select=*&order=created_at.desc&limit=${limit}`
+  );
+  if (!result.data) return [];
+  return result.data.map(row => ({
     id: row.id,
     actorId: row.actor_id,
     action: row.action,

@@ -1,4 +1,8 @@
-import { supabase } from '../lib/supabase';
+/**
+ * Procurement Service — Direct REST API client.
+ */
+
+import { restCall } from '../lib/restClient';
 import type { AnnualProcurement } from '../types';
 import type { Database } from '../lib/database.types';
 
@@ -25,41 +29,26 @@ export function mapProcurementRow(row: ProcurementRow): AnnualProcurement {
 }
 
 export async function fetchProcurements(): Promise<AnnualProcurement[]> {
-  const { data, error } = await supabase
-    .from('annual_procurements')
-    .select('*')
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    console.error('Error fetching procurements:', error);
-    return [];
-  }
-  return (data || []).map(mapProcurementRow);
+  const result = await restCall<ProcurementRow[]>('GET', 'annual_procurements?select=*&order=created_at.desc');
+  if (!result.data) return [];
+  return result.data.map(mapProcurementRow);
 }
 
 export async function createProcurement(proc: Omit<AnnualProcurement, 'id'>): Promise<AnnualProcurement | null> {
-  const { data, error } = await supabase
-    .from('annual_procurements')
-    .insert({
-      year: proc.year,
-      title: proc.title,
-      category: proc.category,
-      target_item: proc.targetItem,
-      qty: proc.qty,
-      estimated_unit_price: proc.estimatedUnitPrice,
-      budget: proc.totalBudget,
-      actual_cost: proc.actualCost || null,
-      priority: proc.priority,
-      status: proc.status,
-      requested_by: proc.requestedBy || null,
-      justification: proc.justification || null,
-    })
-    .select()
-    .single();
-
-  if (error) {
-    console.error('Error creating procurement:', error);
-    return null;
-  }
-  return mapProcurementRow(data);
+  const result = await restCall<ProcurementRow[]>('POST', 'annual_procurements', {
+    year: proc.year,
+    title: proc.title,
+    category: proc.category,
+    target_item: proc.targetItem,
+    qty: proc.qty,
+    estimated_unit_price: proc.estimatedUnitPrice,
+    budget: proc.totalBudget,
+    actual_cost: proc.actualCost || null,
+    priority: proc.priority,
+    status: proc.status,
+    requested_by: proc.requestedBy || null,
+    justification: proc.justification || null,
+  });
+  if (!result.data || result.data.length === 0) return null;
+  return mapProcurementRow(result.data[0]);
 }
