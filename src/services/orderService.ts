@@ -1,6 +1,8 @@
 /**
- * Order Service - Uses Supabase JS client for authenticated requests.
- * RLS requires the user's JWT which supabase client handles automatically.
+ * Order Service - Native fetch (restCall) for all Supabase REST operations.
+ * Using native fetch bypasses Supabase JS HTTP/2 transport which causes
+ * ERR_CONNECTION_RESET in Chromium production browsers.
+ * JWT is obtained from supabase.auth.getSession() (localStorage read, no network).
  */
 import { supabase } from '../lib/supabase';
 import type { ProductionOrder, CartItem, PaymentMethod, OrderStatus } from '../types';
@@ -17,6 +19,19 @@ async function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+/**
+ * Gets the current user's JWT token from the Supabase session stored in localStorage.
+ * This is a LOCAL read — no network request made.
+ */
+async function getAuthToken(): Promise<string> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.access_token || SUPABASE_ANON_KEY;
+  } catch {
+    return SUPABASE_ANON_KEY;
+  }
+}
+
 interface RestResult<T> {
   data: T | null;
   error: { message: string; status?: number } | null;
@@ -27,12 +42,14 @@ async function restCall<T = any>(
   endpoint: string,
   body?: any,
   retries = 3,
-  baseDelay = 500
+  baseDelay = 500,
+  authToken?: string
 ): Promise<RestResult<T>> {
   const url = `${SUPABASE_URL}/rest/v1/${endpoint}`;
+  const token = authToken || SUPABASE_ANON_KEY;
   const headers = {
     'apikey': SUPABASE_ANON_KEY,
-    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+    'Authorization': `Bearer ${token}`,
     'Content-Type': 'application/json',
     'Prefer': 'return=representation',
   };
@@ -166,27 +183,25 @@ export function mapOrderRow(
 }
 
 export async function fetchOrders(): Promise<ProductionOrder[]> {
-  const { data: orders, error } = await supabase
-    .from('orders')
-    .select('*')
-    .order('created_at', { ascending: false });
-
-  if (error || !orders || orders.length === 0) {
-    if (error) console.error('[ORDER] fetchOrders error:', error.message);
+  const token = await getAuthToken();
+  const ordersResult = await restCall<OrderRow[]>('GET', 'orders?select=*&order=created_at.desc', undefined, 3, 500, token);
+  if (!ordersResult.data || ordersResult.data.length === 0) {
+    if (ordersResult.error) console.error('[ORDER] fetchOrders error:', ordersResult.error.message);
     return [];
   }
 
+  const orders = ordersResult.data;
   const orderIds = orders.map(o => o.id);
+  const idsParam = orderIds.map(id => encodeURIComponent(id)).join(',');
 
-  const [itemsRes, historyRes, refundsRes] = await Promise.all([
-    supabase.from('order_items').select('*').in('order_id', orderIds),
-    supabase.from('order_status_history').select('*').in('order_id', orderIds).order('timestamp', { ascending: true }),
-    supabase.from('refunds').select('*').in('order_id', orderIds).eq('status', 'Completed'),
-  ]);
+  // Sequential fetches to avoid HTTP/2 concurrent stream limits
+  const itemsResult = await restCall<OrderItemRow[]>('GET', `order_items?order_id=in.(${idsParam})`, undefined, 2, 500, token);
+  const historyResult = await restCall<StatusHistoryRow[]>('GET', `order_status_history?order_id=in.(${idsParam})&order=timestamp.asc`, undefined, 2, 500, token);
+  const refundsResult = await restCall<any[]>('GET', `refunds?order_id=in.(${idsParam})&status=eq.Completed`, undefined, 2, 500, token);
 
-  const allItems = itemsRes.data || [];
-  const allHistory = historyRes.data || [];
-  const allRefunds = refundsRes.data || [];
+  const allItems = itemsResult.data || [];
+  const allHistory = historyResult.data || [];
+  const allRefunds = refundsResult.data || [];
 
   return orders.map(order => {
     const items = allItems.filter(i => i.order_id === order.id);
@@ -200,7 +215,7 @@ export async function fetchOrders(): Promise<ProductionOrder[]> {
         reason: r.reason,
         operator: r.created_by || 'Admin',
       }));
-    return mapOrderRow(order as OrderRow, items as OrderItemRow[], history as StatusHistoryRow[], refunds);
+    return mapOrderRow(order, items, history, refunds);
   });
 }
 
@@ -225,96 +240,90 @@ export async function createOrder(orderData: {
   };
 }): Promise<{ success: boolean; orderId?: string; orderNo?: string; error?: string }> {
   const keyToUse = orderData.idempotencyKey || `IDEMP-${orderData.createdBy || 'STUDENT'}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+  const token = await getAuthToken();
 
-  const { data, error } = await supabase.rpc('create_order', {
-    order_data: {
-      items: orderData.items.map(item => ({
-        product_id: item.productId || null,
-        product_name: item.productName,
-        variant_id: item.variantId || null,
-        variant_name: item.variantName || null,
-        unit_price: item.unitPrice,
-        cost_price: item.costPrice || 0,
-        qty: item.qty,
-        unit: item.unit,
-        length_meters: item.lengthMeters || null,
-        width_meters: item.widthMeters || null,
-        calculated_area: item.calculatedArea || null,
-        total_price: item.totalPrice,
-        notes: item.notes || null,
-        is_custom_order: item.isCustomOrder || false,
-        custom_description: item.customDescription || null,
-        file_url: item.fileUrl || null,
-        file_name: item.fileName || null,
-      })),
-      customer_name: orderData.customerName,
-      customer_phone: orderData.customerPhone,
-      discount: orderData.discount,
-      paid_amount: orderData.paidAmount,
-      payment_method: orderData.paymentMethod,
-      operator_name: orderData.operatorName,
-      priority: orderData.priority,
-      notes: orderData.notes,
-      status: orderData.status || 'Menunggu Admin',
-      created_by: orderData.createdBy || null,
-      idempotency_key: keyToUse,
-      inbox_file: orderData.inboxFile ? {
-        upload_date: orderData.inboxFile.uploadDate || null,
-        customer_name: orderData.inboxFile.customerName || orderData.customerName,
-        class_grade: orderData.inboxFile.classGrade || null,
-        major: orderData.inboxFile.major || null,
-        phone: orderData.inboxFile.phone || orderData.customerPhone,
-        service_type: orderData.inboxFile.serviceType || null,
-        print_size: orderData.inboxFile.printSize || null,
-        qty: orderData.inboxFile.qty || 1,
-        notes: orderData.inboxFile.notes || null,
-        file_name: orderData.inboxFile.fileName,
-        file_type: orderData.inboxFile.fileType,
-        file_size: orderData.inboxFile.fileSize,
-        preview_url: orderData.inboxFile.previewUrl || null,
-        storage_path: orderData.inboxFile.storagePath || null,
-        folder_path: orderData.inboxFile.folderPath || null,
-      } : null,
-    },
-  });
+  const orderPayload = {
+    items: orderData.items.map(item => ({
+      product_id: item.productId || null,
+      product_name: item.productName,
+      variant_id: item.variantId || null,
+      variant_name: item.variantName || null,
+      unit_price: item.unitPrice,
+      cost_price: item.costPrice || 0,
+      qty: item.qty,
+      unit: item.unit,
+      length_meters: item.lengthMeters || null,
+      width_meters: item.widthMeters || null,
+      calculated_area: item.calculatedArea || null,
+      total_price: item.totalPrice,
+      notes: item.notes || null,
+      is_custom_order: item.isCustomOrder || false,
+      custom_description: item.customDescription || null,
+      file_url: item.fileUrl || null,
+      file_name: item.fileName || null,
+    })),
+    customer_name: orderData.customerName,
+    customer_phone: orderData.customerPhone,
+    discount: orderData.discount,
+    paid_amount: orderData.paidAmount,
+    payment_method: orderData.paymentMethod,
+    operator_name: orderData.operatorName,
+    priority: orderData.priority,
+    notes: orderData.notes,
+    status: orderData.status || 'Menunggu Admin',
+    created_by: orderData.createdBy || null,
+    idempotency_key: keyToUse,
+    inbox_file: orderData.inboxFile ? {
+      upload_date: orderData.inboxFile.uploadDate || null,
+      customer_name: orderData.inboxFile.customerName || orderData.customerName,
+      class_grade: orderData.inboxFile.classGrade || null,
+      major: orderData.inboxFile.major || null,
+      phone: orderData.inboxFile.phone || orderData.customerPhone,
+      service_type: orderData.inboxFile.serviceType || null,
+      print_size: orderData.inboxFile.printSize || null,
+      qty: orderData.inboxFile.qty || 1,
+      notes: orderData.inboxFile.notes || null,
+      file_name: orderData.inboxFile.fileName,
+      file_type: orderData.inboxFile.fileType,
+      file_size: orderData.inboxFile.fileSize,
+      preview_url: orderData.inboxFile.previewUrl || null,
+      storage_path: orderData.inboxFile.storagePath || null,
+      folder_path: orderData.inboxFile.folderPath || null,
+    } : null,
+  };
 
-  if (error) {
-    console.error('[ORDER] create_order RPC error:', error.message);
-    return { success: false, error: error.message };
+  const result = await restCall<any>('POST', 'rpc/create_order', { order_data: orderPayload }, 2, 500, token);
+
+  if (result.error) {
+    console.error('[ORDER] create_order RPC error:', result.error.message);
+    return { success: false, error: result.error.message };
   }
 
-  const result = data as any;
-  if (!result?.success) {
-    return { success: false, error: result?.error || 'RPC returned failure.' };
+  const rpcResult = result.data;
+  if (!rpcResult?.success) {
+    return { success: false, error: rpcResult?.error || 'RPC returned failure.' };
   }
 
   return {
     success: true,
-    orderId: result.order_id,
-    orderNo: result.order_no,
+    orderId: rpcResult.order_id,
+    orderNo: rpcResult.order_no,
   };
 }
 
 export async function recoverOrderByKey(idempotencyKey: string): Promise<{ success: boolean; orderId?: string; orderNo?: string; guestAccessToken?: string } | null> {
   if (!idempotencyKey) return null;
-  try {
-    const { data, error } = await supabase
-      .from('orders')
-      .select('id, order_no, guest_access_token')
-      .eq('idempotency_key', idempotencyKey)
-      .maybeSingle();
-
-    if (error || !data) return null;
-    return {
-      success: true,
-      orderId: data.id,
-      orderNo: data.order_no,
-      guestAccessToken: data.guest_access_token,
-    };
-  } catch (err) {
-    console.error('[ORDER] recoverOrderByKey error:', err);
-    return null;
+  const token = await getAuthToken();
+  const result = await restCall<any[]>(
+    'GET',
+    `orders?select=id,order_no,guest_access_token&idempotency_key=eq.${encodeURIComponent(idempotencyKey)}`,
+    undefined, 2, 500, token
+  );
+  if (!result.error && result.data && result.data.length > 0) {
+    const order = result.data[0];
+    return { success: true, orderId: order.id, orderNo: order.order_no, guestAccessToken: order.guest_access_token };
   }
+  return null;
 }
 
 export async function createGuestOrder(orderData: {

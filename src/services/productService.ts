@@ -118,12 +118,10 @@ export function mapProductRow(row: ProductRow): Product {
 }
 
 export async function fetchProducts(): Promise<Product[]> {
-  // Fetch all data in parallel via REST
-  const [productsResult, recipesResult, variantsResult] = await Promise.all([
-    restCall<ProductRow[]>('GET', 'products?select=*&order=created_at.desc'),
-    restCall<RecipeRow[]>('GET', 'product_recipes?select=*'),
-    restCall<VariantRow[]>('GET', 'product_variants?select=*&is_active=eq.true'),
-  ]);
+  // Sequential fetches to avoid HTTP/2 concurrent stream limits on Supabase
+  const productsResult = await restCall<ProductRow[]>('GET', 'products?select=*&order=created_at.desc');
+  const recipesResult = await restCall<RecipeRow[]>('GET', 'product_recipes?select=*');
+  const variantsResult = await restCall<VariantRow[]>('GET', 'product_variants?select=*&is_active=eq.true');
 
   const productRows = productsResult.data || [];
   const recipes = recipesResult.data || [];

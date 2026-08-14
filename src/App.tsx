@@ -149,6 +149,8 @@ export function App() {
 
   // Controlled Hydration: Depend entirely on Supabase onAuthStateChange
   const [rawSession, setRawSession] = useState<any>(undefined);
+  // Track last profile user ID to prevent duplicate fetches (useRef avoids stale closure)
+  const lastProfileUserIdRef = React.useRef<string | null>(null);
 
 
   useEffect(() => {
@@ -165,6 +167,7 @@ export function App() {
         setDataLoaded(false);
         setOrders([]);
         setProducts([]);
+        lastProfileUserIdRef.current = null;
       }
     });
     return () => subscription.unsubscribe();
@@ -177,7 +180,7 @@ export function App() {
 
     const hydrateProfile = async () => {
       if (rawSession === undefined) return; // Wait for initial event
-      
+
       if (!rawSession?.user) {
         if (isMounted) {
           setIsLoggedIn(false);
@@ -192,6 +195,13 @@ export function App() {
         return;
       }
 
+      // Deduplicate: skip profile fetch if same user already loaded
+      const userId = rawSession.user.id;
+      if (userId === lastProfileUserIdRef.current && isLoggedIn && currentUser) {
+        setAuthInitializing(false);
+        return;
+      }
+
       // We have a valid session. Now fetch the profile safely.
       try {
         const profile = await authService.fetchUserProfile(rawSession.user);
@@ -199,6 +209,7 @@ export function App() {
         if (isMounted) {
           if (profile) {
             console.log('[AUTH] Profile loaded:', profile.role, profile.defaultPage);
+            lastProfileUserIdRef.current = rawSession.user.id;
             setCurrentUser(profile);
             setIsLoggedIn(true);
             // Redirect based on role when on login or public_upload page
@@ -303,7 +314,8 @@ export function App() {
   // RLS allows anonymous SELECT on visible, non-archived products
   const [guestProductsLoaded, setGuestProductsLoaded] = useState<boolean>(false);
   useEffect(() => {
-    if (isLoggedIn || guestProductsLoaded) return; // Skip if logged in (admin data loading handles it)
+    // Skip if: logged in, already loaded, OR auth is still initializing (prevent race with login)
+    if (isLoggedIn || guestProductsLoaded || authInitializing || rawSession !== null) return;
     const loadGuestProducts = async () => {
       try {
         const prods = await productService.fetchProducts();
@@ -324,7 +336,8 @@ export function App() {
       setGuestProductsLoaded(true);
     };
     loadGuestProducts();
-  }, [isLoggedIn, guestProductsLoaded]);
+  }, [isLoggedIn, guestProductsLoaded, authInitializing, rawSession]);
+
 
   // Sync browser URL with currentPage State changes
   useEffect(() => {

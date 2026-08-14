@@ -254,24 +254,42 @@ export async function getSession(): Promise<any> {
 export async function fetchUserProfile(user: any): Promise<UserProfile | null> {
   if (!user) return null;
 
-  // Try to fetch actual profile from database first
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+  // Get JWT from current session (localStorage read, no network request)
+  let token = supabaseAnonKey;
   try {
-    const { data: profileData, error: profileError } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single();
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.access_token) token = session.access_token;
+  } catch {}
 
-    if (!profileError && profileData) {
-      console.log('[AUTH] Profile fetched from DB:', profileData.role);
-      return mapProfileToUserProfile(profileData as ProfileRow, user.email || '');
-    }
+  // Use native fetch to bypass Supabase JS HTTP/2 transport issues
+  try {
+    const response = await fetch(
+      `${supabaseUrl}/rest/v1/profiles?select=*&id=eq.${user.id}&limit=1`,
+      {
+        method: 'GET',
+        headers: {
+          'apikey': supabaseAnonKey,
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
+        },
+        credentials: 'omit',
+      }
+    );
 
-    if (profileError) {
-      console.warn('[AUTH] Profile DB fetch error, falling back to user_metadata:', profileError.message);
+    if (response.ok) {
+      const rows = await response.json();
+      if (Array.isArray(rows) && rows.length > 0) {
+        console.log('[AUTH] Profile fetched from DB:', rows[0].role);
+        return mapProfileToUserProfile(rows[0] as ProfileRow, user.email || '');
+      }
+    } else {
+      console.warn('[AUTH] Profile DB fetch HTTP error:', response.status);
     }
   } catch (err: any) {
-    console.warn('[AUTH] Profile fetch exception, using user_metadata fallback:', err.message);
+    console.warn('[AUTH] Profile DB fetch error, falling back to user_metadata:', err.message);
   }
 
   // Fallback to user_metadata if DB fetch fails
@@ -297,6 +315,7 @@ export async function fetchUserProfile(user: any): Promise<UserProfile | null> {
   };
   return mapProfileToUserProfile(fallbackProfile, user.email || '');
 }
+
 
 
 
