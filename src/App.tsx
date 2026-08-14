@@ -150,16 +150,26 @@ export function App() {
   // Controlled Hydration: Depend entirely on Supabase onAuthStateChange
   const [rawSession, setRawSession] = useState<any>(undefined);
 
+
   useEffect(() => {
     const { data: { subscription } } = authService.onAuthStateChange((event, session) => {
       if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
         setRawSession(session || null);
+        // Reset data so it reloads from DB for the new user session
+        if (event === 'SIGNED_IN') {
+          setDataLoaded(false);
+          setOrders([]);
+        }
       } else if (event === 'SIGNED_OUT') {
         setRawSession(null);
+        setDataLoaded(false);
+        setOrders([]);
+        setProducts([]);
       }
     });
     return () => subscription.unsubscribe();
   }, []);
+
 
   // Fetch Profile independently when rawSession changes
   useEffect(() => {
@@ -191,9 +201,13 @@ export function App() {
             console.log('[AUTH] Profile loaded:', profile.role, profile.defaultPage);
             setCurrentUser(profile);
             setIsLoggedIn(true);
-            // If they are on public_upload or login, keep them on public_upload for Student role
-            if (currentPage === 'login') {
-              setCurrentPage(profile.role === 'Admin TEFA' || profile.role === 'Admin' ? 'dashboard' : 'public_upload');
+            // Redirect based on role when on login or public_upload page
+            const isAdminRole = profile.role === 'Admin TEFA' || profile.role === 'Admin';
+            if (currentPage === 'login' || currentPage === 'public_upload') {
+              if (isAdminRole) {
+                setCurrentPage('dashboard');
+              }
+              // Students stay on public_upload
             }
           } else {
             // Valid token but profile missing/inactive -> fallback profile from auth metadata
@@ -250,6 +264,7 @@ export function App() {
         setProducts(prods);
 
         const ords = await orderServiceModule.fetchOrders().catch(() => []);
+        console.log('[DATA] Orders loaded:', ords.length);
         setOrders(ords);
 
         // 2. Admin-only tables (inbox_files, materials, stock_movements, dll dilindungi RLS Admin)

@@ -1,7 +1,8 @@
 /**
- * Order Service - Direct REST API client.
- * Bypasses Supabase JS to avoid HTTP/2 connection issues.
+ * Order Service - Uses Supabase JS client for authenticated requests.
+ * RLS requires the user's JWT which supabase client handles automatically.
  */
+import { supabase } from '../lib/supabase';
 import type { ProductionOrder, CartItem, PaymentMethod, OrderStatus } from '../types';
 import type { Database } from '../lib/database.types';
 
@@ -165,22 +166,27 @@ export function mapOrderRow(
 }
 
 export async function fetchOrders(): Promise<ProductionOrder[]> {
-  const ordersResult = await restCall<OrderRow[]>('GET', 'orders?select=*&order=created_at.desc');
-  if (!ordersResult.data || ordersResult.data.length === 0) return [];
+  const { data: orders, error } = await supabase
+    .from('orders')
+    .select('*')
+    .order('created_at', { ascending: false });
 
-  const orders = ordersResult.data;
+  if (error || !orders || orders.length === 0) {
+    if (error) console.error('[ORDER] fetchOrders error:', error.message);
+    return [];
+  }
+
   const orderIds = orders.map(o => o.id);
-  const idsParam = orderIds.map(id => encodeURIComponent(id)).join(',');
 
-  const [itemsResult, historyResult, refundsResult] = await Promise.all([
-    restCall<OrderItemRow[]>('GET', `order_items?order_id=in.(${idsParam})`),
-    restCall<StatusHistoryRow[]>('GET', `order_status_history?order_id=in.(${idsParam})&order=timestamp.asc`),
-    restCall<any[]>('GET', `refunds?order_id=in.(${idsParam})&status=eq.Completed`),
+  const [itemsRes, historyRes, refundsRes] = await Promise.all([
+    supabase.from('order_items').select('*').in('order_id', orderIds),
+    supabase.from('order_status_history').select('*').in('order_id', orderIds).order('timestamp', { ascending: true }),
+    supabase.from('refunds').select('*').in('order_id', orderIds).eq('status', 'Completed'),
   ]);
 
-  const allItems = itemsResult.data || [];
-  const allHistory = historyResult.data || [];
-  const allRefunds = refundsResult.data || [];
+  const allItems = itemsRes.data || [];
+  const allHistory = historyRes.data || [];
+  const allRefunds = refundsRes.data || [];
 
   return orders.map(order => {
     const items = allItems.filter(i => i.order_id === order.id);
@@ -194,7 +200,7 @@ export async function fetchOrders(): Promise<ProductionOrder[]> {
         reason: r.reason,
         operator: r.created_by || 'Admin',
       }));
-    return mapOrderRow(order, items, history, refunds);
+    return mapOrderRow(order as OrderRow, items as OrderItemRow[], history as StatusHistoryRow[], refunds);
   });
 }
 
@@ -220,90 +226,95 @@ export async function createOrder(orderData: {
 }): Promise<{ success: boolean; orderId?: string; orderNo?: string; error?: string }> {
   const keyToUse = orderData.idempotencyKey || `IDEMP-${orderData.createdBy || 'STUDENT'}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
 
-  const orderPayload = {
-    items: orderData.items.map(item => ({
-      product_id: item.productId || null,
-      product_name: item.productName,
-      variant_id: item.variantId || null,
-      variant_name: item.variantName || null,
-      unit_price: item.unitPrice,
-      cost_price: item.costPrice || 0,
-      qty: item.qty,
-      unit: item.unit,
-      length_meters: item.lengthMeters || null,
-      width_meters: item.widthMeters || null,
-      calculated_area: item.calculatedArea || null,
-      total_price: item.totalPrice,
-      notes: item.notes || null,
-      is_custom_order: item.isCustomOrder || false,
-      custom_description: item.customDescription || null,
-      file_url: item.fileUrl || null,
-      file_name: item.fileName || null,
-    })),
-    customer_name: orderData.customerName,
-    customer_phone: orderData.customerPhone,
-    discount: orderData.discount,
-    paid_amount: orderData.paidAmount,
-    payment_method: orderData.paymentMethod,
-    operator_name: orderData.operatorName,
-    priority: orderData.priority,
-    notes: orderData.notes,
-    status: orderData.status || 'Menunggu Admin',
-    created_by: orderData.createdBy || null,
-    idempotency_key: keyToUse,
-    inbox_file: orderData.inboxFile ? {
-      upload_date: orderData.inboxFile.uploadDate || null,
-      customer_name: orderData.inboxFile.customerName || orderData.customerName,
-      class_grade: orderData.inboxFile.classGrade || null,
-      major: orderData.inboxFile.major || null,
-      phone: orderData.inboxFile.phone || orderData.customerPhone,
-      service_type: orderData.inboxFile.serviceType || null,
-      print_size: orderData.inboxFile.printSize || null,
-      qty: orderData.inboxFile.qty || 1,
-      notes: orderData.inboxFile.notes || null,
-      file_name: orderData.inboxFile.fileName,
-      file_type: orderData.inboxFile.fileType,
-      file_size: orderData.inboxFile.fileSize,
-      preview_url: orderData.inboxFile.previewUrl || null,
-      storage_path: orderData.inboxFile.storagePath || null,
-      folder_path: orderData.inboxFile.folderPath || null,
-    } : null,
-  };
+  const { data, error } = await supabase.rpc('create_order', {
+    order_data: {
+      items: orderData.items.map(item => ({
+        product_id: item.productId || null,
+        product_name: item.productName,
+        variant_id: item.variantId || null,
+        variant_name: item.variantName || null,
+        unit_price: item.unitPrice,
+        cost_price: item.costPrice || 0,
+        qty: item.qty,
+        unit: item.unit,
+        length_meters: item.lengthMeters || null,
+        width_meters: item.widthMeters || null,
+        calculated_area: item.calculatedArea || null,
+        total_price: item.totalPrice,
+        notes: item.notes || null,
+        is_custom_order: item.isCustomOrder || false,
+        custom_description: item.customDescription || null,
+        file_url: item.fileUrl || null,
+        file_name: item.fileName || null,
+      })),
+      customer_name: orderData.customerName,
+      customer_phone: orderData.customerPhone,
+      discount: orderData.discount,
+      paid_amount: orderData.paidAmount,
+      payment_method: orderData.paymentMethod,
+      operator_name: orderData.operatorName,
+      priority: orderData.priority,
+      notes: orderData.notes,
+      status: orderData.status || 'Menunggu Admin',
+      created_by: orderData.createdBy || null,
+      idempotency_key: keyToUse,
+      inbox_file: orderData.inboxFile ? {
+        upload_date: orderData.inboxFile.uploadDate || null,
+        customer_name: orderData.inboxFile.customerName || orderData.customerName,
+        class_grade: orderData.inboxFile.classGrade || null,
+        major: orderData.inboxFile.major || null,
+        phone: orderData.inboxFile.phone || orderData.customerPhone,
+        service_type: orderData.inboxFile.serviceType || null,
+        print_size: orderData.inboxFile.printSize || null,
+        qty: orderData.inboxFile.qty || 1,
+        notes: orderData.inboxFile.notes || null,
+        file_name: orderData.inboxFile.fileName,
+        file_type: orderData.inboxFile.fileType,
+        file_size: orderData.inboxFile.fileSize,
+        preview_url: orderData.inboxFile.previewUrl || null,
+        storage_path: orderData.inboxFile.storagePath || null,
+        folder_path: orderData.inboxFile.folderPath || null,
+      } : null,
+    },
+  });
 
-  for (let attempt = 0; attempt <= 2; attempt++) {
-    const result = await restCall<any>('POST', 'rpc/create_order', { order_data: orderPayload }, 2);
-
-    if (!result.error && result.data) {
-      const rpcResult = result.data;
-      if (rpcResult?.success) {
-        return { success: true, orderId: rpcResult.order_id, orderNo: rpcResult.order_no };
-      } else {
-        return { success: false, error: rpcResult?.error || 'RPC returned failure.' };
-      }
-    }
-
-    if (attempt < 2) {
-      await sleep(500 * Math.pow(2, attempt));
-    } else {
-      return { success: false, error: result.error?.message || 'Gagal mengirim pesanan.' };
-    }
+  if (error) {
+    console.error('[ORDER] create_order RPC error:', error.message);
+    return { success: false, error: error.message };
   }
 
-  return { success: false, error: 'Gagal mengirim pesanan.' };
+  const result = data as any;
+  if (!result?.success) {
+    return { success: false, error: result?.error || 'RPC returned failure.' };
+  }
+
+  return {
+    success: true,
+    orderId: result.order_id,
+    orderNo: result.order_no,
+  };
 }
 
 export async function recoverOrderByKey(idempotencyKey: string): Promise<{ success: boolean; orderId?: string; orderNo?: string; guestAccessToken?: string } | null> {
   if (!idempotencyKey) return null;
-  const result = await restCall<any[]>(
-    'GET',
-    `orders?select=id,order_no,guest_access_token&idempotency_key=eq.${encodeURIComponent(idempotencyKey)}`,
-    undefined, 2
-  );
-  if (!result.error && result.data && result.data.length > 0) {
-    const order = result.data[0];
-    return { success: true, orderId: order.id, orderNo: order.order_no, guestAccessToken: order.guest_access_token };
+  try {
+    const { data, error } = await supabase
+      .from('orders')
+      .select('id, order_no, guest_access_token')
+      .eq('idempotency_key', idempotencyKey)
+      .maybeSingle();
+
+    if (error || !data) return null;
+    return {
+      success: true,
+      orderId: data.id,
+      orderNo: data.order_no,
+      guestAccessToken: data.guest_access_token,
+    };
+  } catch (err) {
+    console.error('[ORDER] recoverOrderByKey error:', err);
+    return null;
   }
-  return null;
 }
 
 export async function createGuestOrder(orderData: {

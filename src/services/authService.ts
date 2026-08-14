@@ -24,6 +24,8 @@ interface ProfileRow {
   updated_at: string;
 }
 
+const ADMIN_ROLES = ['Admin', 'Super Admin', 'Kepala TEFA', 'Guru', 'Staff'];
+
 /**
  * Maps a Supabase profile row + auth user to the existing UserProfile interface.
  * This adapter ensures the rest of the app can use the same UserProfile type.
@@ -32,7 +34,7 @@ export function mapProfileToUserProfile(
   profile: ProfileRow,
   email: string
 ): UserProfile {
-  const isAdmin = profile.role === 'Admin';
+  const isAdmin = ADMIN_ROLES.includes(profile.role);
   return {
     id: profile.id,
     name: profile.full_name,
@@ -90,8 +92,6 @@ export async function signIn(email: string, password: string): Promise<{ success
     const userProfile = await fetchUserProfile(data.user);
 
     if (!userProfile) {
-      // It might be a network error or missing profile.
-      // We rely on fetchUserProfile to throw if it's a network error, otherwise it returns null if missing or inactive.
       return { success: false, message: 'Profil tidak ditemukan. Registrasi mungkin tidak selesai sempurna. Hubungi admin.' };
     }
 
@@ -251,15 +251,31 @@ export async function getSession(): Promise<any> {
   }
 }
 
-// Single-flight deduplication tracker for profile fetches
-let inFlightProfileRequest: Promise<UserProfile | null> | null = null;
-
 export async function fetchUserProfile(user: any): Promise<UserProfile | null> {
-  // Always return a profile if user object exists, even if user_metadata is null/undefined
   if (!user) return null;
 
-  const meta = user.user_metadata || {};
+  // Try to fetch actual profile from database first
+  try {
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single();
 
+    if (!profileError && profileData) {
+      console.log('[AUTH] Profile fetched from DB:', profileData.role);
+      return mapProfileToUserProfile(profileData as ProfileRow, user.email || '');
+    }
+
+    if (profileError) {
+      console.warn('[AUTH] Profile DB fetch error, falling back to user_metadata:', profileError.message);
+    }
+  } catch (err: any) {
+    console.warn('[AUTH] Profile fetch exception, using user_metadata fallback:', err.message);
+  }
+
+  // Fallback to user_metadata if DB fetch fails
+  const meta = user.user_metadata || {};
   const fallbackProfile: ProfileRow = {
     id: user.id,
     full_name: meta.full_name || user.email || 'Pengguna TEFA',
