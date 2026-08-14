@@ -42,13 +42,15 @@ async function restCall<T = any>(
   authToken?: string
 ): Promise<RestResult<T>> {
   const url = `${SUPABASE_URL}/rest/v1/${endpoint}`;
-  const token = authToken || SUPABASE_ANON_KEY;
+  const token = authToken || getAuthToken() || SUPABASE_ANON_KEY;
   const headers = {
     'apikey': SUPABASE_ANON_KEY,
     'Authorization': `Bearer ${token}`,
     'Content-Type': 'application/json',
     'Prefer': 'return=representation',
   };
+
+
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {

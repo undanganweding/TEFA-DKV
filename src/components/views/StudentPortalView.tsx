@@ -1171,15 +1171,18 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
                         onChange={(e) => {
                           if (e.target.files && e.target.files[0]) {
                             const f = e.target.files[0];
+                            const preview = f.type.startsWith('image/') ? URL.createObjectURL(f) : undefined;
                             setStandaloneFile({
                               name: f.name,
                               size: `${(f.size / (1024 * 1024)).toFixed(1)} MB`,
-                              type: 'JPG',
+                              type: f.name.endsWith('.png') ? 'PNG' : f.name.endsWith('.pdf') ? 'PDF' : 'JPG',
+                              previewUrl: preview,
                             });
                           }
                         }}
                         className="hidden"
                       />
+
 
                       <label
                         htmlFor="direct-order-file"
@@ -1963,15 +1966,18 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
                   onChange={(e) => {
                     if (e.target.files && e.target.files[0]) {
                       const f = e.target.files[0];
+                      const preview = f.type.startsWith('image/') ? URL.createObjectURL(f) : undefined;
                       setDetailFile({
                         name: f.name,
                         size: `${(f.size / (1024 * 1024)).toFixed(1)} MB`,
-                        type: 'JPG',
+                        type: f.name.endsWith('.png') ? 'PNG' : f.name.endsWith('.pdf') ? 'PDF' : 'JPG',
+                        previewUrl: preview,
                       });
                     }
                   }}
                   className="text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-extrabold file:bg-[#5B4BFF] file:text-white"
                 />
+
               </div>
 
               <div className="space-y-1">
