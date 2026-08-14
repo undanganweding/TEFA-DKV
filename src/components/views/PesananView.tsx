@@ -4,6 +4,7 @@ import { ProductionOrder, OrderStatus } from '../../types';
 
 interface PesananViewProps {
   orders: ProductionOrder[];
+  inboxFiles?: any[];
   onUpdateOrderStatus: (orderId: string, newStatus: OrderStatus, note?: string) => void;
   onRecordPayment: (orderId: string, amount: number) => void;
   onRefundOrder?: (orderId: string, amount: number, reason: string) => void;
@@ -17,6 +18,7 @@ interface PesananViewProps {
 
 export const PesananView: React.FC<PesananViewProps> = ({
   orders,
+  inboxFiles = [],
   onUpdateOrderStatus,
   onRecordPayment,
   onRefundOrder,
@@ -27,6 +29,7 @@ export const PesananView: React.FC<PesananViewProps> = ({
   onRejectOrder,
   onConfirmOrderPrice,
 }) => {
+
   const [selectedFilter, setSelectedFilter] = useState<string>('Semua');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [activeOrderDetail, setActiveOrderDetail] = useState<ProductionOrder | null>(null);
@@ -311,9 +314,15 @@ export const PesananView: React.FC<PesananViewProps> = ({
           {filteredOrders.map((order) => {
             const mainProduct = order.items[0]?.productName || 'Cetak Custom TEFA';
             const progress = getProgressPercentage(order.status);
-            const imagePreview =
-              order.designImage ||
-              'https://images.unsplash.com/photo-1561070791-2526d30994b5?w=500&q=80';
+            
+            // Find uploaded file from order items or linked inbox files
+            const linkedFile = inboxFiles.find((f: any) => f.linkedOrderNo === order.orderNo || f.linked_order_no === order.orderNo);
+            const itemWithFile = order.items.find(i => i.fileUrl || i.fileName);
+            const uploadedImageUrl = itemWithFile?.fileUrl || linkedFile?.previewUrl || linkedFile?.folderPath || order.designImage;
+            const hasRealImage = uploadedImageUrl && (uploadedImageUrl.startsWith('http') || uploadedImageUrl.startsWith('data:image'));
+            const imagePreview = hasRealImage
+              ? uploadedImageUrl
+              : 'https://images.unsplash.com/photo-1561070791-2526d30994b5?w=500&q=80';
 
             return (
               <motion.div
@@ -324,12 +333,19 @@ export const PesananView: React.FC<PesananViewProps> = ({
               >
                 <div>
                   {/* Thumbnail Image Preview */}
-                  <div className="aspect-video w-full rounded-[18px] bg-slate-100 overflow-hidden relative mb-3.5 border border-slate-100">
-                    <img
-                      src={imagePreview}
-                      alt={mainProduct}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
+                  <div className="aspect-video w-full rounded-[18px] bg-slate-100 overflow-hidden relative mb-3.5 border border-slate-100 flex items-center justify-center">
+                    {hasRealImage ? (
+                      <img
+                        src={imagePreview}
+                        alt={mainProduct}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center text-slate-400 p-4 text-center">
+                        <span className="material-symbols-outlined text-4xl text-[#5B4BFF]/50 mb-1">design_services</span>
+                        <span className="text-[11px] font-bold text-slate-600 line-clamp-1">{itemWithFile?.fileName || linkedFile?.fileName || 'Pesanan Cetak'}</span>
+                      </div>
+                    )}
                     <span className="absolute top-2 left-2 bg-slate-900/85 backdrop-blur-xs text-white text-[10px] font-black px-2.5 py-1 rounded-full font-mono shadow-xs">
                       {order.orderNo}
                     </span>
@@ -346,6 +362,11 @@ export const PesananView: React.FC<PesananViewProps> = ({
                     <p className="text-xs font-semibold text-slate-500 truncate">
                       Pemesan: <span className="text-slate-800 font-extrabold">{order.customerName}</span> ({order.institution || 'Siswa DKV'})
                     </p>
+                    {order.notes && (
+                      <p className="text-[11px] text-slate-600 bg-amber-50/80 border border-amber-200/60 rounded-lg px-2.5 py-1 line-clamp-2 font-medium">
+                        <strong className="text-amber-800 font-extrabold">Catatan:</strong> {order.notes}
+                      </p>
+                    )}
                   </div>
 
                   {/* Progress Indicator */}
@@ -377,7 +398,7 @@ export const PesananView: React.FC<PesananViewProps> = ({
                         onOpenOrderReceipt(order);
                       }}
                       title="Cetak Nota"
-                      className="p-2 rounded-full bg-slate-100 hover:bg-purple-100 hover:text-[#5B4BFF] text-slate-600 transition-colors"
+                      className="p-2 rounded-full bg-slate-100 hover:bg-purple-100 hover:text-[#5B4BFF] text-slate-600 transition-colors cursor-pointer"
                     >
                       <span className="material-symbols-outlined text-base">receipt_long</span>
                     </button>
@@ -386,7 +407,7 @@ export const PesananView: React.FC<PesananViewProps> = ({
                         e.stopPropagation();
                         setActiveOrderDetail(order);
                       }}
-                      className="bg-[#5B4BFF] hover:bg-purple-700 text-white text-xs font-extrabold px-3.5 py-1.5 rounded-full shadow-md shadow-purple-500/20 transition-all flex items-center gap-1"
+                      className="bg-[#5B4BFF] hover:bg-purple-700 text-white text-xs font-extrabold px-3.5 py-1.5 rounded-full shadow-md shadow-purple-500/20 transition-all flex items-center gap-1 cursor-pointer"
                     >
                       <span>Detail</span>
                       <span className="material-symbols-outlined text-sm">arrow_forward</span>
@@ -400,142 +421,221 @@ export const PesananView: React.FC<PesananViewProps> = ({
       )}
 
       {/* Order Detail Modal / Drawer */}
-      {activeOrderDetail && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <motion.div
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="bg-white w-full max-w-2xl rounded-[28px] shadow-2xl border border-slate-200 overflow-hidden p-6 space-y-5"
-          >
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-              <div>
-                <span className="text-xs font-black text-[#5B4BFF] font-mono">{activeOrderDetail.orderNo}</span>
-                <h3 className="text-lg font-black text-slate-900">{activeOrderDetail.customerName}</h3>
-              </div>
-              <button
-                onClick={() => setActiveOrderDetail(null)}
-                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center"
-              >
-                <span className="material-symbols-outlined text-lg">close</span>
-              </button>
-            </div>
+      {activeOrderDetail && (() => {
+        const linkedFile = inboxFiles.find((f: any) => f.linkedOrderNo === activeOrderDetail.orderNo || f.linked_order_no === activeOrderDetail.orderNo);
+        const itemWithFile = activeOrderDetail.items.find(i => i.fileUrl || i.fileName);
+        const uploadedFileUrl = itemWithFile?.fileUrl || linkedFile?.previewUrl || linkedFile?.folderPath || activeOrderDetail.designImage;
+        const uploadedFileName = itemWithFile?.fileName || linkedFile?.fileName || 'File Desain Siswa';
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-semibold">
-              <div className="bg-slate-50 p-3.5 rounded-2xl space-y-3">
-                <span className="text-slate-400 font-extrabold uppercase tracking-wider block text-[10px] border-b border-slate-200 pb-2">Rincian Produk Cetak</span>
-                <div className="space-y-3 max-h-40 overflow-y-auto pr-2">
-                  {activeOrderDetail.items.map((item, idx) => (
-                    <div key={idx} className="space-y-1">
-                      <p className="text-slate-900 font-extrabold text-sm">{item.productName || 'Custom TEFA'}</p>
-                      {item.variantName && <p className="text-slate-600">Varian: {item.variantName}</p>}
-                      <p className="text-slate-600">
-                        {item.qty} {item.unit || 'pcs'} x {formatRupiah(item.unitPrice || 0)}
-                      </p>
-                      <p className="text-[#5B4BFF] font-black text-sm">Subtotal: {formatRupiah(item.totalPrice || 0)}</p>
+        return (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="bg-white w-full max-w-2xl rounded-[28px] shadow-2xl border border-slate-200 overflow-hidden p-6 space-y-5 my-8 max-h-[90vh] overflow-y-auto"
+            >
+              <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+                <div>
+                  <span className="text-xs font-black text-[#5B4BFF] font-mono">{activeOrderDetail.orderNo}</span>
+                  <h3 className="text-lg font-black text-slate-900">{activeOrderDetail.customerName}</h3>
+                  {activeOrderDetail.customerPhone && (
+                    <p className="text-xs font-semibold text-slate-500 flex items-center gap-1 mt-0.5">
+                      <span className="material-symbols-outlined text-sm text-emerald-600">phone</span>
+                      {activeOrderDetail.customerPhone} ({activeOrderDetail.institution || 'Siswa DKV'})
+                    </p>
+                  )}
+                </div>
+                <button
+                  onClick={() => setActiveOrderDetail(null)}
+                  className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-lg">close</span>
+                </button>
+              </div>
+
+              {/* Uploaded File / Artwork Preview Box */}
+              {(uploadedFileUrl || itemWithFile?.fileName || linkedFile?.fileName) && (
+                <div className="bg-purple-50/70 border border-purple-200/80 rounded-2xl p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="material-symbols-outlined text-purple-600">attachment</span>
+                      <span className="text-xs font-black text-purple-950 uppercase tracking-wider">File & Gambar Yang Diupload Siswa</span>
                     </div>
-                  ))}
+                    {uploadedFileUrl && (
+                      <a
+                        href={uploadedFileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="bg-[#5B4BFF] hover:bg-purple-700 text-white text-[11px] font-extrabold px-3 py-1.5 rounded-full flex items-center gap-1 transition-all shadow-xs"
+                      >
+                        <span className="material-symbols-outlined text-sm">open_in_new</span>
+                        <span>Buka File Asli</span>
+                      </a>
+                    )}
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-4 items-start bg-white p-3 rounded-xl border border-purple-100">
+                    {uploadedFileUrl && (uploadedFileUrl.startsWith('http') || uploadedFileUrl.startsWith('data:image')) ? (
+                      <img
+                        src={uploadedFileUrl}
+                        alt="Design Uploaded"
+                        className="w-28 h-28 object-cover rounded-lg border border-slate-200 shrink-0"
+                      />
+                    ) : (
+                      <div className="w-20 h-20 rounded-lg bg-purple-100 text-purple-700 flex flex-col items-center justify-center shrink-0">
+                        <span className="material-symbols-outlined text-3xl">draft</span>
+                      </div>
+                    )}
+                    <div className="space-y-1 text-xs font-semibold text-slate-700">
+                      <p className="font-extrabold text-slate-900 text-sm">{uploadedFileName}</p>
+                      {linkedFile?.fileSize && <p className="text-slate-500">Ukuran: {linkedFile.fileSize}</p>}
+                      {linkedFile?.serviceType && <p className="text-slate-500">Layanan: {linkedFile.serviceType}</p>}
+                      {linkedFile?.printSize && <p className="text-slate-500">Ukuran Cetak: {linkedFile.printSize}</p>}
+                      {linkedFile?.notes && (
+                        <p className="text-purple-900 bg-purple-50 p-2 rounded-lg mt-1 border border-purple-200/50">
+                          <strong>Catatan File:</strong> {linkedFile.notes}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Order Notes / Specification Box */}
+              {activeOrderDetail.notes && (
+                <div className="bg-amber-50/80 border border-amber-200 rounded-2xl p-4 space-y-1 text-xs">
+                  <span className="text-amber-900 font-black uppercase tracking-wider block text-[10px] flex items-center gap-1">
+                    <span className="material-symbols-outlined text-sm text-amber-700">description</span>
+                    Catatan / Keterangan Pemesan
+                  </span>
+                  <p className="text-slate-800 font-bold leading-relaxed">{activeOrderDetail.notes}</p>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-semibold">
+                <div className="bg-slate-50 p-3.5 rounded-2xl space-y-3">
+                  <span className="text-slate-400 font-extrabold uppercase tracking-wider block text-[10px] border-b border-slate-200 pb-2">Rincian Produk Cetak</span>
+                  <div className="space-y-3 max-h-40 overflow-y-auto pr-2">
+                    {activeOrderDetail.items.map((item, idx) => (
+                      <div key={idx} className="space-y-1 border-b border-slate-100 last:border-0 pb-2">
+                        <p className="text-slate-900 font-extrabold text-sm">{item.productName || 'Custom TEFA'}</p>
+                        {item.variantName && <p className="text-slate-600">Varian: {item.variantName}</p>}
+                        {item.notes && (
+                          <p className="text-purple-700 bg-purple-50 px-2 py-0.5 rounded text-[11px] font-bold">
+                            Spesifikasi: {item.notes}
+                          </p>
+                        )}
+                        <p className="text-slate-600">
+                          {item.qty} {item.unit || 'pcs'} x {formatRupiah(item.unitPrice || 0)}
+                        </p>
+                        <p className="text-[#5B4BFF] font-black text-sm">Subtotal: {formatRupiah(item.totalPrice || 0)}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="bg-slate-50 p-3.5 rounded-2xl space-y-2">
+                  <span className="text-slate-400 font-extrabold uppercase tracking-wider block text-[10px]">Status Pembayaran</span>
+                  <p className="text-slate-900 font-extrabold text-sm">Total: {formatRupiah(activeOrderDetail.totalAmount)}</p>
+                  <p className="text-slate-700 font-bold">Bayar: {formatRupiah(activeOrderDetail.paidAmount)}</p>
+                  <p className="text-rose-600 font-bold">Sisa Tagihan: {formatRupiah(activeOrderDetail.balanceDue)}</p>
+                  {activeOrderDetail.refundedAmount && activeOrderDetail.refundedAmount > 0 ? (
+                    <p className="text-rose-650 font-bold">Refunded: {formatRupiah(activeOrderDetail.refundedAmount)}</p>
+                  ) : null}
+                  <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800">
+                    {activeOrderDetail.paymentStatus}
+                  </span>
                 </div>
               </div>
 
-              <div className="bg-slate-50 p-3.5 rounded-2xl space-y-1">
-                <span className="text-slate-400 font-extrabold uppercase tracking-wider block text-[10px]">Status Pembayaran</span>
-                <p className="text-slate-900 font-extrabold text-sm">Total: {formatRupiah(activeOrderDetail.totalAmount)}</p>
-                <p className="text-slate-700 font-bold">Bayar: {formatRupiah(activeOrderDetail.paidAmount)}</p>
-                {activeOrderDetail.refundedAmount && activeOrderDetail.refundedAmount > 0 ? (
-                  <p className="text-rose-650 font-bold">Refunded: {formatRupiah(activeOrderDetail.refundedAmount)}</p>
-                ) : null}
-                <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800">
-                  {activeOrderDetail.paymentStatus}
-                </span>
+              {/* Change Status Controls */}
+              <div className="space-y-2">
+                <label className="text-xs font-extrabold text-slate-700">Ubah Status Pesanan:</label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {(['Menunggu Admin', 'Diproses', 'Selesai', 'Diterima'] as OrderStatus[]).map((st) => {
+                    const isActive = activeOrderDetail.status === st;
+                    return (
+                      <button
+                        key={st}
+                        onClick={async () => {
+                          setActiveOrderDetail({ ...activeOrderDetail, status: st });
+                          await onUpdateOrderStatus(activeOrderDetail.id, st);
+                        }}
+                        className={`py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                          isActive
+                            ? 'bg-[#5B4BFF] text-white shadow-md'
+                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                        }`}
+                      >
+                        {st}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
 
-            {/* Change Status Controls */}
-            <div className="space-y-2">
-              <label className="text-xs font-extrabold text-slate-700">Ubah Status Pesanan:</label>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {(['Menunggu Admin', 'Diproses', 'Selesai', 'Diterima'] as OrderStatus[]).map((st) => {
-                  const isActive = activeOrderDetail.status === st;
-                  return (
-                    <button
-                      key={st}
-                      onClick={async () => {
-                        setActiveOrderDetail({ ...activeOrderDetail, status: st });
-                        await onUpdateOrderStatus(activeOrderDetail.id, st);
-                      }}
-                      className={`py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                        isActive
-                          ? 'bg-[#5B4BFF] text-white shadow-md'
-                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                      }`}
-                    >
-                      {st}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+              <div className="flex gap-2 flex-wrap pt-2">
 
-
-            <div className="flex gap-2 flex-wrap">
-              {activeOrderDetail.status === 'Menunggu Konfirmasi' && onConfirmOrderPrice && (
-                <button
-                  onClick={() => {
-                    setConfirmPriceItems(JSON.parse(JSON.stringify(activeOrderDetail.items))); // deep clone
-                    setShowConfirmPriceModal(true);
-                  }}
-                  className="py-2 px-4 rounded-xl text-xs font-bold bg-[#5B4BFF] text-white shadow-md hover:bg-purple-700 transition-colors"
-                >
-                  Konfirmasi Harga
-                </button>
-              )}
-              <button
-                onClick={() => {
-                  setShowRejectModal(true);
-                  setRejectReasonInput('');
-                }}
-                className="py-2 px-4 rounded-xl text-xs font-bold bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors"
-                disabled={activeOrderDetail.status === 'Dibatalkan' || activeOrderDetail.status === 'Ditolak'}
-              >
-                {activeOrderDetail.status === 'Dibatalkan' || activeOrderDetail.status === 'Ditolak' ? 'Pesanan Dibatalkan/Ditolak' : 'Tolak Pesanan'}
-              </button>
-            </div>
-
-            <div className="pt-4 border-t border-slate-100 flex items-center justify-between gap-2 flex-wrap">
-              <div className="flex gap-2">
-                <button
-                  onClick={() => onOpenOrderReceipt(activeOrderDetail)}
-                  className="bg-purple-50 text-[#5B4BFF] hover:bg-purple-100 font-extrabold text-xs px-4 py-2.5 rounded-full flex items-center gap-1.5 cursor-pointer"
-                >
-                  <span className="material-symbols-outlined text-base">receipt_long</span>
-                  <span>Nota</span>
-                </button>
-
-                {onRefundOrder && activeOrderDetail.paidAmount > 0 && activeOrderDetail.paymentStatus !== 'REFUNDED' && (
+                {activeOrderDetail.status === 'Menunggu Konfirmasi' && onConfirmOrderPrice && (
                   <button
                     onClick={() => {
-                      const available = activeOrderDetail.paidAmount - (activeOrderDetail.refundedAmount || 0);
-                      setRefundAmountInput(available);
-                      setShowRefundModal(true);
+                      setConfirmPriceItems(JSON.parse(JSON.stringify(activeOrderDetail.items))); // deep clone
+                      setShowConfirmPriceModal(true);
                     }}
-                    className="bg-red-50 hover:bg-red-100 text-red-650 font-extrabold text-xs px-4 py-2.5 rounded-full flex items-center gap-1.5 cursor-pointer border border-red-200"
+                    className="py-2 px-4 rounded-xl text-xs font-bold bg-[#5B4BFF] text-white shadow-md hover:bg-purple-700 transition-colors cursor-pointer"
                   >
-                    <span className="material-symbols-outlined text-base">payments</span>
-                    <span>Refund</span>
+                    Konfirmasi Harga
                   </button>
                 )}
+                <button
+                  onClick={() => {
+                    setShowRejectModal(true);
+                    setRejectReasonInput('');
+                  }}
+                  className="py-2 px-4 rounded-xl text-xs font-bold bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors cursor-pointer"
+                  disabled={activeOrderDetail.status === 'Dibatalkan' || activeOrderDetail.status === 'Ditolak'}
+                >
+                  {activeOrderDetail.status === 'Dibatalkan' || activeOrderDetail.status === 'Ditolak' ? 'Pesanan Dibatalkan/Ditolak' : 'Tolak Pesanan'}
+                </button>
               </div>
 
-              <button
-                onClick={() => setActiveOrderDetail(null)}
-                className="bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs px-5 py-2.5 rounded-full"
-              >
-                Tutup Detail
-              </button>
-            </div>
-          </motion.div>
-        </div>
-      )}
+              <div className="pt-4 border-t border-slate-100 flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => onOpenOrderReceipt(activeOrderDetail)}
+                    className="bg-purple-50 text-[#5B4BFF] hover:bg-purple-100 font-extrabold text-xs px-4 py-2.5 rounded-full flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-base">receipt_long</span>
+                    <span>Nota</span>
+                  </button>
+
+                  {onRefundOrder && activeOrderDetail.paidAmount > 0 && activeOrderDetail.paymentStatus !== 'REFUNDED' && (
+                    <button
+                      onClick={() => {
+                        const available = activeOrderDetail.paidAmount - (activeOrderDetail.refundedAmount || 0);
+                        setRefundAmountInput(available);
+                        setShowRefundModal(true);
+                      }}
+                      className="bg-red-50 hover:bg-red-100 text-red-650 font-extrabold text-xs px-4 py-2.5 rounded-full flex items-center gap-1.5 cursor-pointer border border-red-200"
+                    >
+                      <span className="material-symbols-outlined text-base">payments</span>
+                      <span>Refund</span>
+                    </button>
+                  )}
+                </div>
+
+                <button
+                  onClick={() => setActiveOrderDetail(null)}
+                  className="bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs px-5 py-2.5 rounded-full cursor-pointer"
+                >
+                  Tutup Detail
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        );
+      })()}
+
 
       {/* Refund Confirmation Modal */}
       {showRefundModal && activeOrderDetail && (

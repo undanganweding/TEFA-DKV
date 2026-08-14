@@ -1769,6 +1769,7 @@ export function App() {
           {currentPage === 'pesanan' && (
             <PesananView
               orders={activeOrders}
+              inboxFiles={activeInboxFiles}
               onUpdateOrderStatus={handleUpdateOrderStatus}
               onRecordPayment={handleRecordPayment}
               onRefundOrder={handleRefundOrder}
@@ -1780,6 +1781,7 @@ export function App() {
               onArchiveOrder={handleArchiveOrder}
             />
           )}
+
 
           {currentPage === 'produk' && (
             <ProdukView
