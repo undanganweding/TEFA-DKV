@@ -221,9 +221,44 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
     productPage * itemsPerPage
   );
 
-  // Filter Orders for Current Student (Matches name or phone or shows all active student orders)
-  const myOrders = orders.filter((o) => !o.isArchived);
-  const myFiles = inboxFiles.filter((f) => !f.isArchived);
+  // Helper for Downloading / Viewing uploaded files
+  const handleDownloadFile = async (file: InboxFile) => {
+    try {
+      if (file.previewUrl) {
+        window.open(file.previewUrl, '_blank', 'noopener,noreferrer');
+        return;
+      }
+      if (file.folderPath && file.folderPath.startsWith('http')) {
+        window.open(file.folderPath, '_blank', 'noopener,noreferrer');
+        return;
+      }
+      alert(`File "${file.fileName}" tersimpan di server TEFA. Menghubungkan ke server download...`);
+    } catch (err) {
+      console.error('Error downloading file:', err);
+      alert('Gagal membuka file. Silakan hubungi Admin Studio TEFA.');
+    }
+  };
+
+  // Filter Orders & Inbox Files strictly for Current Student (DATA ISOLATION)
+  const currentStudentEmail = currentUser?.email?.toLowerCase().trim();
+  const currentStudentName = currentUser?.name?.toLowerCase().trim();
+  const currentStudentPhone = currentUser?.phone?.replace(/\D/g, '');
+
+  const myOrders = orders.filter((o) => {
+    if (o.isArchived) return false;
+    // Strict match by email, name, phone, or currentUser ID
+    const matchEmail = currentStudentEmail && o.customerEmail && o.customerEmail.toLowerCase().trim() === currentStudentEmail;
+    const matchName = currentStudentName && o.customerName && o.customerName.toLowerCase().trim() === currentStudentName;
+    const matchPhone = currentStudentPhone && o.customerPhone && o.customerPhone.replace(/\D/g, '').includes(currentStudentPhone);
+    return matchEmail || matchName || matchPhone;
+  });
+
+  const myFiles = inboxFiles.filter((f) => {
+    if (f.isArchived) return false;
+    const matchName = currentStudentName && f.customerName && f.customerName.toLowerCase().trim() === currentStudentName;
+    const matchPhone = currentStudentPhone && f.phone && f.phone.replace(/\D/g, '').includes(currentStudentPhone);
+    return matchName || matchPhone;
+  });
 
   const [isSubmittingOrder, setIsSubmittingOrder] = useState<boolean>(false);
   const [submissionStatusMsg, setSubmissionStatusMsg] = useState<string | null>(null);
@@ -360,6 +395,19 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
 
           setSubmittedOrderSuccess({ orderId: finalOrderNo, productName, totalAmount });
           setSelectedProductForDetail(null);
+          // Clean Reset Form Fields
+          setStandaloneNotes('');
+          setStandaloneSizeSpec('');
+          setStandaloneQty(1);
+          setStandaloneFile(null);
+          setDetailNotes('');
+          setDetailQty(1);
+          setDetailFile(null);
+          setCustomTitle('');
+          setCustomDesc('');
+          setCustomSize('');
+          setCustomQty(1);
+          setCustomRefFile(null);
         } else {
           alert('Status pesanan belum dapat diverifikasi. Silakan cek Pesanan Saya sebelum mencoba lagi.');
         }
@@ -1365,11 +1413,11 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
 
                       <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center text-xs font-bold">
                         {[
-                          { label: 'Order Dibuat', icon: 'check_circle', active: true },
-                          { label: 'File Diterima', icon: 'description', active: ord.status !== 'Draft' },
-                          { label: 'Diproses', icon: 'precision_manufacturing', active: ['Diproses'].includes(ord.status) },
-                          { label: 'Selesai', icon: 'verified', active: ['Selesai', 'Diterima'].includes(ord.status) },
-                          { label: 'Selesai', icon: 'task_alt', active: ord.status === 'Selesai' },
+                          { label: 'Order Masuk', icon: 'check_circle', active: true },
+                          { label: 'Verifikasi File', icon: 'description', active: !['Draft'].includes(ord.status) },
+                          { label: 'Produksi', icon: 'precision_manufacturing', active: ['Diproses', 'Produksi', 'Siap Diambil / Dikirim', 'Selesai', 'Diterima'].includes(ord.status) },
+                          { label: 'Siap Diambil', icon: 'verified', active: ['Siap Diambil / Dikirim', 'Selesai', 'Diterima'].includes(ord.status) },
+                          { label: 'Selesai', icon: 'task_alt', active: ['Selesai', 'Diterima'].includes(ord.status) },
                         ].map((step, sIdx) => (
                           <div
                             key={sIdx}
@@ -1440,7 +1488,7 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
 
                     <div className="flex gap-2 pt-1">
                       <button
-                        onClick={() => alert(`Mengunduh file: ${file.fileName}`)}
+                        onClick={() => handleDownloadFile(file)}
                         className="flex-1 bg-[#1A2035] hover:bg-slate-800 text-slate-200 font-bold text-xs py-2 rounded-xl border border-slate-700 flex items-center justify-center gap-1 cursor-pointer"
                       >
                         <span className="material-symbols-outlined text-sm">download</span>

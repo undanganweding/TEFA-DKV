@@ -1557,7 +1557,12 @@ export function App() {
   }
 
   // 3. Role-Based Access Control Protection for Admin Pages
-  if (currentUser?.role === 'Siswa' || currentUser?.role === 'Guest') {
+  const isStudentOrGuestRole =
+    currentUser?.role === 'Siswa' ||
+    currentUser?.role === 'Student' ||
+    currentUser?.role === 'Guest';
+
+  if (isStudentOrGuestRole) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6 text-white font-sans">
         <div className="max-w-md w-full bg-slate-800/90 border border-slate-700/80 p-8 rounded-3xl text-center shadow-2xl space-y-5">

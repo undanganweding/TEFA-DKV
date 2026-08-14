@@ -267,3 +267,87 @@ export async function uploadGuestOrderFile(params: {
 
   return { success: true, storagePath };
 }
+
+// ===== STUDENT ORDER FILE UPLOAD =====
+
+export async function uploadStudentOrderFile(params: {
+  orderId: string;
+  studentId?: string;
+  orderNo: string;
+  customerName: string;
+  customerPhone: string;
+  classGrade: string;
+  major?: string;
+  serviceType: string;
+  printSize?: string;
+  qty?: number;
+  notes?: string;
+  file: File;
+}): Promise<{ success: boolean; storagePath?: string; publicUrl?: string; error?: string }> {
+  const { orderId, studentId, orderNo, customerName, customerPhone, classGrade, major, serviceType, printSize, qty, notes, file } = params;
+
+  const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const uniqueName = `${Date.now()}-${sanitizedName}`;
+  const storagePath = `student-orders/${studentId || 'student'}/${orderId}/${uniqueName}`;
+
+  // Upload to Supabase Storage bucket
+  const { error: uploadError } = await supabase.storage
+    .from('design-files')
+    .upload(storagePath, file, { upsert: true });
+
+  let downloadUrl = '';
+  if (!uploadError) {
+    const { data: signedData } = await supabase.storage.from('design-files').createSignedUrl(storagePath, 60 * 60 * 24 * 7); // 7 days
+    downloadUrl = signedData?.signedUrl || '';
+  }
+
+  const ext = file.name.split('.').pop()?.toUpperCase() || 'FILE';
+  const fileTypeLabel = ['JPG', 'JPEG', 'PNG', 'PDF', 'PSD', 'AI', 'CDR', 'ZIP'].includes(ext)
+    ? (ext === 'JPEG' ? 'JPG' : ext)
+    : 'PDF';
+
+  const fileSizeStr = file.size < 1024 * 1024
+    ? `${(file.size / 1024).toFixed(1)} KB`
+    : `${(file.size / (1024 * 1024)).toFixed(2)} MB`;
+
+  // Create inbox_files record via REST
+  const inboxResult = await restCall('POST', 'inbox_files', {
+    upload_date: new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }),
+    customer_name: customerName,
+    class_grade: classGrade,
+    major: major || null,
+    phone: customerPhone,
+    service_type: serviceType,
+    print_size: printSize || 'Standard',
+    qty: qty || 1,
+    notes: notes || null,
+    file_name: file.name,
+    file_type: fileTypeLabel,
+    file_size: fileSizeStr,
+    preview_url: downloadUrl || null,
+    storage_path: storagePath,
+    folder_path: `/TEFA_FILES/2026/STUDENTS/${orderId}/${file.name}`,
+    status: 'Menunggu Pemeriksaan',
+    linked_order_no: orderNo,
+  });
+
+  if (inboxResult.error) {
+    console.warn('[STUDENT_FILE] Inbox file record notice:', inboxResult.error);
+  }
+
+  return {
+    success: !uploadError,
+    storagePath,
+    publicUrl: downloadUrl,
+    error: uploadError ? uploadError.message : undefined,
+  };
+}
+
+export async function getFileDownloadUrl(file: { previewUrl?: string | null; storagePath?: string | null }): Promise<string | null> {
+  if (file.storagePath) {
+    const signed = await getSignedUrl('design-files', file.storagePath);
+    if (signed) return signed;
+  }
+  return file.previewUrl || null;
+}
+
