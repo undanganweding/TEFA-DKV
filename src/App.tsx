@@ -334,6 +334,46 @@ export function App() {
     loadData();
   }, [isLoggedIn, currentUser, dataLoaded]);
 
+  // Periodic Polling Realtime Sync for Orders & Status Updates (Every 5 seconds)
+  // Ensures realtime status synchronization between Admin and Student Platform
+  useEffect(() => {
+    if (!isLoggedIn || !dataLoaded) return;
+
+    const syncOrdersRealtime = async () => {
+      try {
+        const freshOrders = await orderServiceModule.fetchOrders();
+        if (freshOrders && Array.isArray(freshOrders)) {
+          setOrders((prev) => {
+            // Check if there are real changes to avoid unnecessary re-renders
+            const prevMap = new Map(prev.map(o => [o.id, `${o.status}-${o.paymentStatus}-${o.paidAmount}-${o.totalAmount}-${(o.statusHistory || []).length}`]));
+            const freshMap = new Map(freshOrders.map(o => [o.id, `${o.status}-${o.paymentStatus}-${o.paidAmount}-${o.totalAmount}-${(o.statusHistory || []).length}`]));
+            
+            let hasChanges = freshOrders.length !== prev.length;
+            if (!hasChanges) {
+              for (const [id, hash] of freshMap) {
+                if (prevMap.get(id) !== hash) {
+                  hasChanges = true;
+                  break;
+                }
+              }
+            }
+
+            if (hasChanges) {
+              console.log('[REALTIME_SYNC] Syncing orders updates from database:', freshOrders.length);
+              return freshOrders;
+            }
+            return prev;
+          });
+        }
+      } catch (err) {
+        // Silently skip transient polling errors
+      }
+    };
+
+    const intervalId = setInterval(syncOrdersRealtime, 5000);
+    return () => clearInterval(intervalId);
+  }, [isLoggedIn, dataLoaded]);
+
   // Load products for Guest users (does not require login)
   // RLS allows anonymous SELECT on visible, non-archived products
   const [guestProductsLoaded, setGuestProductsLoaded] = useState<boolean>(false);
@@ -943,18 +983,20 @@ export function App() {
     }
   };
 
-  const handleUpdateOrderStatus = (orderId: string, newStatus: OrderStatus) => {
+  const handleUpdateOrderStatus = async (orderId: string, newStatus: OrderStatus, note?: string) => {
+    // 1. Optimistic Local State Update
+    const now = new Date();
+    const currentOperator = currentUser?.name || settings.activeShiftOperator || 'Admin';
     setOrders((prev) =>
       prev.map((ord) => {
         if (ord.id === orderId) {
-          const now = new Date();
           const updatedHistory = [
             ...(ord.statusHistory || []),
             {
               status: newStatus,
               timestamp: now.toLocaleString('id-ID'),
-              updatedBy: settings.activeShiftOperator,
-              note: `Status diperbarui menjadi ${newStatus}`,
+              updatedBy: currentOperator,
+              note: note || `Status diperbarui menjadi ${newStatus}`,
             },
           ];
 
@@ -989,6 +1031,28 @@ export function App() {
         return ord;
       })
     );
+
+    // 2. Persist update to Supabase Backend Database via RPC
+    try {
+      const res = await orderServiceModule.updateOrderStatus(
+        orderId,
+        newStatus,
+        currentOperator,
+        note
+      );
+
+      if (res.success) {
+        // Fetch fresh orders from database to ensure complete sync
+        const freshOrders = await orderServiceModule.fetchOrders().catch(() => []);
+        if (freshOrders.length > 0) {
+          setOrders(freshOrders);
+        }
+      } else {
+        console.warn('[ORDER_STATUS] RPC update_order_status returned error:', res.error);
+      }
+    } catch (err) {
+      console.error('[ORDER_STATUS] Failed to persist order status to Supabase:', err);
+    }
   };
 
   const handleRecordPayment = async (orderId: string, additionalAmount: number) => {
