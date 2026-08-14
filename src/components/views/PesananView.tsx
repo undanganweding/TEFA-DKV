@@ -456,23 +456,36 @@ export const PesananView: React.FC<PesananViewProps> = ({
               {/* Uploaded File / Artwork Preview Box */}
               {(uploadedFileUrl || itemWithFile?.fileName || linkedFile?.fileName) && (
                 <div className="bg-purple-50/70 border border-purple-200/80 rounded-2xl p-4 space-y-3">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
                     <div className="flex items-center gap-2">
                       <span className="material-symbols-outlined text-purple-600">attachment</span>
                       <span className="text-xs font-black text-purple-950 uppercase tracking-wider">File & Gambar Yang Diupload Siswa</span>
                     </div>
                     {uploadedFileUrl && (
-                      <a
-                        href={uploadedFileUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="bg-[#5B4BFF] hover:bg-purple-700 text-white text-[11px] font-extrabold px-3 py-1.5 rounded-full flex items-center gap-1 transition-all shadow-xs"
-                      >
-                        <span className="material-symbols-outlined text-sm">open_in_new</span>
-                        <span>Buka File Asli</span>
-                      </a>
+                      <div className="flex items-center gap-2">
+                        <a
+                          href={uploadedFileUrl}
+                          download={uploadedFileName}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-extrabold px-3 py-1.5 rounded-full flex items-center gap-1 transition-all shadow-xs cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined text-sm">download</span>
+                          <span>Unduh File</span>
+                        </a>
+                        <a
+                          href={uploadedFileUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="bg-[#5B4BFF] hover:bg-purple-700 text-white text-[11px] font-extrabold px-3 py-1.5 rounded-full flex items-center gap-1 transition-all shadow-xs cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined text-sm">open_in_new</span>
+                          <span>Buka File Asli</span>
+                        </a>
+                      </div>
                     )}
                   </div>
+
 
                   <div className="flex flex-col sm:flex-row gap-4 items-start bg-white p-3 rounded-xl border border-purple-100">
                     {uploadedFileUrl && (uploadedFileUrl.startsWith('http') || uploadedFileUrl.startsWith('data:image')) ? (

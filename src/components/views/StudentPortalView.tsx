@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { InboxFile, Product, ProductionOrder, UserProfile } from '../../types';
 import * as profileService from '../../services/profileService';
+import * as fileService from '../../services/fileService';
 import { initialProducts } from '../../data/mockData';
 import logoSmkNu from '../../assets/logo_smknu.png';
+
 
 interface StudentPortalViewProps {
   products: Product[];
@@ -264,18 +266,18 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
   const [submissionStatusMsg, setSubmissionStatusMsg] = useState<string | null>(null);
 
   // Order Submission Helper
-  const handleCreateOrderSubmit = (
+  const handleCreateOrderSubmit = async (
     productName: string,
     unitPrice: number,
     qty: number,
     sizeSpec: string,
     material: string,
     notes: string,
-    fileData?: { name: string; size: string; type: any; previewUrl?: string } | null
+    fileData?: { name: string; size: string; type: any; previewUrl?: string; rawFile?: File } | null
   ) => {
     if (isSubmittingOrder) return; // Prevent double-click & React StrictMode duplicate submissions
     setIsSubmittingOrder(true);
-    setSubmissionStatusMsg('Memverifikasi pesanan...');
+    setSubmissionStatusMsg('Mengunggah file & memverifikasi pesanan...');
 
     const clientDedupeId = `IDEMP-${currentUser?.id || 'STUDENT'}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
     const randomNum = Math.floor(10000 + Math.random() * 90000);
@@ -284,11 +286,31 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
     const formattedDate = `${now.getDate().toString().padStart(2, '0')} Agu 2026 ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
     const totalAmount = unitPrice * qty;
 
-    const fileToUpload = fileData || {
-      name: `file_desain_${productName.toLowerCase().replace(/\s+/g, '_')}.jpg`,
-      size: '4.2 MB',
-      type: 'JPG' as const,
-      previewUrl: 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=600&q=80',
+    let finalFileUrl: string | undefined = fileData?.previewUrl;
+    let finalStoragePath: string | undefined = undefined;
+
+    // Perform actual real upload to Supabase Storage if raw file is present
+    if (fileData?.rawFile) {
+      try {
+        const fileExt = fileData.rawFile.name.split('.').pop() || 'jpg';
+        const sanitizedName = fileData.rawFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+        const uploadPath = `students/${currentUser?.id || 'public'}/${orderId}/${Date.now()}-${sanitizedName}`;
+        
+        const uploadRes = await fileService.uploadFile('design-files', uploadPath, fileData.rawFile);
+        if (uploadRes?.url) {
+          finalFileUrl = uploadRes.url;
+          finalStoragePath = uploadRes.path;
+        }
+      } catch (uploadErr) {
+        console.warn('Real file upload skipped or failed, using local preview:', uploadErr);
+      }
+    }
+
+    const fileToUpload = {
+      name: fileData?.name || `file_desain_${productName.toLowerCase().replace(/\s+/g, '_')}.jpg`,
+      size: fileData?.size || '4.2 MB',
+      type: fileData?.type || ('JPG' as const),
+      previewUrl: finalFileUrl || fileData?.previewUrl || 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=600&q=80',
     };
 
     // 1. Create File Inbox Item
@@ -307,10 +329,12 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
       fileType: fileToUpload.type,
       fileSize: fileToUpload.size,
       previewUrl: fileToUpload.previewUrl,
-      folderPath: `/TEFA_FILES/2026/STUDENTS/${orderId}/${fileToUpload.name}`,
+      storagePath: finalStoragePath,
+      folderPath: finalStoragePath || `/TEFA_FILES/2026/STUDENTS/${orderId}/${fileToUpload.name}`,
       status: 'Menunggu Pemeriksaan',
       linkedOrderNo: orderId,
     };
+
 
     // 2. Create Production Order for Admin
     if (onAddOrder) {
@@ -1177,11 +1201,13 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
                               size: `${(f.size / (1024 * 1024)).toFixed(1)} MB`,
                               type: f.name.endsWith('.png') ? 'PNG' : f.name.endsWith('.pdf') ? 'PDF' : 'JPG',
                               previewUrl: preview,
+                              rawFile: f,
                             });
                           }
                         }}
                         className="hidden"
                       />
+
 
 
                       <label
@@ -1972,11 +1998,13 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
                         size: `${(f.size / (1024 * 1024)).toFixed(1)} MB`,
                         type: f.name.endsWith('.png') ? 'PNG' : f.name.endsWith('.pdf') ? 'PDF' : 'JPG',
                         previewUrl: preview,
+                        rawFile: f,
                       });
                     }
                   }}
-                  className="text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-extrabold file:bg-[#5B4BFF] file:text-white"
+                  className="text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-extrabold file:bg-[#5B4BFF] file:text-white cursor-pointer"
                 />
+
 
               </div>
 
