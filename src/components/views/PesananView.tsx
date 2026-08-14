@@ -424,8 +424,15 @@ export const PesananView: React.FC<PesananViewProps> = ({
       {activeOrderDetail && (() => {
         const linkedFile = inboxFiles.find((f: any) => f.linkedOrderNo === activeOrderDetail.orderNo || f.linked_order_no === activeOrderDetail.orderNo);
         const itemWithFile = activeOrderDetail.items.find(i => i.fileUrl || i.fileName);
-        const uploadedFileUrl = itemWithFile?.fileUrl || linkedFile?.previewUrl || linkedFile?.folderPath || activeOrderDetail.designImage;
+        let uploadedFileUrl = itemWithFile?.fileUrl || linkedFile?.previewUrl || linkedFile?.storagePath || linkedFile?.folderPath || activeOrderDetail.designImage;
         const uploadedFileName = itemWithFile?.fileName || linkedFile?.fileName || 'File Desain Siswa';
+
+        // Ensure file URL points to valid Supabase storage URL if it is a storage path
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        if (uploadedFileUrl && !uploadedFileUrl.startsWith('http') && !uploadedFileUrl.startsWith('data:') && !uploadedFileUrl.startsWith('blob:')) {
+          const cleanPath = uploadedFileUrl.startsWith('/') ? uploadedFileUrl.slice(1) : uploadedFileUrl;
+          uploadedFileUrl = `${supabaseUrl}/storage/v1/object/public/design-files/${cleanPath}`;
+        }
 
         return (
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto">
@@ -461,30 +468,41 @@ export const PesananView: React.FC<PesananViewProps> = ({
                       <span className="material-symbols-outlined text-purple-600">attachment</span>
                       <span className="text-xs font-black text-purple-950 uppercase tracking-wider">File & Gambar Yang Diupload Siswa</span>
                     </div>
-                    {uploadedFileUrl && (
-                      <div className="flex items-center gap-2">
-                        <a
-                          href={uploadedFileUrl}
-                          download={uploadedFileName}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                    <div className="flex items-center gap-2">
+                      {uploadedFileUrl ? (
+                        <>
+                          <a
+                            href={uploadedFileUrl}
+                            download={uploadedFileName}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-extrabold px-3 py-1.5 rounded-full flex items-center gap-1 transition-all shadow-xs cursor-pointer"
+                          >
+                            <span className="material-symbols-outlined text-sm">download</span>
+                            <span>Unduh File</span>
+                          </a>
+                          <a
+                            href={uploadedFileUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="bg-[#5B4BFF] hover:bg-purple-700 text-white text-[11px] font-extrabold px-3 py-1.5 rounded-full flex items-center gap-1 transition-all shadow-xs cursor-pointer"
+                          >
+                            <span className="material-symbols-outlined text-sm">open_in_new</span>
+                            <span>Buka File Asli</span>
+                          </a>
+                        </>
+                      ) : (
+                        <button
+                          onClick={() => alert(`File "${uploadedFileName}" tersimpan di server. File path: ${linkedFile?.folderPath || 'inbox_files'}`)}
                           className="bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-extrabold px-3 py-1.5 rounded-full flex items-center gap-1 transition-all shadow-xs cursor-pointer"
                         >
                           <span className="material-symbols-outlined text-sm">download</span>
                           <span>Unduh File</span>
-                        </a>
-                        <a
-                          href={uploadedFileUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="bg-[#5B4BFF] hover:bg-purple-700 text-white text-[11px] font-extrabold px-3 py-1.5 rounded-full flex items-center gap-1 transition-all shadow-xs cursor-pointer"
-                        >
-                          <span className="material-symbols-outlined text-sm">open_in_new</span>
-                          <span>Buka File Asli</span>
-                        </a>
-                      </div>
-                    )}
+                        </button>
+                      )}
+                    </div>
                   </div>
+
 
 
                   <div className="flex flex-col sm:flex-row gap-4 items-start bg-white p-3 rounded-xl border border-purple-100">

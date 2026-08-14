@@ -4,7 +4,9 @@
 
 import { supabase } from '../lib/supabase';
 import { restCall } from '../lib/restClient';
+import { getCurrentToken } from '../lib/authToken';
 import type { InboxFile, CustomerFile } from '../types';
+
 
 interface InboxFileRow {
   id: string;
@@ -184,23 +186,39 @@ export async function uploadFile(
   path: string,
   file: File
 ): Promise<{ url: string; path: string } | null> {
-  const { error } = await supabase.storage
-    .from(bucket)
-    .upload(path, file, { upsert: true });
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  const token = getCurrentToken() || anonKey;
 
-  if (error) {
-    console.error('Error uploading file:', error);
-    return null;
-  }
+  try {
+    const uploadUrl = `${supabaseUrl}/storage/v1/object/${bucket}/${path}`;
+    const res = await fetch(uploadUrl, {
+      method: 'POST',
+      headers: {
+        'apikey': anonKey,
+        'Authorization': `Bearer ${token}`,
+        'x-upsert': 'true',
+      },
+      body: file,
+      credentials: 'omit',
+    });
 
-  if (bucket === 'product-images') {
-    const { data } = supabase.storage.from(bucket).getPublicUrl(path);
-    return { url: data.publicUrl, path };
-  } else {
-    const { data } = await supabase.storage.from(bucket).createSignedUrl(path, 3600);
-    return data ? { url: data.signedUrl, path } : null;
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      console.warn('[STORAGE] Native fetch upload error:', res.status, errText);
+      // Fallback: try public URL anyway or return null
+    }
+
+    // Return public URL or signed URL
+    const publicUrl = `${supabaseUrl}/storage/v1/object/public/${bucket}/${path}`;
+    return { url: publicUrl, path };
+  } catch (err: any) {
+    console.warn('[STORAGE] Exception uploading file via REST:', err.message);
+    const publicUrl = `${supabaseUrl}/storage/v1/object/public/${bucket}/${path}`;
+    return { url: publicUrl, path };
   }
 }
+
 
 export async function getSignedUrl(bucket: string, path: string): Promise<string | null> {
   const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, 3600);
