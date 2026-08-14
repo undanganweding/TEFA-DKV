@@ -157,10 +157,9 @@ export function App() {
     const { data: { subscription } } = authService.onAuthStateChange((event, session) => {
       if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
         setRawSession(session || null);
-        // Reset data so it reloads from DB for the new user session
+        // Only trigger data reload without blanking out existing orders immediately
         if (event === 'SIGNED_IN') {
           setDataLoaded(false);
-          setOrders([]);
         }
       } else if (event === 'SIGNED_OUT') {
         setRawSession(null);
@@ -274,7 +273,32 @@ export function App() {
         const prods = await productService.fetchProducts().catch(() => []);
         setProducts(prods);
 
-        const ords = await orderServiceModule.fetchOrders().catch(() => []);
+        let ords = await orderServiceModule.fetchOrders().catch(() => []);
+        
+        // Restore/Merge student orders from local persistence (essential when anon fallback is used)
+        const storageKeys = [
+          'tefa_student_orders_persisted',
+          currentUser?.id ? `tefa_student_orders_${currentUser.id}` : null,
+          'tefa_student_orders_guest'
+        ].filter(Boolean) as string[];
+
+        for (const k of storageKeys) {
+          const raw = localStorage.getItem(k);
+          if (raw) {
+            try {
+              const parsed = JSON.parse(raw) as ProductionOrder[];
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                const existingIds = new Set(ords.map(o => o.id));
+                const existingNos = new Set(ords.map(o => o.orderNo));
+                const toMerge = parsed.filter(lo => !existingIds.has(lo.id) && !existingNos.has(lo.orderNo));
+                ords = [...ords, ...toMerge];
+              }
+            } catch (e) {
+              console.warn('Error reading saved student orders from ' + k, e);
+            }
+          }
+        }
+
         console.log('[DATA] Orders loaded:', ords.length);
         setOrders(ords);
 
@@ -823,6 +847,23 @@ export function App() {
           orderNo: res.orderNo || newOrder.orderNo,
         };
         setOrders((prev) => [persistedOrder, ...prev]);
+
+        // Save order to student local persistence for bulletproof reload retention
+        try {
+          const keysToSave = [
+            'tefa_student_orders_persisted',
+            currentUser?.id ? `tefa_student_orders_${currentUser.id}` : null
+          ].filter(Boolean) as string[];
+
+          for (const key of keysToSave) {
+            const existingSaved = localStorage.getItem(key);
+            const currentList: ProductionOrder[] = existingSaved ? JSON.parse(existingSaved) : [];
+            const updatedList = [persistedOrder, ...currentList.filter(o => o.id !== persistedOrder.id && o.orderNo !== persistedOrder.orderNo)];
+            localStorage.setItem(key, JSON.stringify(updatedList));
+          }
+        } catch (storageErr) {
+          console.warn('Could not save to local student order backup:', storageErr);
+        }
 
         // Auto add transaction if paid
         if (newOrder.paidAmount > 0) {
