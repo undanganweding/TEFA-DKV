@@ -97,6 +97,14 @@ export async function signIn(email: string, password: string): Promise<{ success
       return { success: false, message: 'Profil tidak ditemukan. Registrasi mungkin tidak selesai sempurna. Hubungi admin.' };
     }
 
+    // Auto-heal bloated legacy metadata on login
+    const meta = data.user.user_metadata || {};
+    if (meta.avatar_path && (meta.avatar_path.startsWith('data:') || meta.avatar_path.length > 500)) {
+      supabase.auth.updateUser({
+        data: { avatar_path: null }
+      }).catch((e) => console.warn('Could not auto-heal bloated user_metadata:', e));
+    }
+
     // Check account status
     if (userProfile.statusAkun === 'Pending') {
       await supabase.auth.signOut();

@@ -341,8 +341,39 @@ export function App() {
 
     const syncOrdersRealtime = async () => {
       try {
-        const freshOrders = await orderServiceModule.fetchOrders();
+        const isStudent = currentUser?.role === 'Siswa';
+        let freshOrders = await orderServiceModule.fetchOrders();
+        
+        // Safety guard: If student order fetch returns empty (due to RLS or token fallback),
+        // do not wipe out valid orders already in memory!
+        if (isStudent && (!freshOrders || freshOrders.length === 0)) {
+          return;
+        }
+
         if (freshOrders && Array.isArray(freshOrders)) {
+          // If student has existing local backup orders, merge any missing ones
+          if (isStudent) {
+            const storageKeys = [
+              'tefa_student_orders_persisted',
+              currentUser?.id ? `tefa_student_orders_${currentUser.id}` : null,
+            ].filter(Boolean) as string[];
+
+            for (const k of storageKeys) {
+              const raw = localStorage.getItem(k);
+              if (raw) {
+                try {
+                  const parsed = JSON.parse(raw) as ProductionOrder[];
+                  if (Array.isArray(parsed) && parsed.length > 0) {
+                    const existingIds = new Set(freshOrders.map(o => o.id));
+                    const existingNos = new Set(freshOrders.map(o => o.orderNo));
+                    const toMerge = parsed.filter(lo => !existingIds.has(lo.id) && !existingNos.has(lo.orderNo));
+                    freshOrders = [...freshOrders, ...toMerge];
+                  }
+                } catch { /* ignore parse error */ }
+              }
+            }
+          }
+
           setOrders((prev) => {
             // Check if there are real changes to avoid unnecessary re-renders
             const prevMap = new Map(prev.map(o => [o.id, `${o.status}-${o.paymentStatus}-${o.paidAmount}-${o.totalAmount}-${(o.statusHistory || []).length}`]));
@@ -372,7 +403,7 @@ export function App() {
 
     const intervalId = setInterval(syncOrdersRealtime, 5000);
     return () => clearInterval(intervalId);
-  }, [isLoggedIn, dataLoaded]);
+  }, [isLoggedIn, dataLoaded, currentUser]);
 
   // Load products for Guest users (does not require login)
   // RLS allows anonymous SELECT on visible, non-archived products
