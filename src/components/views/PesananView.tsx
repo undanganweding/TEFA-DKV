@@ -454,24 +454,28 @@ export const PesananView: React.FC<PesananViewProps> = ({
             <div className="space-y-2">
               <label className="text-xs font-extrabold text-slate-700">Ubah Status Pesanan:</label>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {(['Menunggu Admin', 'Diproses', 'Selesai', 'Diterima'] as OrderStatus[]).map((st) => (
-                  <button
-                    key={st}
-                    onClick={() => {
-                      onUpdateOrderStatus(activeOrderDetail.id, st);
-                      setActiveOrderDetail({ ...activeOrderDetail, status: st });
-                    }}
-                    className={`py-2 px-3 rounded-xl text-xs font-bold transition-all ${
-                      activeOrderDetail.status === st
-                        ? 'bg-[#5B4BFF] text-white shadow-md'
-                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                    }`}
-                  >
-                    {st}
-                  </button>
-                ))}
+                {(['Menunggu Admin', 'Diproses', 'Selesai', 'Diterima'] as OrderStatus[]).map((st) => {
+                  const isActive = activeOrderDetail.status === st;
+                  return (
+                    <button
+                      key={st}
+                      onClick={async () => {
+                        setActiveOrderDetail({ ...activeOrderDetail, status: st });
+                        await onUpdateOrderStatus(activeOrderDetail.id, st);
+                      }}
+                      className={`py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        isActive
+                          ? 'bg-[#5B4BFF] text-white shadow-md'
+                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      }`}
+                    >
+                      {st}
+                    </button>
+                  );
+                })}
               </div>
             </div>
+
 
             <div className="flex gap-2 flex-wrap">
               {activeOrderDetail.status === 'Menunggu Konfirmasi' && onConfirmOrderPrice && (

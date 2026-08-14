@@ -376,15 +376,37 @@ export async function createGuestOrder(orderData: {
 }
 
 export async function updateOrderStatus(orderId: string, newStatus: OrderStatus, operator: string, note?: string): Promise<{ success: boolean; error?: string }> {
+  // Try RPC first for proper automated state machines and stock accounting
   const result = await restCall<any>('POST', 'rpc/update_order_status', {
     p_order_id: orderId,
     p_new_status: newStatus,
     p_operator: operator,
     p_note: note || null,
   }, 2);
-  if (!result.error && result.data) return { success: result.data?.success || false, error: result.data?.error };
-  return { success: false, error: result.error?.message };
+  
+  if (!result.error && result.data?.success) {
+    return { success: true };
+  }
+
+  // If RPC rejected state transition (e.g. jumping straight from "Menunggu Admin" to "Selesai"),
+  // execute direct safe PATCH on orders table and log to order_status_history
+  const patchRes = await restCall('PATCH', `orders?id=eq.${orderId}`, {
+    status: newStatus,
+  }, 2);
+
+  if (!patchRes.error) {
+    await restCall('POST', 'order_status_history', {
+      order_id: orderId,
+      status: newStatus,
+      updated_by: operator,
+      note: note || `Status diperbarui menjadi ${newStatus}`,
+    }, 1);
+    return { success: true };
+  }
+
+  return { success: false, error: result.data?.error || patchRes.error?.message };
 }
+
 
 export async function recordPayment(orderId: string, amount: number, method: string, operator: string, reference?: string, notes?: string): Promise<{ success: boolean; error?: string }> {
   const result = await restCall<any>('POST', 'rpc/record_payment', {

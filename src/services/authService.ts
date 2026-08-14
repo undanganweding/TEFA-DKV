@@ -225,27 +225,13 @@ export async function signUp(input: {
 
 export async function signOut(): Promise<void> {
   try {
-    await supabase.auth.signOut();
+    setCurrentToken(null);
+    await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
   } catch {
-    // Fallback: try direct REST logout
-    try {
-      const session = await supabase.auth.getSession();
-      const token = session?.data?.session?.access_token;
-      if (token) {
-        await fetch(`${import.meta.env.VITE_SUPABASE_URL}/auth/v1/logout?scope=global`, {
-          method: 'POST',
-          headers: {
-            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${token}`,
-          },
-          credentials: 'omit',
-        });
-      }
-    } catch {
-      // Ignore network errors during signout
-    }
+    // Ignore signOut transport errors
   }
 }
+
 
 export async function getSession(): Promise<any> {
   try {
