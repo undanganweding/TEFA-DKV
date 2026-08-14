@@ -188,6 +188,7 @@ export function App() {
         
         if (isMounted) {
           if (profile) {
+            console.log('[AUTH] Profile loaded:', profile.role, profile.defaultPage);
             setCurrentUser(profile);
             setIsLoggedIn(true);
             // If they are on public_upload or login, keep them on public_upload for Student role
@@ -216,6 +217,7 @@ export function App() {
               updated_at: new Date().toISOString(),
             }, rawSession.user.email || '');
 
+            console.warn('[AUTH] Profile fallback used. role:', fallbackProfile.role, 'defaultPage:', fallbackProfile.defaultPage);
             setCurrentUser(fallbackProfile);
             setIsLoggedIn(true);
           }
@@ -1358,6 +1360,7 @@ export function App() {
           setCurrentUser(user);
           setIsLoggedIn(true);
           const target = user.defaultPage || (user.role === 'Siswa' || user.role === 'Guest' ? 'public_upload' : 'dashboard');
+          console.log('[AUTH] Redirecting to:', target, 'role:', user.role);
           setCurrentPage(target);
         }}
         onBackToHome={() => setCurrentPage('public_upload')}
